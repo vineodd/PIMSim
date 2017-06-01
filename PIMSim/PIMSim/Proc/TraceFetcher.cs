@@ -18,8 +18,7 @@ namespace SimplePIM.Procs
         public List<StreamReader> sr = new List<StreamReader>();
         public string path = "";
         public int n;
-
-       
+      
         public TraceFetcher()
         {
 

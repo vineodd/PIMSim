@@ -17,7 +17,7 @@ using SimplePIM.Statics;
 #endregion
 namespace SimplePIM.General
 {
-    public class SimplePIMSimulator
+    public class PIMSimulator
     {
 
         public InsPartition ins_p;
@@ -28,14 +28,14 @@ namespace SimplePIM.General
         public PageConverter pg;
         public Shared_Cache shared_cache;
         public PIM_ pim;
-        public SimplePIMSimulator(string[] args)
+        public PIMSimulator(string[] args)
         {
-            Config.config_file = Environment.CurrentDirectory + @"\Test\4cpu2pu_1function";
+            // Config.config_file = Environment.CurrentDirectory + @"\Test\4cpu2pu_1function";
             initAllconfigs(args);
             mctrl = new Mctrl[2];
             trace = new TraceFetcher();
-       //   trace.SET_trace_path(Config.trace_path);
-            trace.SET_trace_path(Environment.CurrentDirectory+ @"\Test\4cpu2pu_1function");
+            trace.SET_trace_path(Config.trace_path);
+            //    trace.SET_trace_path(Environment.CurrentDirectory+ @"\Test\4cpu2pu_1function");
 
             ins_p = new InsPartition();
             ins_p.attach_tracefetcher(ref trace);
@@ -44,10 +44,10 @@ namespace SimplePIM.General
             if (Config.shared_cache)
                 shared_cache = new Shared_Cache();
             proc = new List<Proc>();
-            mctrl[0]= new Mctrl();
-            for(int i = 0; i < Config.N; i++)
+            mctrl[0] = new Mctrl();
+            for (int i = 0; i < Config.N; i++)
             {
-                Proc to_add = new Proc( ref ins_p, i);
+                Proc to_add = new Proc(ref ins_p, i);
                 if (Config.shared_cache)
                     to_add.attach_shared_cache(ref shared_cache);
                 to_add.attach_memctrl(ref mctrl[0]);
@@ -55,7 +55,7 @@ namespace SimplePIM.General
                 proc.Add(to_add);
             }
             if (Config.pim_config.ram_type == RAM_TYPE.DRAM)
-                mem = new DDRMem(ref proc,  0) as MemObject;
+                mem = new DDRMem(ref proc, 0) as MemObject;
             else
             {
                 if (Config.pim_config.ram_type == RAM_TYPE.HMC)
@@ -68,7 +68,7 @@ namespace SimplePIM.General
             mem.attach_mctrl(ref mctrl[0]);
             //   mem.attach_proc_return(ref proc);
 
-            
+
             mctrl[1] = new Mctrl(true);
             mctrl[1].init_queue();
             mem.attach_mctrl(ref mctrl[1]);
@@ -86,15 +86,15 @@ namespace SimplePIM.General
                 {
                     proc[j].Step();
                 }
-                foreach(var m in mctrl)
+                foreach (var m in mctrl)
                     m.Step();
-                foreach(var mem in MemorySelecter.MemoryInfo)
+                foreach (var mem in MemorySelecter.MemoryInfo)
                 {
                     mem.Item3.Step();
                 }
                 pim.Step();
-               if(i % 100==0)
-                    Console.WriteLine("Cycle: "+ i);
+                if (i % 100 == 0)
+                    Console.WriteLine("Cycle: " + i);
             }
         }
         public void initAllconfigs(string[] args)
@@ -102,7 +102,7 @@ namespace SimplePIM.General
 
             //before parsing args, overallconfig file should be initialed
             parse_args(args);
- 
+
             Config.read_configs();
             Config.initial();
             Config.pim_config.initConfig();
@@ -119,14 +119,14 @@ namespace SimplePIM.General
         }
         public bool parse_args(string[] args)
         {
-           if(args.Count() % 2 != 0 || args.Count() == 0)
+            if (args.Count() % 2 != 0 || args.Count() == 0)
             {
                 DEBUG.Error("Please make sure that all the args are input correctly.");
                 Environment.Exit(2);
             }
             for (int i = 0; i < args.Count(); i += 2)
             {
-               string command = args[i].Replace("-", "");
+                string command = args[i].Replace("-", "");
                 if (command.Equals("trace_path", StringComparison.OrdinalIgnoreCase) || command.Equals("t"))
                 {
                     Config.trace_path = args[i + 1];
@@ -167,9 +167,9 @@ namespace SimplePIM.General
 
         }
 
-        public bool setValue(string key_,object value_)
+        public bool setValue(string key_, object value_)
         {
-           return  Config.SetValue(key_, value_);
+            return Config.SetValue(key_, value_);
         }
 
         public void PrintState()

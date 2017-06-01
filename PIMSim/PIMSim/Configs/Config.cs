@@ -134,7 +134,7 @@ namespace SimplePIM.Configs
             if(pim_config.ram_type == RAM_TYPE.DRAM|| pim_config.ram_type ==RAM_TYPE.PCM)
             {
                 dram_config = new DRAMConfig();
-                Config.dram_config.ReadIniFile(Config.dram_config. systemIniFilename);
+                Config.dram_config.ReadIniFile(Config.config_file + @"\" + Config.dram_config.systemIniFilename);
 
                 // If we have any overrides, set them now before creating all of the memory objects
                 

@@ -358,8 +358,8 @@ namespace SimplePIM.Memory.DDR
             uint lineNumber = 0;
             try
             {
-              //  fs = new FileStream("E:\\VSWorkspaces\\ddrcpp\\ddrcpp\\Debug\\" + filename, FileMode.Open);
-                fs = new FileStream(Environment.CurrentDirectory+@"\" + filename, FileMode.Open);
+
+                fs = new FileStream( filename, FileMode.Open);
                 sr = new StreamReader(fs);
             }
             catch (Exception e)

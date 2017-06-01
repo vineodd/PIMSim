@@ -123,9 +123,7 @@
     <Compile Include="Proc\Stage\Stage_Decode.cs" />
     <Compile Include="Proc\Stage\Stage_LoadData.cs" />
     <Compile Include="Proc\Stage\Stage_Writeback.cs" />
-    <Compile Include="Proc\TLB.cs" />
     <Compile Include="Proc\TraceFetcher.cs" />
-    <Compile Include="Proc\XBar.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SimplePIM.cs" />

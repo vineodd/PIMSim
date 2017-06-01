@@ -24,7 +24,7 @@ namespace SimplePIM
         static void Main(string[] args)
         {
             AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
-            SimplePIMSimulator pimsim = new SimplePIMSimulator(args);
+            PIMSimulator pimsim = new PIMSimulator(args);
             pimsim.run();
             pimsim.PrintState();
             Console.ReadKey();
