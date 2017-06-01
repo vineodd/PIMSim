@@ -1,0 +1,148 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{AF99DF9B-D7D0-4497-A110-2382D7777271}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>PIMSim</RootNamespace>
+    <AssemblyName>PIMSim</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Configs\Config.cs" />
+    <Compile Include="Configs\HMCConfig.cs" />
+    <Compile Include="Configs\PIMConfigs.cs" />
+    <Compile Include="General\Counter.cs" />
+    <Compile Include="General\InputType\Function.cs" />
+    <Compile Include="General\InputType\InputType.cs" />
+    <Compile Include="General\InputType\Instruction.cs" />
+    <Compile Include="General\InputType\InstructionBlock.cs" />
+    <Compile Include="General\ProcCallBack.cs" />
+    <Compile Include="General\ProcRequest.cs" />
+    <Compile Include="General\Register.cs" />
+    <Compile Include="General\Request.cs" />
+    <Compile Include="General\SimulatorObj.cs" />
+    <Compile Include="General\Stage.cs" />
+    <Compile Include="Memory\DDR\Bank.cs" />
+    <Compile Include="Memory\DDR\BankState.cs" />
+    <Compile Include="Memory\DDR\BusPacket.cs" />
+    <Compile Include="Memory\DDR\Callback.cs" />
+    <Compile Include="Memory\DDR\ClockDomain.cs" />
+    <Compile Include="Memory\DDR\CommandQueue.cs" />
+    <Compile Include="Memory\DDR\DDRMem.cs" />
+    <Compile Include="Memory\DDR\Deque.cs" />
+    <Compile Include="Memory\DDR\DRAMConfig.cs" />
+    <Compile Include="Memory\DDR\GenericDeque.cs" />
+    <Compile Include="Memory\DDR\GenericDeque.Enumerator.cs" />
+    <Compile Include="Memory\DDR\GenericDeque.Node.cs" />
+    <Compile Include="Memory\DDR\GenericDeque.Synchronized.cs" />
+    <Compile Include="Memory\DDR\MemoryController.cs" />
+    <Compile Include="Memory\DDR\MemorySystem.cs" />
+    <Compile Include="Memory\DDR\MultiChannelMemorySystem.cs" />
+    <Compile Include="Memory\DDR\Rank.cs" />
+    <Compile Include="Memory\DDR\SimulatorObject.cs" />
+    <Compile Include="Memory\DDR\Transaction.cs" />
+    <Compile Include="Memory\HMC\CMC\CMC.cs" />
+    <Compile Include="Memory\HMC\HMC4LinkTec.cs" />
+    <Compile Include="Memory\HMC\HMCMem.cs" />
+    <Compile Include="Memory\HMC\HMCSim.cs" />
+    <Compile Include="Memory\HMC\HMC_Bank.cs" />
+    <Compile Include="Memory\HMC\HMC_Cmc.cs" />
+    <Compile Include="Memory\HMC\HMC_DEV.cs" />
+    <Compile Include="Memory\HMC\HMC_DRAM.cs" />
+    <Compile Include="Memory\HMC\HMC_Link.cs" />
+    <Compile Include="Memory\HMC\HMC_Power.cs" />
+    <Compile Include="Memory\HMC\HMC_Process_packcts.cs" />
+    <Compile Include="Memory\HMC\HMC_Quad.cs" />
+    <Compile Include="Memory\HMC\HMC_Queue.cs" />
+    <Compile Include="Memory\HMC\HMC_Reg.cs" />
+    <Compile Include="Memory\HMC\HMC_split.cs" />
+    <Compile Include="Memory\HMC\HMC_Token.cs" />
+    <Compile Include="Memory\HMC\HMC_Vault.cs" />
+    <Compile Include="Memory\HMC\HMC_Xbar.cs" />
+    <Compile Include="Memory\HMC\Macros.cs" />
+    <Compile Include="Memory\MemObject.cs" />
+    <Compile Include="Memory\MemRequest.cs" />
+    <Compile Include="PIM\AddressMapping.cs" />
+    <Compile Include="PIM\Coherence.cs" />
+    <Compile Include="PIM\ComputationalUnit.cs" />
+    <Compile Include="PIM\Consistency.cs" />
+    <Compile Include="PIM\CU_Pre_Set\Adder.cs" />
+    <Compile Include="PIM\CU_Pre_Set\PIMInterface.cs" />
+    <Compile Include="PIM\PIM.cs" />
+    <Compile Include="PIM\PIMProc.cs" />
+    <Compile Include="PIM\PIM_Stage\PIMStage_ADD.cs" />
+    <Compile Include="PIM\PIM_Stage\PIMStage_Store.cs" />
+    <Compile Include="PIM\PIM_Stage\PIM_Load.cs" />
+    <Compile Include="PIM\SpinLock.cs" />
+    <Compile Include="Proc\ALU.cs" />
+    <Compile Include="Proc\Cache.cs" />
+    <Compile Include="Proc\CachePolicy\CacheReplacePolicy.cs" />
+    <Compile Include="Proc\CachePolicy\LRU.cs" />
+    <Compile Include="Proc\InsPartition.cs" />
+    <Compile Include="Proc\InstructionWindow.cs" />
+    <Compile Include="Proc\Mctrl.cs" />
+    <Compile Include="Proc\PageConverter.cs" />
+    <Compile Include="Proc\Proc.cs" />
+    <Compile Include="Proc\Shared_Cache.cs" />
+    <Compile Include="Proc\Stage\Stage_Computation.cs" />
+    <Compile Include="Proc\Stage\Stage_Decode.cs" />
+    <Compile Include="Proc\Stage\Stage_LoadData.cs" />
+    <Compile Include="Proc\Stage\Stage_Writeback.cs" />
+    <Compile Include="Proc\TLB.cs" />
+    <Compile Include="Proc\TraceFetcher.cs" />
+    <Compile Include="Proc\XBar.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SimplePIM.cs" />
+    <Compile Include="Statics\DEBUG.cs" />
+    <Compile Include="Statics\Error.cs" />
+    <Compile Include="Tools\TextTraceParser.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
