@@ -5,13 +5,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.Configs;
+using SimplePIM.Statics;
 #endregion
 
 namespace SimplePIM.PIM
 {
     /// <summary>
     /// Spin Lock Defination
-    /// Spin Lock is an overall data corherence method. By looking at spinlock table,Processors and PIM units can get informations that which block are used.
+    /// Spin Lock is an overall data coherence method. By looking at spinlock table,Processors and PIM units can get informations that which block are used.
     /// </summary>
     public class SpinLock
     {
@@ -41,6 +42,14 @@ namespace SimplePIM.PIM
         /// </summary>
         public List<string> lock_table;
 
+        //for statics
+        private UInt64 total_set_lock = 0;
+        private UInt64 total_get_lock = 0;
+        private UInt64 total_unlock = 0;
+        private UInt64 total_stalled = 0;
+        private UInt64 total_unstalled = 0;
+        public UInt64 total_request => total_get_lock + total_set_lock + total_unlock;
+
         public SpinLock()
         {
             page_index = MemorySelecter.get_RAM_size() / size;
@@ -63,6 +72,7 @@ namespace SimplePIM.PIM
             int index = (int)(index_all / 64);
             int mod = (int)(index_all % 64);
             setbit(mod, index, true);
+            total_set_lock++;
         }
         /// <summary>
         /// Get current lock state of an address.
@@ -71,13 +81,18 @@ namespace SimplePIM.PIM
         /// <returns></returns>
         public bool get_lock_state(UInt64 addr)
         {
+            total_get_lock++;
             var addr_ = MemorySelecter.resize(addr);
             var index = addr_ / size;
             Int32 i = (Int32)(index / 64);
             int j = (int)(index % 64);
             //  return lock_table[(Int32)(addr / page_index)];
             if ((lock_table[i].ToArray())[j] == TRUE)
+            {
+                total_stalled++;
                 return true;
+            }
+            total_unstalled++;
             return false;
         }
         public void relese_lock(UInt64 addr)
@@ -91,6 +106,7 @@ namespace SimplePIM.PIM
             var item = lock_table[i].ToArray();
             item[j] = FALSE;
             lock_table[i] = new string(item);
+            total_unlock++;
         }
 
         /// <summary>
@@ -107,7 +123,20 @@ namespace SimplePIM.PIM
             lock_table[i] = new string(data);
 
         }
-
+        /// <summary>
+        /// Print current status.
+        /// </summary>
+        public void PrintStatus()
+        {
+            DEBUG.WriteLine("=====================SpinLock Statics=====================");
+            DEBUG.WriteLine();
+            DEBUG.WriteLine("        Total Requests Served : " + total_request);
+            DEBUG.WriteLine("        SetLock Requests      : " + total_set_lock);
+            DEBUG.WriteLine("        GetLock Requests      : " + total_get_lock);
+            DEBUG.WriteLine("        UnLock Requests       : " + total_unlock);
+            DEBUG.WriteLine("      Total stalled/Unstalled : " + total_stalled + "/" + total_unstalled);
+            DEBUG.WriteLine();
+    }
 
     }
 }
