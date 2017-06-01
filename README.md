@@ -6,7 +6,7 @@ PIMSim is a trace-based simulator of PIM architecture, which provides both host-
 2.  Getting started with PIMSim
 
 2.1  Prepare input traces.
-PIMSim is a trace-based simulator. It supports three different types of inputs. The trace filename should be “CPUx.trace”(x indicate the id of CPU). For each trace line, it should provide cycle, instruction, [read/write], [Data], [Address].
+PIMSim is a trace-based simulator. It supports three different types of inputs. The trace filename should be “ CPUx.trace ” (x indicate the id of CPU). For each trace line, it should provide cycle, instruction, [read/write], [Data], [Address].
 
       0|ld t1, SS:[rsp]|R|D=0x0000000000000001 A=0x7fffffffee20
       1|addi rsp, rsp, 0x8
@@ -43,8 +43,9 @@ If you just want to insert a function, you can add this:
 This input indicates an function named 'Add', which has two inputs and one output. The operation duration lasts 2 cycles.
 
 2.2 Prepare Config Files
-PIMSim has two kind of config inputs: PIM settings and RAM settings. For PIM settings, you can attach them by PIMConfig Class in "/Configs/PIMConfigs.cs". For RAM settings, we modified and integrate HMCSim(https://github.com/tactcomplabs/gc64-hmcsim) and DRAMSim2(https://github.com/dramninjasUMD/DRAMSim2) to adapt PIM Simulation. If you need simuate HMC or DRAM (or both of them),  you should provide config files of them. In the future, we'll add more new memory simuations such as NVM, Memristor and so on.
-                      
+PIMSim has two kind of config inputs: PIM settings and RAM settings. For PIM settings, you can attach them by PIMConfig Class in "/Configs/PIMConfigs.cs". For RAM settings, we modified and integrate HMCSim ( https://github.com/tactcomplabs/gc64-hmcsim ) and DRAMSim2 ( https://github.com/dramninjasUMD/DRAMSim2 ) to adapt PIM Simulation. If you need simuate HMC or DRAM (or both of them),  you should provide config files of them. In the future, we'll add more new memory simuations such as NVM, Memristor and so on.
+
+
 2.3 Run PIMSim
 
 You can run PIMSim by providing such paramaters:
