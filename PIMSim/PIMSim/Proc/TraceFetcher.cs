@@ -8,7 +8,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using SimplePIM.Configs;
 using SimplePIM.General;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Procs
 {

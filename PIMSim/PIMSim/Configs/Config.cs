@@ -7,7 +7,7 @@ using System.Reflection;
 using System.IO;
 using SimplePIM.PIM;
 using SimplePIM.Memory.DDR;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Configs
 {

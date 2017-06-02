@@ -7,7 +7,7 @@ using SimplePIM.Configs;
 using SimplePIM.Procs;
 using SimplePIM.General;
 using System.IO;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.PIM
 {

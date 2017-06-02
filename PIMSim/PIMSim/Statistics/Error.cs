@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SimplePIM.Statics
+namespace SimplePIM.Statistics
 {
     public static class Error
     {

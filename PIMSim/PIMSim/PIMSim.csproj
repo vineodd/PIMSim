@@ -128,8 +128,8 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SimplePIM.cs" />
-    <Compile Include="Statics\DEBUG.cs" />
-    <Compile Include="Statics\Error.cs" />
+    <Compile Include="Statistics\DEBUG.cs" />
+    <Compile Include="Statistics\Error.cs" />
     <Compile Include="Tools\TextTraceParser.cs" />
   </ItemGroup>
   <ItemGroup>

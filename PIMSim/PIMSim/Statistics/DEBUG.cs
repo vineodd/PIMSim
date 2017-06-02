@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.IO;
 
 
-namespace SimplePIM.Statics
+namespace SimplePIM.Statistics
 {
     public static class DEBUG
     {

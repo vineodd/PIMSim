@@ -6,7 +6,7 @@ using SimplePIM.Configs;
 using SimplePIM.Memory;
 using SimplePIM.General;
 using SimplePIM.PIM;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 #endregion
 
 namespace SimplePIM.Procs

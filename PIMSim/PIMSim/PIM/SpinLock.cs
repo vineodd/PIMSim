@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.Configs;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 using SimplePIM.Memory;
 #endregion
 
@@ -43,7 +43,7 @@ namespace SimplePIM.PIM
         /// </summary>
         public List<string> lock_table;
 
-        //for statics
+        //for statistics
         private UInt64 total_set_lock = 0;
         private UInt64 total_get_lock = 0;
         private UInt64 total_unlock = 0;
@@ -129,7 +129,7 @@ namespace SimplePIM.PIM
         /// </summary>
         public void PrintStatus()
         {
-            DEBUG.WriteLine("=====================SpinLock Statics=====================");
+            DEBUG.WriteLine("=====================SpinLock Statistics=====================");
             DEBUG.WriteLine();
             DEBUG.WriteLine("        Total Requests Served : " + total_request);
             DEBUG.WriteLine("        SetLock Requests      : " + total_set_lock);

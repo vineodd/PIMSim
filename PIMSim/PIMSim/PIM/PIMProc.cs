@@ -9,7 +9,7 @@ using SimplePIM.Configs;
 using SimplePIM.Memory;
 using SimplePIM.General;
 using SimplePIM.Memory.DDR;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 #endregion
 namespace SimplePIM.PIM
 {

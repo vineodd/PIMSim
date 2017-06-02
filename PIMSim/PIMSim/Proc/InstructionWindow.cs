@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.General;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 using SimplePIM.Configs;
 
 namespace SimplePIM.Procs

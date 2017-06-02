@@ -13,7 +13,7 @@ using SimplePIM.Memory.DDR;
 using System.IO;
 using SimplePIM.PIM;
 using SimplePIM.Memory.HMC;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 #endregion
 namespace SimplePIM.General
 {

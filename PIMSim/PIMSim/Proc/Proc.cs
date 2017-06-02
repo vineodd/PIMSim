@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using SimplePIM.Configs;
 using SimplePIM.General;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 using SimplePIM.PIM;
 #endregion
 

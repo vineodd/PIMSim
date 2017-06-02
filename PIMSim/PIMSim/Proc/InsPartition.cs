@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.Configs;
 using SimplePIM.General;
-using SimplePIM.Statics;
+using SimplePIM.Statistics;
 #endregion
 namespace SimplePIM.Procs
 {
