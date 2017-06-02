@@ -51,6 +51,7 @@
     <Compile Include="General\InputType\InputType.cs" />
     <Compile Include="General\InputType\Instruction.cs" />
     <Compile Include="General\InputType\InstructionBlock.cs" />
+    <Compile Include="General\OverallClock.cs" />
     <Compile Include="General\ProcCallBack.cs" />
     <Compile Include="General\ProcRequest.cs" />
     <Compile Include="General\Register.cs" />
@@ -97,7 +98,7 @@
     <Compile Include="Memory\HMC\Macros.cs" />
     <Compile Include="Memory\MemObject.cs" />
     <Compile Include="Memory\MemRequest.cs" />
-    <Compile Include="PIM\AddressMapping.cs" />
+    <Compile Include="Memory\MemorySelector.cs" />
     <Compile Include="PIM\Coherence.cs" />
     <Compile Include="PIM\ComputationalUnit.cs" />
     <Compile Include="PIM\Consistency.cs" />

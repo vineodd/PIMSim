@@ -91,6 +91,11 @@ namespace SimplePIM.Configs
         public static DRAMConfig dram_config = null;
 
         public static HMCConfig hmc_config = null;
+
+        public static uint operationcode_length = 32;
+        public static uint address_bit = 48;
+        public static double host_clock_factor = 1;
+        public static UInt64 proc_frequent = 4 * (UInt64)Math.Pow(2, 30);
       //  public 
         public static bool SetValue(string name,object value)
         {

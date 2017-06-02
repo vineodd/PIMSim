@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Memory;
 using SimplePIM.Configs;
 
-namespace SimplePIM.PIM
+namespace SimplePIM.Memory
 {
     public static class MemorySelecter
     {

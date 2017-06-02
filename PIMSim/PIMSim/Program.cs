@@ -12,6 +12,11 @@ namespace SimplePIM
 {
     class Program
     {
+        /// <summary>
+        /// When application is going to exit, close file handles.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         static void CurrentDomain_ProcessExit(object sender, EventArgs e)
         {
             if (Config.fs != null)
@@ -26,7 +31,7 @@ namespace SimplePIM
             AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
             PIMSimulator pimsim = new PIMSimulator(args);
             pimsim.run();
-            pimsim.PrintState();
+            pimsim.PrintStatus();
             Console.ReadKey();
 
         }

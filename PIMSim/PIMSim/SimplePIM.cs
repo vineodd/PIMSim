@@ -75,6 +75,7 @@ namespace SimplePIM.General
             pim = new PIM_(ref ins_p, ref mctrl[1]);
             Coherence.init();
             Coherence.linkproc(proc);
+            OverallClock.InitClock();
         }
         public void run()
         {
@@ -84,17 +85,21 @@ namespace SimplePIM.General
                 ins_p.Step();
                 for (int j = 0; j < Config.N; j++)
                 {
-                    proc[j].Step();
+                    if (OverallClock.ifProcStep(j))
+                        proc[j].Step();
                 }
                 foreach (var m in mctrl)
                     m.Step();
                 foreach (var mem in MemorySelecter.MemoryInfo)
                 {
-                    mem.Item3.Step();
+                    if (OverallClock.ifMemoryStep(0))
+                        mem.Item3.Step();
                 }
-                pim.Step();
+                if (OverallClock.ifPIMUnitStep(0))
+                    pim.Step();
                 if (i % 100 == 0)
                     Console.WriteLine("Cycle: " + i);
+                OverallClock.Step();
             }
         }
         public void initAllconfigs(string[] args)
@@ -106,6 +111,7 @@ namespace SimplePIM.General
             Config.read_configs();
             Config.initial();
             Config.pim_config.initConfig();
+            
 
         }
         private void Usage()
@@ -172,10 +178,11 @@ namespace SimplePIM.General
             return Config.SetValue(key_, value_);
         }
 
-        public void PrintState()
+        public void PrintStatus()
         {
             foreach (var item in proc)
-                item.PrintState();
+                item.PrintStatus();
+            ins_p.PrintStatus();   
         }
     }
 }

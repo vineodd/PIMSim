@@ -1,22 +1,25 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SimplePIM.Configs;
+#endregion
 
 namespace SimplePIM.General
 {
     public class InstructionBlock : InputType
     {
-        public int ins_count;
+        public int ins_count=> ins.Count();
         public List<Instruction> ins = new List<Instruction>();
         public UInt64 servetime=NULL;
         public string name = "";
-        public int get_ins_count()
+        public override ulong Length()
         {
-            ins_count = ins.Count();
-            return ins_count;
+            return Config.operationcode_length * (uint)ins_count;
         }
+
         public void add_ins(Instruction ins_)
         {
             if (ins.Count == 0)

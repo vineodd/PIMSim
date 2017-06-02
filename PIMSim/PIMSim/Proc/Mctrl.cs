@@ -1,4 +1,4 @@
-﻿#region using
+﻿#region Reference
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,9 +14,12 @@ namespace SimplePIM.Procs
     /// <summary>
     /// [Memory Controller Defination] 
     /// This class performs as a managment of packets sending.
+    /// The real memory controller is defined at \Memory\.
     /// </summary>
     public class Mctrl : SimulatorObj
     {
+        #region Private Variables
+
         /// <summary>
         /// [Wait Queue] 
         /// Added Processor Requests are placed here.
@@ -28,6 +31,9 @@ namespace SimplePIM.Procs
         /// </summary>
         private List<Queue<MemRequest>> send_queue;
 
+        #endregion
+
+        #region Public Variables
         /// <summary>
         /// PIM Controller bit
         /// <para>When PIM memory controller processed a memory operation,
@@ -36,6 +42,23 @@ namespace SimplePIM.Procs
         /// </para>
         /// </summary>
         public bool PIM = false;
+
+        #endregion
+
+        #region Statistics Variables
+
+        private UInt64 stalled_reqs_by_coherence = 0;
+        private UInt64 total_add = 0;
+        private UInt64 add_failed = 0;
+
+        #endregion 
+
+        #region Public Methods
+
+        /// <summary>
+        /// Constructed Function;
+        /// </summary>
+        /// <param name="pim_">if this MTRL is at memory-side</param>
         public Mctrl(bool pim_ = false)
         {
             PIM = pim_;
@@ -62,16 +85,19 @@ namespace SimplePIM.Procs
             if (wait_queue.Count > Config.crtl_queue_max - 1)
             {
                 if (Config.DEBUG_MTRL)
-                    DEBUG.WriteLine("-- MTRL : Add request to mctrl failed : wait_queue full --[" + req_.type + "] [0x" + req_.actual_addr.ToString("X")+"]");
+                    DEBUG.WriteLine("-- MTRL : Add requests failed : wait_queue full --[" + req_.type + "] [0x" + req_.actual_addr.ToString("X")+"]");
+                add_failed++;
                 return false;
             }
 
             wait_queue.Add(req_);
 
             if (Config.DEBUG_MTRL)
-                DEBUG.WriteLine("--MTRL : Add request to mctrl : [" + req_.type + "] [0x" + req_.actual_addr.ToString("X")+"]");
+                DEBUG.WriteLine("-- MTRL : Add requests : [" + req_.type + "] [0x" + req_.actual_addr.ToString("X")+"]");
+            total_add++;
             return true;
         }
+
         /// <summary>
         /// Memory Object get their requests here.
         /// </summary>
@@ -80,7 +106,6 @@ namespace SimplePIM.Procs
         /// <returns></returns>
         public bool get_req(int pid, ref MemRequest req_)
         {
-            string s = PIM ? "PIM " : "";
             if (send_queue[pid].Count() <= 0)
             {
 
@@ -91,7 +116,7 @@ namespace SimplePIM.Procs
             req_ = send_queue[pid].Peek();
             req_.pim = PIM ? true : false;
             if (Config.DEBUG_MTRL)
-                DEBUG.WriteLine("--" + s + " MTRL -- [" + pid + "] : Pull Requests : [" + req_.memtype + "] [0x" + req_.address.ToString("X") + "]");
+                DEBUG.WriteLine("--" + (PIM ? "PIM " : "") + " MTRL -- [" + pid + "] : Push Requests : [" + req_.memtype + "] [0x" + req_.address.ToString("X") + "]");
             send_queue[pid].Dequeue();
             return true;
         }
@@ -136,7 +161,8 @@ namespace SimplePIM.Procs
                         else
                         {
                             //current data are unavalible cuz it locked.
-                            //stall time++
+                            //stall req++
+                            stalled_reqs_by_coherence++;
                             if (Config.DEBUG_MTRL)
                                 DEBUG.WriteLine("-- ProcRequest Stalled by SpinLock : [" + peek.type + "] [0x" + peek.block_addr.ToString("X") + "] [0x" + peek.actual_addr.ToString("X") + "]");
                         }
@@ -150,11 +176,17 @@ namespace SimplePIM.Procs
                 DEBUG.WriteLine("--------------------------------------------");
             }
         }
+
+        /// <summary>
+        /// Transfer Processor requests into Memory requests
+        /// </summary>
+        /// <param name="pro_req_">processor request to transfer</param>
+        /// <returns></returns>
         public MemRequest transfer(ProcRequest pro_req_)
         {
             MemRequest trans = new MemRequest();
             trans.address = MemorySelecter.resize( pro_req_.actual_addr);
-            trans.data = 0;
+            trans.data = 0;     //actully we need no data here, but we'll take it in the future.
             trans.block_addr = pro_req_.block_addr;
             trans.pid = pro_req_.pid;
             switch (pro_req_.type)
@@ -169,9 +201,19 @@ namespace SimplePIM.Procs
                     trans.memtype = MemReqType.RETURN_DATA;
                     break;
             }
-            
-
             return trans;
         }
+
+        /// <summary>
+        /// Print Statistics Info
+        /// </summary>
+        public void PrintStatus()
+        {
+            DEBUG.WriteLine("    Total reqs added : " + total_add);
+            DEBUG.WriteLine("    Total regs stalled : " + add_failed);
+            DEBUG.WriteLine(" Total Stalled by Coherence :" + stalled_reqs_by_coherence);
+        }
+
+        #endregion
     }
 }

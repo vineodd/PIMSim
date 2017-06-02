@@ -1,15 +1,25 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Reflection;
 using System.Threading.Tasks;
 using SimplePIM.General;
+using SimplePIM.Configs;
+
+#endregion
 
 namespace SimplePIM.General
 {
+    /// <summary>
+    /// Instruction Defination
+    /// </summary>
     public class Instruction :InputType
     {
+        #region Public Varibles
+
         public InstructionType type;
         public UInt64 address = 0;
         public UInt64 data = 0;
@@ -18,7 +28,7 @@ namespace SimplePIM.General
         public string Operand1 = "";
         public string Operand2 = "";
         public string Operand3 = "";
-        public UInt64 pc = 0;
+        public UInt64 pc = 0;   
         public bool is_mem = false;
         public bool can_operated = false;
         public UInt64 block_addr = 0;
@@ -27,13 +37,13 @@ namespace SimplePIM.General
         public bool pim = false;
         public UInt64 served_cycle = 0;
 
+        #endregion
+
         public Instruction(string ins, UInt64 pc_ = 0)
         {
-            Operation = ins.Substring(0, ins.IndexOf(" ") + 1);
+            Operation = ins.Substring(0, ins.IndexOf(" ") + 1).Trim();
             string inst = ins.Substring(ins.IndexOf(" ")).Trim();
             string[] split = inst.Split(',');
-
-
             for (int i = 1; i <= split.Length; i++)
             {
                 FieldInfo fi = this.GetType().GetField("Operand" + i);
@@ -50,6 +60,10 @@ namespace SimplePIM.General
             Operand2 = op2;
             Operand3 = op3;
             is_mem = false;
+        }
+        public override ulong Length()
+        {
+            return  Config.operationcode_length;
         }
 
         public Instruction( UInt64 pc_ = 0)

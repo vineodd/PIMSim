@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.Configs;
 using SimplePIM.Statics;
+using SimplePIM.Memory;
 #endregion
 
 namespace SimplePIM.PIM
@@ -136,7 +137,7 @@ namespace SimplePIM.PIM
             DEBUG.WriteLine("        UnLock Requests       : " + total_unlock);
             DEBUG.WriteLine("      Total stalled/Unstalled : " + total_stalled + "/" + total_unstalled);
             DEBUG.WriteLine();
-    }
+        }
 
     }
 }

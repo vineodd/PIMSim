@@ -11,7 +11,6 @@ namespace SimplePIM.Procs
 {
     public class InstructionWindow
     {
-        
         public int id;
         public int size;
         public List<Instruction> ins;

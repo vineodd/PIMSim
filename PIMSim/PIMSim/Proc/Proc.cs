@@ -14,7 +14,7 @@ namespace SimplePIM.Procs
     /// </summary>
     public class Proc : SimulatorObj
     {
-        #region Private Varibles
+        #region Private Variables
 
         /// <summary>
         /// [Private Level 1 Cache]
@@ -113,7 +113,7 @@ namespace SimplePIM.Procs
 
         #endregion
 
-        #region Statics
+        #region Statistics Variables
 
         //For statics
         private UInt64 total_instruction => cal_ins + read_reqs + write_reqs + nop;
@@ -142,7 +142,7 @@ namespace SimplePIM.Procs
 
         #endregion
 
-        #region Public Varibles
+        #region Public Variables
 
         /// <summary>
         /// [Process id]
@@ -787,7 +787,7 @@ namespace SimplePIM.Procs
         /// <summary>
         /// Print Statics.
         /// </summary>
-        public void PrintState()
+        public void PrintStatus()
         {
             DEBUG.WriteLine("=====================Processor [" + pid + "] Statics=====================");
             DEBUG.WriteLine();
