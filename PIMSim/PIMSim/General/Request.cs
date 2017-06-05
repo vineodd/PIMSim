@@ -9,7 +9,8 @@ namespace SimplePIM.General
 {
     public abstract class Request
     {
-       
-
+        public UInt64 ts_arrival = 0;
+        public UInt64 ts_departure = 0;
+        public UInt64 ts_issue = 0;
     }
 }

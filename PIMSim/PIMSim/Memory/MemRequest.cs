@@ -1,24 +1,34 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.General;
 
+#endregion
+
 namespace SimplePIM.Memory
 {
+    /// <summary>
+    /// Memory Requets Defination
+    /// </summary>
     public class MemRequest : Request
     {
+        #region Public Variables
+
         public UInt64 address;
         public UInt64 data;
         public UInt64 block_addr;
-        public UInt64 ts_arrival = 0;
-        public UInt64 ts_departure = 0;
-        public UInt64 ts_issue = 0;
         public MemReqType memtype;
         public UInt64 cycle = 0;
         public bool pim = false;
         public int pid = 0;
+
+        #endregion
+
+        #region Public Methods
 
         public MemRequest()
         {
@@ -33,8 +43,10 @@ namespace SimplePIM.Memory
             data = data_;
             memtype = memtype_;
         }
+
+        #endregion
     }
-    
+
     public enum MemReqType
     {
         //basic memory requests

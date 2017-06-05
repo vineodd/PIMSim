@@ -13,11 +13,9 @@ namespace SimplePIM.Memory.DDR
     public class DDRMem : MemObject
     {
         public TransactionReceiver transactionReceiver;
-        public string traceFileName = "k6_aoe_02_short.trc";
         public string pwdString = "";
         public uint megsOfMemory = 2048;
         public bool useClockCycle = true;
-        public Dictionary<string, string> paramOverrides = null;
         public UInt64 numCycles = 1000;
         public MultiChannelMemorySystem memorySystem;
         public Callback_t read_cb;
@@ -31,19 +29,19 @@ namespace SimplePIM.Memory.DDR
         Transaction trans = null;
         bool pendingTrans = false;
         UInt64 addr = 0;
-  
+
         public override void attach_mctrl(ref Mctrl mctrl_)
         {
-            mctrl .Add( mctrl_);
+            mctrl.Add(mctrl_);
         }
-        public DDRMem(ref List<Proc> proc_,int pid_)
+        public DDRMem(ref List<Proc> proc_, int pid_)
         {
             this.pid = pid_;
             mctrl = new List<Mctrl>();
             proc = proc_;
             transactionReceiver = new TransactionReceiver(ref proc);
-           
-            memorySystem = new MultiChannelMemorySystem(Config.dram_config. systemIniFilename, pwdString, traceFileName, megsOfMemory,paramOverrides);
+
+            memorySystem = new MultiChannelMemorySystem(Config.dram_config.systemIniFilename, pwdString, megsOfMemory);
             memorySystem.setCPUClockSpeed(0);
             if (Config.dram_config.RETURN_TRANSACTIONS)
             {
@@ -52,7 +50,7 @@ namespace SimplePIM.Memory.DDR
                 read_cb = new Callback_t(transactionReceiver.read_complete);
                 // new Callback<TransactionReceiver, void, unsigned, uint64_t, uint64_t>(&transactionReceiver, &TransactionReceiver::read_complete);
                 write_cb = new Callback_t(transactionReceiver.write_complete);//
-                                                                              //  new Callback<TransactionReceiver, void, unsigned, uint64_t, uint64_t>(&transactionReceiver, &TransactionReceiver::write_complete);
+                 //  new Callback<TransactionReceiver, void, unsigned, uint64_t, uint64_t>(&transactionReceiver, &TransactionReceiver::write_complete);
                 memorySystem.RegisterCallbacks(read_cb, write_cb, null);
             }
             TransationQueue = new Queue<MemRequest>();
@@ -60,7 +58,6 @@ namespace SimplePIM.Memory.DDR
         }
         public override bool addTransation(MemRequest req_)
         {
-            //if()
             this.TransationQueue.Enqueue(req_);
             return false;
         }
@@ -113,7 +110,7 @@ namespace SimplePIM.Memory.DDR
                     TransationQueue.Dequeue();
                     if (transType != TransactionType.DATA_READ && transType != TransactionType.DATA_WRITE)
                         return;
-                    trans = new Transaction(transType, addr, data,req.block_addr,req.pid,req.pim);
+                    trans = new Transaction(transType, addr, data, req.block_addr, req.pid, req.pim);
                     Console.WriteLine("ADD transaction: addr=" + addr.ToString("X"));
 
 
@@ -165,8 +162,8 @@ namespace SimplePIM.Memory.DDR
             Transaction trans = new Transaction();
             trans.address = addr;
             alignTransactionAddress(ref trans);
-            uint channelNumber =memorySystem. findChannelNumber(trans.address);
-            int ch = 0, ra = 0, ba = 0, ro=0, co = 0;
+            uint channelNumber = memorySystem.findChannelNumber(trans.address);
+            int ch = 0, ra = 0, ba = 0, ro = 0, co = 0;
             memorySystem.channels[(int)channelNumber].memoryController.addressMapping(addr, ref ch, ref ra, ref ba, ref ro, ref co);
             return ba;
         }

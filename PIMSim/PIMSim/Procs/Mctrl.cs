@@ -71,7 +71,7 @@ namespace SimplePIM.Procs
         /// </summary>
         public void init_queue()
         {
-            for (int i = 0; i < MemorySelecter.get_mem_count(); i++)
+            for (int i = 0; i < MemorySelector.get_mem_count; i++)
                 send_queue.Add(new Queue<MemRequest>());
         }
 
@@ -145,7 +145,7 @@ namespace SimplePIM.Procs
                         //    DEBUG.WriteLine("-- Use Coherence : [" + Config.pim_config.Consistency_Model.ToString() + "]");
                         if (!Coherence.spin_lock.get_lock_state(peek.actual_addr))
                         {
-                            send_queue[MemorySelecter.get_id(wait_queue[i].actual_addr)].Enqueue(transfer(wait_queue[i]));
+                            send_queue[MemorySelector.get_id(wait_queue[i].actual_addr)].Enqueue(transfer(wait_queue[i]));
                             wait_queue.RemoveAt(i);
                             i--;
                             if (Config.DEBUG_MTRL)
@@ -185,7 +185,7 @@ namespace SimplePIM.Procs
         public MemRequest transfer(ProcRequest pro_req_)
         {
             MemRequest trans = new MemRequest();
-            trans.address = MemorySelecter.resize( pro_req_.actual_addr);
+            trans.address = MemorySelector.resize( pro_req_.actual_addr);
             trans.data = 0;     //actully we need no data here, but we'll take it in the future.
             trans.block_addr = pro_req_.block_addr;
             trans.pid = pro_req_.pid;

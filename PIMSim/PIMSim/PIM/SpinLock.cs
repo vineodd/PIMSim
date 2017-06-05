@@ -53,7 +53,7 @@ namespace SimplePIM.PIM
 
         public SpinLock()
         {
-            page_index = MemorySelecter.get_RAM_size() / size;
+            page_index = MemorySelector.get_RAM_size() / size;
 
             lock_table = new List<string>();
             //foreach block entry, set lock table false.
@@ -67,7 +67,7 @@ namespace SimplePIM.PIM
         public void setlock(UInt64 addr)
         {
             //resize address in case of address is out of range.
-            var addr_ = MemorySelecter.resize(addr);
+            var addr_ = MemorySelector.resize(addr);
 
             Int64 index_all = (Int64)(addr_ / size);
             int index = (int)(index_all / 64);
@@ -83,7 +83,7 @@ namespace SimplePIM.PIM
         public bool get_lock_state(UInt64 addr)
         {
             total_get_lock++;
-            var addr_ = MemorySelecter.resize(addr);
+            var addr_ = MemorySelector.resize(addr);
             var index = addr_ / size;
             Int32 i = (Int32)(index / 64);
             int j = (int)(index % 64);
@@ -98,7 +98,7 @@ namespace SimplePIM.PIM
         }
         public void relese_lock(UInt64 addr)
         {
-            var addr_ = MemorySelecter.resize(addr);
+            var addr_ = MemorySelector.resize(addr);
             var index = addr_ / size;
             Int32 i = (Int32)(index / 64);
             int j = (int)(index % 64);

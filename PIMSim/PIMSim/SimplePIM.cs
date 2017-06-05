@@ -63,7 +63,7 @@ namespace SimplePIM.General
                     mem = new HMCMem(ref proc) as MemObject;
                 }
             }
-            MemorySelecter.add(32, ref mem);
+            MemorySelector.add(32, ref mem);
             mctrl[0].init_queue();
             mem.attach_mctrl(ref mctrl[0]);
             //   mem.attach_proc_return(ref proc);
@@ -90,7 +90,7 @@ namespace SimplePIM.General
                 }
                 foreach (var m in mctrl)
                     m.Step();
-                foreach (var mem in MemorySelecter.MemoryInfo)
+                foreach (var mem in MemorySelector.MemoryInfo)
                 {
                     if (OverallClock.ifMemoryStep(0))
                         mem.Item3.Step();

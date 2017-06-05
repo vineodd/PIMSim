@@ -1,4 +1,5 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,23 +10,42 @@ using System.Text.RegularExpressions;
 using SimplePIM.Configs;
 using SimplePIM.General;
 using SimplePIM.Statistics;
+#endregion
 
 namespace SimplePIM.Procs
 {
+    /// <summary>
+    /// TraceFetcher Defination
+    /// </summary>
     public class TraceFetcher :SimulatorObj
     {
-        public List<FileStream> trace = new List<FileStream>();
-        public List<StreamReader> sr = new List<StreamReader>();
-        public string path = "";
-        public int n;
-      
-        public TraceFetcher()
-        {
+        #region Private Variables
 
-            path = Config.trace_path;
-            n = Config.N;
-            
-        }
+        /// <summary>
+        /// FileStream of input trace
+        /// </summary>
+        private List<FileStream> trace = new List<FileStream>();
+
+        /// <summary>
+        /// StreamReader of FileStream.
+        /// You can replace it with GZIPReader.
+        /// </summary>
+        private List<StreamReader> sr = new List<StreamReader>();
+
+        /// <summary>
+        /// Trace file folder path.
+        /// </summary>
+        private string path = Config.trace_path;
+
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Set Trace File Folder Path.
+        /// </summary>
+        /// <param name="trace_file">path</param>
+        /// <returns></returns>
         public bool SET_trace_path(string trace_file)
         {
 
@@ -35,9 +55,9 @@ namespace SimplePIM.Procs
                 if (Config.DEBUG_TRACE)
                     DEBUG.WriteLine("-- Trace Fetcher : Set Trace File Path : " + path);
               
-                trace = new List<FileStream>(n);
-                sr = new List<StreamReader>(n);
-                for (int i = 0; i < n; i++)
+                trace = new List<FileStream>(Config.N);
+                sr = new List<StreamReader>(Config.N);
+                for (int i = 0; i < Config.N; i++)
                 {
                     trace.Add(new FileStream(path + @"\CPU" + i + ".trace", FileMode.Open));
                     sr.Add(new StreamReader(trace[i]));
@@ -46,82 +66,81 @@ namespace SimplePIM.Procs
                 return true;
             }
             return false;
-            // Debug.Assert(File.Exists(tracepath));
+
         }
+
+        /// <summary>
+        /// Destructor
+        /// Close File handles.
+        /// </summary>
         ~TraceFetcher()
         {
             foreach(var item in sr) { item.Close(); }
             foreach (var item in trace) { item.Close(); }
-
         }
+
+        /// <summary>
+        /// Parse one trace line into instruction
+        /// </summary>
+        /// <param name="line">string line</param>
+        /// <param name="pid_">trace file id</param>
+        /// <returns></returns>
         public Instruction parse_ins(string line,int pid_)
         {
             try
             {
-                string[] tmp = line.Split('|');
-                Instruction ins = new Instruction(tmp[1]);
-                ins.cycle = UInt64.Parse(tmp[0]);
+                //try one line
+                DEBUG.Assert(line != null);
+
+                string[] split_ins = line.Split('|');
+                Instruction ins = new Instruction(split_ins[1]);
+                ins.cycle = UInt64.Parse(split_ins[0]);
                 ins.pid = pid_;
+
                 if (Config.pim_config.PIM_Fliter == PIM_input_type.All)
                 {
-                    //all ins
+                    //set all insruction to pim
+                    ins.pim = Config.pim_config.PIM_Ins_List.Any(s => s == ins.Operation) ? true : false;
                 }
                 else
                 {
-                    if (ins.Operation.StartsWith("PIM_"))
-                        ins.pim = true;
-                    else
-                        ins.pim = false;
+                    //use PIM_ label to identify PIM operations
+                    ins.pim = (ins.Operation.StartsWith("PIM_")) ? true : false;
                 }
-                if (tmp.Length >= 4)
+                //read address and data.
+                if (split_ins.Length >= 4)
                 {
-                    if (tmp[2] == "R")
+                    ins.type = (split_ins[2] == "R") ? InstructionType.READ : InstructionType.EOF;
+                    ins.type = (split_ins[2] == "W") ? InstructionType.WRITE : InstructionType.EOF;
+
+
+
+                    string[] d_and_a = split_ins[3].Split(' ');
+                    ins.is_mem = false;
+
+                    //read data and address
+                    foreach (string p in d_and_a)
                     {
-                        ins.type = InstructionType.READ;
-                        string[] danda = tmp[3].Split(' ');
-                        ins.is_mem = false;
-                        foreach (string p in danda)
+                        if (p.Contains("A="))
                         {
-                            if (p.Contains("A="))
-                            {
-                                ins.address = UInt64.Parse(p.Replace("A=0x", ""), System.Globalization.NumberStyles.AllowHexSpecifier);
-                                ins.is_mem = true;
-                            }
+                            ins.address = UInt64.Parse(p.Replace("A=0x", ""), System.Globalization.NumberStyles.AllowHexSpecifier);
+                            ins.is_mem = true;
+                        }
+                        else
+                        {
                             if (p.Contains("D="))
                             {
                                 ins.data = UInt64.Parse(p.Replace("D=0x", ""), System.Globalization.NumberStyles.AllowHexSpecifier);
                                 ins.is_mem = true;
                             }
-
-                        }
-
-
-                    }
-                    else {
-                        if (tmp[2] == "W")
-                        {
-                            ins.type = InstructionType.WRITE;
-                            string[] danda = tmp[3].Split(' ');
-                            foreach (string p in danda)
+                            else
                             {
-                                if (p.Contains("A="))
-                                {
-                                    ins.address = UInt64.Parse(p.Replace("A=0x", ""), System.Globalization.NumberStyles.AllowHexSpecifier);
-                                    ins.is_mem = true;
-                                }
-                                if (p.Contains("D="))
-                                {
-                                    ins.data = UInt64.Parse(p.Replace("D=0x", ""), System.Globalization.NumberStyles.AllowHexSpecifier);
-                                    ins.is_mem = true;
-                                }
+                                DEBUG.Error("Error in parsing trace line.");
+                                Environment.Exit(2);
                             }
                         }
-                        else
-                        {
-                            //these shall never happend
-                            ins.type = InstructionType.EOF;
-                        }
                     }
+
                 }
                 else
                 {
@@ -130,13 +149,18 @@ namespace SimplePIM.Procs
                 return ins;
             }
 
-            catch (Exception e)
+            catch 
             {
-                Console.WriteLine("ERROR : faied to parse trace in CPU:" + pid_ + "line=" + line);
+                DEBUG.Error("Faied to parse trace in CPU:" + pid_ + "line=" + line);
                 return null;
-
             }
         }
+
+        /// <summary>
+        /// Get inputs by trace id
+        /// </summary>
+        /// <param name="pid_">trace file id</param>
+        /// <returns>InputType</returns>
         public InputType get_req(int pid_)
         {
             string currentline = "";
@@ -194,7 +218,6 @@ namespace SimplePIM.Procs
                     {
                         if (currentline.Contains("PIM_") && currentline.Contains("FUNCTION_START"))
                         {
-                            int block_size = 0;
                             Function func = new Function();
                             func.cycle = UInt64.Parse(currentline.Substring(0, currentline.IndexOf("|") + 1));
                             while (true)
@@ -233,8 +256,7 @@ namespace SimplePIM.Procs
                                         }
                                         else
                                         {
-                                            ///?????
-                                            ///
+                                            //Wow you get it!
                                             Environment.Exit(1);
 
                                         }
@@ -259,11 +281,14 @@ namespace SimplePIM.Procs
             }
         }
 
+        /// <summary>
+        /// Cycle++
+        /// </summary>
         public override void Step()
         {
             cycle++;
         }
 
-
+        #endregion
     }
 }

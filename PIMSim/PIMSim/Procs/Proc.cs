@@ -633,6 +633,10 @@ namespace SimplePIM.Procs
             }
         }
 
+        /// <summary>
+        /// Flush cacheline
+        /// </summary>
+        /// <param name="addr">Block address</param>
         public void flush(UInt64 addr)
         {
             if (!Config.use_cache)

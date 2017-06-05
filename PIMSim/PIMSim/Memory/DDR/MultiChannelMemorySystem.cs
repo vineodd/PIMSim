@@ -11,12 +11,11 @@ namespace SimplePIM.Memory.DDR
 {
     public class MultiChannelMemorySystem : DRAMSimObject
     {
-
         public List<Proc> proc;
         public void addressMapping(UInt64 physicalAddress, ref int newTransactionChan, ref int newTransactionRank, ref int newTransactionBank, ref int newTransactionRow, ref int newTransactionColumn)
         {
             UInt64 tempA, tempB;
-            int transactionSize = (int)Config.dram_config. TRANSACTION_SIZE;
+            int transactionSize = (int)Config.dram_config.TRANSACTION_SIZE;
             UInt64 transactionMask = (UInt64)transactionSize - 1; //ex: (64 bit bus width) x (8 Burst Length) - 1 = 64 bytes - 1 = 63 = 0x3f mask
             int channelBitWidth = (int)Config.dram_config.NUM_CHANS_LOG;
             int rankBitWidth = (int)Config.dram_config.NUM_RANKS_LOG;
@@ -307,21 +306,20 @@ namespace SimplePIM.Memory.DDR
         {
             return (1UL << (int)dramsim_log2(x)) == x;
         }
-        public MultiChannelMemorySystem(string systemIniFilename_, string pwd_, string traceFilename_, uint megsOfMemory_, Dictionary<string, string> paramOverrides = null)
+        public MultiChannelMemorySystem(string systemIniFilename_, string pwd_, uint megsOfMemory_)
         {
 
- 
+
             megsOfMemory = megsOfMemory_;
 
             systemIniFilename = systemIniFilename_;
-            traceFilename = traceFilename_;
             pwd = pwd_;
 
             //  clockDomainCrosser = (new ClockDomain::Callback<MultiChannelMemorySystem, void>(this, &MultiChannelMemorySystem::actual_update));
             clockDomainCrosser = new ClockDomainCrosser(new ClockUpdateCB(this.actual_update));
 
             currentClockCycle = 0;
-            
+
             if (!isPowerOfTwo(megsOfMemory))
             {
                 Console.WriteLine("ERROR:  Please specify a power of 2 memory size");
@@ -338,12 +336,10 @@ namespace SimplePIM.Memory.DDR
             }
 
             Console.WriteLine("DEBUG: == Loading system model file '" + systemIniFilename + "' == ");
-            if (paramOverrides != null)
-                Config.dram_config.OverrideKeys(ref paramOverrides);
             channels = new List<MemorySystem>();
             for (uint i = 0; i < Config.dram_config.NUM_CHANS; i++)
             {
-                MemorySystem channel = new MemorySystem(i, megsOfMemory / Config.dram_config.NUM_CHANS, ref dramsim_log,ref proc);
+                MemorySystem channel = new MemorySystem(i, megsOfMemory / Config.dram_config.NUM_CHANS, ref dramsim_log, ref proc);
                 channels.Add(channel);
             }
         }
@@ -359,10 +355,10 @@ namespace SimplePIM.Memory.DDR
             uint channelNumber = findChannelNumber(trans.address);
             return channels[(int)channelNumber].addTransaction(trans);
         }
-        public bool addTransaction(bool isWrite, UInt64 addr,UInt64 block_addr_,int pid_,bool pim_)
+        public bool addTransaction(bool isWrite, UInt64 addr, UInt64 block_addr_, int pid_, bool pim_)
         {
             uint channelNumber = findChannelNumber(addr);
-            return channels[(int)channelNumber].addTransaction(isWrite, addr,block_addr_,pid_,pim_);
+            return channels[(int)channelNumber].addTransaction(isWrite, addr, block_addr_, pid_, pim_);
         }
         public bool willAcceptTransaction()
         {
@@ -377,7 +373,7 @@ namespace SimplePIM.Memory.DDR
         }
         public bool willAcceptTransaction(UInt64 addr)
         {
-            int chan=0, rank=0, bank=0, row=0, col=0;
+            int chan = 0, rank = 0, bank = 0, row = 0, col = 0;
             addressMapping(addr, ref chan, ref rank, ref bank, ref row, ref col);
             return channels[(int)chan].WillAcceptTransaction();
         }
@@ -452,26 +448,17 @@ namespace SimplePIM.Memory.DDR
 
             // create a properly named verification output file if need be and open it
             // as the stream 'cmd_verify_out'
-            
+
             // This sets up the vis file output along with the creating the result
             // directory structure if it doesn't exist
-           
-            if (Config.dram_config.LOG_OUTPUT) {
+
+            if (Config.dram_config.LOG_OUTPUT)
+            {
                 string dramsimLogFilename = "dramsim";
                 if (sim_description != null)
                 {
                     dramsimLogFilename += "." + sim_description_str;
                 }
-
-                //dramsimLogFilename = FilenameWithNumberSuffix(dramsimLogFilename, ".log");
-
-                //dramsim_log.open(dramsimLogFilename.c_str(), ios_base::out | ios_base::trunc);
-
-                //if (!dramsim_log)
-                //{
-                //    ERROR("Cannot open " << dramsimLogFilename);
-                //    //	exit(-1); 
-                //}
             }
         }
         public void setCPUClockSpeed(UInt64 cpuClkFreqHz)
@@ -502,7 +489,7 @@ namespace SimplePIM.Memory.DDR
             }
 
             // only chan is used from this set 
-            int channelNumber=0, rank=0, bank=0, row=0, col=0;
+            int channelNumber = 0, rank = 0, bank = 0, row = 0, col = 0;
             addressMapping(addr, ref channelNumber, ref rank, ref bank, ref row, ref col);
             if (channelNumber >= Config.dram_config.NUM_CHANS)
             {
@@ -523,12 +510,12 @@ namespace SimplePIM.Memory.DDR
 
             if (currentClockCycle % Config.dram_config.EPOCH_LENGTH == 0)
             {
-              
+
                 for (int i = 0; i < Config.dram_config.NUM_CHANS; i++)
                 {
                     channels[i].printStats(false);
                 }
-                
+
             }
 
             for (int i = 0; i < Config.dram_config.NUM_CHANS; i++)
@@ -590,6 +577,6 @@ namespace SimplePIM.Memory.DDR
             return currentFilename;
         }
     }
-    
+
 }
 

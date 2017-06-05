@@ -1,15 +1,40 @@
-﻿using System;
+﻿#region Reference 
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+#endregion
+
 namespace SimplePIM.General
 {
+    /// <summary>
+    /// Implement of Counter.
+    /// Non-blocked Semaphore implement.
+    /// </summary>
     public class Counter
     {
+        #region Private Variables
+        /// <summary>
+        /// Current value.
+        /// </summary>
         private int count;
+
+        /// <summary>
+        /// Max counter value.
+        /// </summary>
         private int max;
+
+        #endregion
+
+        #region Public Methods
+        /// <summary>
+        /// Construction Function
+        /// </summary>
+        /// <param name="start_">start value.</param>
+        /// <param name="max_">max value.</param>
         public Counter(int start_,int max_)
         {
             if (start_ < 0)
@@ -19,6 +44,11 @@ namespace SimplePIM.General
             count = start_;
             max = max_;
         }
+
+        /// <summary>
+        /// Waitting Signal.
+        /// </summary>
+        /// <returns></returns>
         public bool WaitOne()
         {
             if (max < 0)
@@ -32,6 +62,11 @@ namespace SimplePIM.General
                 throw new ArgumentException();
             return true;
         }
+
+        /// <summary>
+        /// Reset Counter.
+        /// </summary>
+        /// <param name="start_">initial value.</param>
         public void Reset(int start_)
         {
             if (start_ < 0)
@@ -40,16 +75,30 @@ namespace SimplePIM.General
                 throw new ArgumentException();
             count = start_;
         }
+
+        /// <summary>
+        /// Reset Counter.
+        /// </summary>
         public void Reset()
         {
             count = max;
         }
+
+        /// <summary>
+        /// Free signal.
+        /// </summary>
         public void Release()
         {
             if (count + 1 > max)
                 return;
             max++;
         }
+
+        /// <summary>
+        /// If zero. 
+        /// </summary>
         public bool Zero => count == 0 && max != 0;
+
+        #endregion
     }
 }

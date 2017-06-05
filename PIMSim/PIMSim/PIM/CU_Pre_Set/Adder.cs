@@ -1,4 +1,6 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,6 +8,7 @@ using System.Threading.Tasks;
 using SimplePIM.General;
 using SimplePIM.Procs;
 
+#endregion
 
 namespace SimplePIM.PIM
 {
@@ -13,6 +16,7 @@ namespace SimplePIM.PIM
     /// Simple Implement of ADDer
     /// We divide ADD into 3-stage pipeline: Load-Add-Store
     /// Two Load operations can be parallel executed.
+    /// This function used bypass data method.
     /// </summary>
     public class Adder : ComputationalUnit, PIMInterface
     {
@@ -20,7 +24,6 @@ namespace SimplePIM.PIM
         /// Pipeline
         /// </summary>
         public Stage[] pipeline = new Stage[4];
-
 
         public int latency_load = 1;
         public int latnecy_store = 1;

@@ -1,24 +1,46 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.Configs;
+#endregion
 
 namespace SimplePIM.Procs
 {
+    /// <summary>
+    /// Mapping block addresses and actual addresses 
+    /// </summary>
     public class PageConverter
     {
-        public UInt64 page_size = 0;
+        #region  Private Variables
 
-        public UInt64 stride = 0;
+        private UInt64 page_size = 0;
+        /// <summary>
+        /// Used in random mode.
+        /// </summary>
+        private UInt64 stride = 0;
 
-      
+        /// <summary>
+        /// Page table of existed pages.
+        /// </summary>
+        private Dictionary<UInt64, UInt64> page_table;
 
-        public Dictionary<UInt64, UInt64> page_table;
-        public List<UInt64> frame;
-        public UInt64 curr_fid;
-        
+        /// <summary>
+        /// frame
+        /// </summary>
+        private List<UInt64> frame;
+        private UInt64 curr_fid;
+
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Construction Function
+        /// </summary>
+        /// <param name="random">random mode</param>
         public PageConverter(bool random = false)
         {
 
@@ -32,7 +54,11 @@ namespace SimplePIM.Procs
             page_table = new Dictionary<UInt64, UInt64>();
         }
 
-
+        /// <summary>
+        /// Get corresponding mapping.
+        /// </summary>
+        /// <param name="addr_">actual address. </param>
+        /// <returns>virtual address </returns>
         public UInt64 scan_page(UInt64 addr_)
         {
             UInt64 page = addr_ / page_size;
@@ -40,7 +66,7 @@ namespace SimplePIM.Procs
 
             if (page_table.ContainsKey(page))
             {
-                //TLB HIT
+                // HIT
                 return page_table[page] * page_size + offset;
             }
             UInt64 index;
@@ -55,5 +81,6 @@ namespace SimplePIM.Procs
             return index * page_size + offset;
 
         }
+        #endregion
     }
 }

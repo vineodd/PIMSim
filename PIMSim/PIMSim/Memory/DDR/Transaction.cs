@@ -43,10 +43,6 @@ namespace SimplePIM.Memory.DDR
             timeAdded = t.timeAdded;
             timeReturned = t.timeReturned;
             pid = t.pid;
-//# ifndef NO_STORAGE
-//            ERROR("Data storage is really outdated and these copies happen in an \n improper way, which will eventually cause problems. Please send an \n email to dramninjas [at] gmail [dot] com if you need data storage");
-//            abort();
-//#endif
         }
 
         public BusPacketType getBusPacketType()
@@ -165,10 +161,11 @@ namespace SimplePIM.Memory.DDR
             return i;
         }
 
-       public void read_complete(uint id, UInt64 address,UInt64 block_addr, UInt64 done_cycle,bool pim_)
+        // public void read_complete(uint id, UInt64 address,UInt64 block_addr, UInt64 done_cycle,bool pim_)
+        public void read_complete(uint id, CallBackInfo callback)
         {
 
-            int it = find(pendingReadRequests, address);
+            int it = find(pendingReadRequests, callback.address);
             if (it == pendingReadRequests.Count())
             {
                 Console.WriteLine("ERROR: Cant find a pending read for this one");
@@ -183,24 +180,41 @@ namespace SimplePIM.Memory.DDR
                 }
             }
 
-            UInt64 added_cycle = pendingReadRequests[address].First();
-            UInt64 latency = done_cycle - added_cycle;
+            UInt64 added_cycle = pendingReadRequests[callback.address].First();
+            UInt64 latency = callback.done_cycle - added_cycle;
 
             //   for (int i = 0; i < proc.Count(); i++)
-            proc[(int)id].read_callback(block_addr,address);
+            {
+                if (!callback.pim)
+                {
+                    (callback.getsource as Proc).read_callback(callback.block_addr, callback.address);
+                }
+                else
+                {
+                    if (Config.pim_config.unit_type == PIM_Unit_Type.Processors)
+                    {
+                        (callback.getsource as PIMProc).read_callback(callback.block_addr, callback.address);
+                    }
+                    else
+                    {
+                        (callback.getsource as ComputationalUnit).read_callback(callback.address);
+                    }
+                }
+            }
+            
 
             if (Coherence.consistency == Consistency.SpinLock)
             {
-                if (pim_)
+                if (callback.pim)
                 {
-                    Coherence.spin_lock.relese_lock(address);
+                    Coherence.spin_lock.relese_lock(callback.address);
                 }
             }
 
-            pendingReadRequests[address].RemoveAt(0);
-            if (pendingReadRequests[address].Count() == 0)
-                pendingReadRequests.Remove(address);
-            Console.WriteLine("Read Callback:  0x" + address.ToString("X") + "Block_addr=0x"+block_addr+"  latency=" + latency + "cycles (" + done_cycle + "->" + added_cycle + ")");
+            pendingReadRequests[callback.address].RemoveAt(0);
+            if (pendingReadRequests[callback.address].Count() == 0)
+                pendingReadRequests.Remove(callback.address);
+            Console.WriteLine("Read Callback:  0x" + callback.address.ToString("X") + "Block_addr=0x"+ callback.block_addr +"  latency=" + latency + "cycles (" + callback.done_cycle + "->" + added_cycle + ")");
 
             
         }

@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.PIM;
 using System.IO;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Configs
 {
@@ -25,15 +26,12 @@ namespace SimplePIM.Configs
         public int N = 1;
         public int IPC = 1;
         public bool use_l1_cache = true;
-        public string PIM_Settings => Config.config_file+ @"\PIM_Settings.ini";
+        public string PIM_Settings => Config.config_file + @"\PIM_Settings.ini";
         public List<string> CU_Name = new List<string>();
         public int stage = 0;
         public bool wb = true;
         public List<string> stage_name = new List<string>();
-        public PIMConfigs()
-        {
-
-        }
+        public PIM_Load_Method memory_method = PIM_Load_Method.Bypass;
         public void initConfig()
         {
             FileStream fs = new FileStream(PIM_Settings, FileMode.Open);
@@ -100,23 +98,36 @@ namespace SimplePIM.Configs
                 if ((split[0] == "CU"))
                 {
                     var cus = split[1].Split(',');
-                    foreach(var x in cus)
+                    foreach (var x in cus)
                     {
                         CU_Name.Add(x);
                     }
                     continue;
                 }
-                    if ((split[0] == "Stage_List"))
+                if ((split[0] == "Stage_List"))
                 {
                     string[] split_stage = split[1].Split(',');
-                    foreach(string s in split_stage)
+                    foreach (string s in split_stage)
                     {
                         stage_name.Add(s);
                     }
                     stage = stage_name.Count();
                     continue;
                 }
-                    SetValue(split[0], split[1]);
+                if ((split[0] == "PIM_Load_Method"))
+                {
+                    string split_method = split[1];
+                    if (split_method == "Bypass")
+                    {
+                        memory_method = PIM_Load_Method.Bypass;
+                    }
+                    else
+                    {
+                        memory_method = PIM_Load_Method.Conventional;
+                    }
+                    continue;
+                }
+                SetValue(split[0], split[1]);
 
             }
             sr.Close();
@@ -129,9 +140,9 @@ namespace SimplePIM.Configs
                 var s = typeof(PIMConfigs).GetField(name).GetValue(this);
                 typeof(PIMConfigs).GetField(name).SetValue(this, Convert.ChangeType(value, s.GetType()));
             }
-            catch (Exception e)
+            catch
             {
-                Console.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
+                DEBUG.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
                 return false;
             }
             return true;
@@ -142,5 +153,9 @@ namespace SimplePIM.Configs
         Processors,
         Pipeline
     }
-    
+    public enum PIM_Load_Method
+    {
+        Bypass, //addictional circuits added to suport none-conventional data store and load operations.
+        Conventional //traditional ways.
+    }
 }

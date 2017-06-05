@@ -1,11 +1,18 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+#endregion
+
 namespace SimplePIM.General
 {
+    /// <summary>
+    /// Processor Register Defination.
+    /// </summary>
     public class Register 
     {
         public string name;

@@ -1,4 +1,5 @@
-﻿#region using
+﻿#region Reference
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,30 +11,142 @@ using SimplePIM.Memory;
 using SimplePIM.General;
 using SimplePIM.Memory.DDR;
 using SimplePIM.Statistics;
+
 #endregion
+
 namespace SimplePIM.PIM
 {
+    /// <summary>
+    /// PIMProc
+    /// </summary>
     public class PIMProc : ComputationalUnit
     {
+        #region Private Variables
 
+        /// <summary>
+        /// [Private Level 1 Cache]
+        /// </summary>
         public Cache L1Cache;
-        public List<ProcRequest> MSHR;
-        public List<ProcRequest> writeback_req;
-        public int pid;
 
-        public int IPC;
-        public Mctrl mctrl;
-        public ALU alu;
+        /// <summary>
+        /// [Miss-status Handling Registers] 
+        /// </summary>
+        private List<ProcRequest> MSHR;
+
+        /// <summary>
+        /// [WriteBack Queue]
+        /// To process what LLC evites.
+        /// </summary>
+        private List<ProcRequest> writeback_req;
+
+        /// <summary>
+        /// [Instrcution Partitioner]
+        /// Distrubute all the inputs to hosts or memorys.
+        /// </summary>
+        private InsPartition ins_p;
+
+        /// <summary>
+        /// [Processor IPC]
+        /// </summary>
+        private int IPC;
+
+        /// <summary>
+        /// [Memory Controller]
+        /// </summary>
+        private Mctrl mctrl;
+
+        /// <summary>
+        /// [Arithmetic Logic Unit]
+        /// </summary>
+        private ALU alu;
+
+        /// <summary>
+        /// Try to find data in Shared Cache.
+        /// If true, Shared cache encounters a miss. Try to add to mem_queue.
+        /// </summary>
         private bool mctrl_ok = false;
+
+        /// <summary>
+        /// [Retry to add to MSHR]
+        /// It sets true when MSHR is full.
+        /// </summary>
         private bool mshr_ok = false;
+
+        /// <summary>
+        /// [Add_to_Cache Queue]
+        /// To simulate Cache miss latency
+        /// </summary>
+        private Queue<ProcRequest> cache_req_queue;
+
+
+        /// <summary>
+        /// [Instruction Window]
+        /// OoO to process All ins in this processor.
+        /// </summary>
+        private InstructionWindow ins_w;
+
+
+        /// <summary>
+        /// [Current Request]
+        /// </summary>
+        private ProcRequest curr_req;
+
+        /// <summary>
+        /// [Current Instruction]
+        /// </summary>
+        private Instruction curr_ins;
+
+        /// <summary>
+        /// [Current Block]
+        /// </summary>
         private InstructionBlock current_block = null;
+
+        /// <summary>
+        /// [Current Function]
+        /// </summary>
         private Function current_function = null;
 
-        public Queue<ProcRequest> cache_req_queue;
-        public Queue<ProcRequest> mem_req_queue;
-        private ProcRequest curr_req;
-        private Instruction curr_ins;
-        public PageConverter tlb;
+        /// <summary>
+        /// [Translation Lookaside Buffer]
+        /// </summary>
+        private PageConverter tlb;
+
+        /// <summary>
+        /// [Calculation restriction]
+        /// Marks how many calcution this core can process in one CPU cycle.
+        /// </summary>
+        private Counter cal_restrict;
+
+        /// <summary>
+        /// [Memory Operation Restriction]
+        /// Marks how many memory opeartion can be handed in one CPU cycle.
+        /// </summary>
+        private Counter mem_restrict;
+
+        #endregion
+
+        #region Public Variables
+
+        /// <summary>
+        /// [Process id]
+        /// </summary>
+        public int pid;
+
+        /// <summary>
+        /// [Memory Read Callback]
+        /// Triger by a memory read operation complete 
+        /// </summary>
+        public ReadCallBack read_callback;
+
+        /// <summary>
+        /// [Memory Write Callback]
+        /// Triger by a memory write operation complate
+        /// </summary>
+        public WriteCallBack write_callback;
+
+
+        #endregion
+
         /// <summary>
         /// Try to find data in Shared Cache.
         /// If true, Shared cache encounters a miss. Try to add to mem_queue.
@@ -45,11 +158,7 @@ namespace SimplePIM.PIM
         /// It sets true when MSHR is full.
         /// </summary>
         private bool mshr_retry = false;
-        public InsPartition ins_p;
-        // public TraceFetcher trace;
-        public InstructionWindow ins_w;
-        public Counter cal_restrict;
-        public Counter mem_restrict;
+
         //for statics
         public UInt64 stall_cycle = 0;
 
@@ -79,7 +188,6 @@ namespace SimplePIM.PIM
                     }
                     cache_req_queue.Dequeue();
                     MSHR.RemoveAll(x => x.block_addr == req.block_addr);
-                    //  ins_w.can_operated(req.block_addr);
                     ins_w.set_ready(req.block_addr,this.cycle);
                 }
 
@@ -146,7 +254,7 @@ namespace SimplePIM.PIM
                     curr_req = new ProcRequest();
                 curr_req.parse_ins(curr_ins);
             }
-            if (!curr_ins.is_mem)
+            if (!curr_ins.is_mem)       
             {
                 //current instruction is an alg ins or NOP
                 while (cal_restrict.WaitOne())

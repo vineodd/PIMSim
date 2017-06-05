@@ -1,4 +1,6 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,28 +9,62 @@ using SimplePIM.Configs;
 using SimplePIM.General;
 using SimplePIM.Statistics;
 
+#endregion
+
 namespace SimplePIM.Procs
 {
+    /// <summary>
+    /// Shared Cahce Defination.
+    /// </summary>
     public class Shared_Cache
     {
-        public CacheReplacePolicy replace_policy;
 
-        public CacheEntity[,] cache;
-        public UInt64 cycle;        //artificial unit of time to timestamp blocks for LRU replacement
-        public int max_set;       //total sets
+        #region Static Variables
+        private readonly static UInt64 NULL = UInt64.MaxValue;
+        #endregion
+
+        #region Private Variables
+
+        /// <summary>
+        /// Evict policy
+        /// </summary>
+        private CacheReplacePolicy replace_policy;
+
+        /// <summary>
+        /// Cache Information
+        /// </summary>
+        private CacheEntity[,] cache;
+
+        /// <summary>
+        /// time stamp for evicting
+        /// </summary>
+        private UInt64 cycle;
+
+        /// <summary>
+        /// total sets
+        /// </summary>
+        private int max_set;
+
+
+        private int assoc = 0;
+
+        #endregion
+
+        #region Statistics Variables
 
         public UInt64 hits = 0;      //number of cache hits
         public UInt64 miss = 0;     //number of cache misses
 
-        public bool ifbusy = false;
-        public readonly static UInt64 NULL = UInt64.MaxValue;
-        public int assoc = 0;
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Construction Functions
+        /// </summary>
         public Shared_Cache()
         {
             replace_policy = (new LRU() as CacheReplacePolicy);
-
-
-
 
             cycle = 0;
             int set_size = 0;
@@ -45,6 +81,13 @@ namespace SimplePIM.Procs
                 }
             }
         }
+
+        /// <summary>
+        /// Search for a cacheline in cache.
+        /// </summary>
+        /// <param name="block_addr_">target block address</param>
+        /// <param name="reqt_">related request type</param>
+        /// <returns></returns>
         public bool search_block(UInt64 block_addr_, RequestType reqt_)
         {
             cycle++;
@@ -73,6 +116,12 @@ namespace SimplePIM.Procs
 
             return false;
         }
+
+        /// <summary>
+        /// Remove target cache line.
+        /// </summary>
+        /// <param name="block_addr_">target block address</param>
+        /// <returns></returns>
         public bool remove(UInt64 block_addr_)
         {
             cycle++;
@@ -92,6 +141,14 @@ namespace SimplePIM.Procs
             }
             return false;
         }
+
+        /// <summary>
+        /// Add a cacheline into cache.
+        /// </summary>
+        /// <param name="block_addr_">target block address</param>
+        /// <param name="reqt_">related request type</param>
+        /// <param name="pid_">ID of process</param>
+        /// <returns></returns>
         public UInt64 add(ulong block_addr_, RequestType reqt_, int pid_)
         {
             //make sure that block to add was not in the cache
@@ -138,5 +195,6 @@ namespace SimplePIM.Procs
          
 
         }
+        #endregion
     }
 }

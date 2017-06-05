@@ -1,36 +1,67 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.Procs;
 
+#endregion
+
 namespace SimplePIM.General
 {
+    /// <summary>
+    /// Processor Request Defination.
+    /// </summary>
     public class ProcRequest : Request
     {
+        #region Public Vaiables
+
+        /// <summary>
+        /// id of Processors
+        /// </summary>
         public int pid;
+
+        /// <summary>
+        /// Cycles should be serve.
+        /// </summary>
         public UInt64 cycle;
+
+        /// <summary>
+        /// Type.
+        /// </summary>
         public RequestType type;
 
         //address
         public UInt64 actual_addr;
         public UInt64 block_addr;
 
-        //timestamp
-        public UInt64 ts_arrival=0;
-        public UInt64 ts_departure=0;
-        public UInt64 ts_issue=0;
-        public int latency;
- 
-        public int queueing_latency;
+        /// <summary>
+        /// Ready bit.
+        /// True : This Request is completely processed.
+        /// </summary>
         public bool ready = false;
 
-        //
-
-
+        /// <summary>
+        /// Memory bit.
+        /// True : This request contains memory operations.
+        /// </summary>
         public bool if_mem;
+
+        /// <summary>
+        /// PC.
+        /// </summary>
         public UInt64 pc;
+
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Parse Instructions into ProcRequest
+        /// </summary>
+        /// <param name="ins_">Parsed Instructions</param>
         public void parse_ins(Instruction ins_)
         {
             pid = ins_.pid;
@@ -59,8 +90,16 @@ namespace SimplePIM.General
             block_addr = ins_.block_addr;
             
         }
+
+        #endregion
     }
 
+    /// <summary>
+    /// Requests Type.
+    /// <para>READ,WRITE : Memory operation.</para>
+    /// <para>NOP : no operations.</para>
+    /// <para>CALCULATION : ALU operation.</para>
+    /// </summary>
     public enum RequestType
     {
         READ,

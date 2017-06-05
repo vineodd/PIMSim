@@ -12,21 +12,41 @@ namespace SimplePIM.Procs
 {
     /// <summary>
     /// [Arithmetic Logic Unit]
-    /// This 
     /// </summary>
     public class ALU : SimulatorObj
     {
+        #region Private Variables
 
-        public Queue<KeyValuePair<UInt64, Instruction>> ins;
-        public ALUSim_Type type;
-        public Stage[] pipeline = new Stage[4];
-        public Counter para_load;
-        public Counter add_count;
-        public Counter multi_count;
+        /// <summary>
+        /// Processed instructions queue.
+        /// </summary>
+        private Queue<KeyValuePair<UInt64, Instruction>> ins;
 
-        private StringBuilder sb = new StringBuilder();
-        //for statics 
+        /// <summary>
+        /// Pipeline.
+        /// </summary>
+        private Stage[] pipeline = new Stage[4];
+
+        // calculation limitation.
+        private Counter add_count;
+        private Counter multi_count;
+
+        #endregion
+
+        #region Statistics Variables
+        //for statistics 
         public UInt64 total_loaded = 0;
+        private StringBuilder sb = new StringBuilder();
+        public UInt64 total_stalled = 0;
+
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Feed'n instructions to ALU.
+        /// </summary>
+        /// <param name="ins_"></param>
         public void add_ins(Instruction ins_)
         {
             total_loaded++;
@@ -34,6 +54,10 @@ namespace SimplePIM.Procs
                 DEBUG.WriteLine("-- ALU : Feed Insts : " + ins_.ToString());
             ins.Enqueue(new KeyValuePair<ulong, Instruction>(cycle, ins_));
         }
+
+        /// <summary>
+        /// Construction Function.
+        /// </summary>
         public ALU()
         {
             
@@ -41,7 +65,6 @@ namespace SimplePIM.Procs
 
             add_count = new Counter(Config.add_ability, Config.add_ability);
             multi_count = new Counter(Config.multi_ability, Config.multi_ability);
-            para_load = new Counter(Config.para_load, Config.para_load);
             //init pipeline stage
 
             //********************************************************
@@ -87,6 +110,10 @@ namespace SimplePIM.Procs
                 DEBUG.WriteLine("-- ALU : Initialed.");
 
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
         public override void Step()
         {
             cycle++;
@@ -97,28 +124,36 @@ namespace SimplePIM.Procs
                 DEBUG.WriteLine("---------- ALU Update [Cycle " + cycle + "]------------");
             }
             bool final = false;
+
+            //feed instructions
             while (true)
             {
-                if (ins.Count <= 0)
+                if (ins.Count <= 0) //no inputs
                     break;
-                var to_add = ins.Peek();
+                var processed_instruction = ins.Peek();
                 Instruction added;
-                if (cycle >= to_add.Key)
-                {
 
-                    added = to_add.Value;
+                if (cycle >= processed_instruction.Key)
+                {
+                   
+                    added = processed_instruction.Value;
                 }
                 else
                 {
+                    //input is waitting for processing.
                     continue;
                 }
+
                 if (!pipeline[0].input_ready)
                 {
+                    //feed input to pipeline 0
                     pipeline[0].set_input(added);
                     ins.Dequeue();
                 }
                 break;
             }
+
+            //pipeline stages steps.
             for (int i = pipeline.Count()-1; i >=0; i--)
             {
                 
@@ -129,13 +164,18 @@ namespace SimplePIM.Procs
                 }
                 if (!stall)
                 {
-                    //stall++
+                    final = true;
                 }
                 if (i == pipeline.Count() - 1)
                 {
                     final = stall;
                 }
                 
+            }
+            if (final)
+            {
+                //ALU stalled
+                total_stalled++;
             }
             if (Config.DEBUG_ALU)
             {
@@ -144,20 +184,52 @@ namespace SimplePIM.Procs
             }
 
         }
+
+        #endregion
     }
+
+    /// <summary>
+    /// [ Calculation Table ]
+    /// <para>This table is used to search for required Adders and Multipliers of a specified instruction.</para>
+    /// <para>You may not use this table unless you want to simulate register behaviors.</para>
+    /// </summary>
     public static class Cal_table
     {
-        public static Tuple<string, int, int>[] table = {
+        #region Private Variables
 
-             new Tuple<string, int, int>("subi", 1, 0),
-            new Tuple<string, int, int>("add",1,0)
+        /// <summary>
+        /// Table Entries.
+        /// <para> [1 string] Opeations.</para>
+        /// <para> [2 int] Used Adders.</para>
+        /// <para> [3 int] Used Multipliers.</para>
+        /// </summary>
+        private static Tuple<string, int, int>[] table = {
+
+            new Tuple<string, int, int>("subi", 1, 0),
+            new Tuple<string, int, int>("add", 1, 0)
         };
+
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Scan if operations are recorded in the table.
+        /// </summary>
+        /// <param name="op">target operation.</param>
+        /// <returns></returns>
         public static bool ContainOPs(string op)
         {
             if (table.Any(s => s.Item1 == op))
                 return true;
             return false;
         }
+
+        /// <summary>
+        /// Get one item in the table
+        /// </summary>
+        /// <param name="op">target operation.</param>
+        /// <returns></returns>
         public static Tuple<string, int, int> GetItem(string op)
         {
             if (!table.Any(s => s.Item1 == op))
@@ -167,11 +239,8 @@ namespace SimplePIM.Procs
                 return null;
             return item.First();
         }
+
+        #endregion
     }
-    public enum ALUSim_Type
-    {
-        AVG,
-        TABLE
-    }
-    
+
 }

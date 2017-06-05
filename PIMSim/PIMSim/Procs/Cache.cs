@@ -1,4 +1,6 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,17 +9,49 @@ using SimplePIM.Configs;
 using SimplePIM.General;
 using SimplePIM.Statistics;
 
+#endregion
+
 namespace SimplePIM.Procs
 {
+    /// <summary>
+    /// Cache information class.
+    /// This class records the information of a cache line.
+    /// </summary>
     public class CacheEntity
     {
+        #region Public Variables
+
+        /// <summary>
+        /// Block address
+        /// </summary>
         public UInt64 block_addr;
+
+        /// <summary>
+        /// Served Cycle
+        /// </summary>
         public UInt64 timestamp;
+
+        /// <summary>
+        /// Dirty bit
+        /// </summary>
         public bool dirty;
+
+        /// <summary>
+        /// ID of Processors.
+        /// Used in Shared Cache.
+        /// </summary>
         public int pid;
+
+        /// <summary>
+        /// Valid bit
+        /// </summary>
         public bool valid;
 
-        public CacheEntity(UInt64 block_, UInt64 timestamp_, bool dirty_, int pid_,bool via_)
+        #endregion
+
+        #region Public Methods
+
+        public CacheEntity(UInt64 block_, UInt64 timestamp_, bool dirty_, int pid_, bool via_)
         {
             block_addr = block_;
             timestamp = timestamp_;
@@ -25,50 +59,99 @@ namespace SimplePIM.Procs
             pid = pid_;
             valid = via_;
         }
+
+        #endregion
     }
+
+    /// <summary>
+    /// Cache Defination.
+    /// </summary>
     public class Cache
     {
-        public UInt64 cycle;        //artificial unit of time to timestamp blocks for LRU replacement
-        public int max_set;       //total sets
+        #region Static Varables
 
-        public UInt64 hits = 0;      //number of cache hits
-        public UInt64 miss = 0;     //number of cache misses
+        public readonly static UInt64 NULL = UInt64.MaxValue;
 
+        #endregion
+
+        #region Public Variables
+
+        /// <summary>
+        /// timestamp for LRU
+        /// </summary>
+        public UInt64 cycle;
+
+        /// <summary>
+        ///  total sets
+        /// </summary>
+        public int max_set;
+
+        /// <summary>
+        /// number of cache hits
+        /// </summary>
+        public UInt64 hits = 0;
+
+        /// <summary>
+        /// number of cache misses
+        /// </summary>
+        public UInt64 miss = 0;
+
+        /// <summary>
+        /// Cache entiry information collection.
+        /// </summary>
         public CacheEntity[,] cache;
 
-        public bool ifbusy = false;
-        public readonly static UInt64 NULL = UInt64.MaxValue;
+        /// <summary>
+        /// Cache associativity
+        /// </summary>
         public int assoc = 0;
+
+        /// <summary>
+        /// Cacheline Replcae Policy.
+        /// </summary>
         public CacheReplacePolicy replace_policy;
 
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Construction Function
+        /// </summary>
         public Cache()
         {
             replace_policy = (new LRU() as CacheReplacePolicy);
 
-            
-
             cycle = 0;
             int set_size = 0;
-            
-            
-                assoc = Config.l1cache_assoc;
-                set_size = Config.block_size * assoc;
-                max_set = Config.l1cache_size / set_size;
-                assoc = Config.l1cache_assoc;
-            
+
+
+            assoc = Config.l1cache_assoc;
+            set_size = Config.block_size * assoc;
+            max_set = Config.l1cache_size / set_size;
+            assoc = Config.l1cache_assoc;
+
 
             cache = new CacheEntity[assoc, max_set];
-    
 
-            for(int i = 0; i < assoc; i++)
+
+            for (int i = 0; i < assoc; i++)
             {
-                for(int j = 0; j < max_set; j++)
+                for (int j = 0; j < max_set; j++)
                 {
                     cache[i, j] = new CacheEntity(NULL, 0, false, 0, false);
                 }
             }
 
         }
+
+        /// <summary>
+        /// Add a cacheline into cache.
+        /// </summary>
+        /// <param name="block_addr_">target block address</param>
+        /// <param name="reqt_">related request type</param>
+        /// <param name="pid_">ID of process</param>
+        /// <returns></returns>
         public UInt64 add(ulong block_addr_, RequestType reqt_, int pid_)
         {
             //make sure that block to add was not in the cache
@@ -78,7 +161,7 @@ namespace SimplePIM.Procs
             int index = (int)(block_addr_ % (uint)max_set);
 
             int res_ass = -1;
-            bool res = replace_policy.Calculate_Rep(assoc, index, cache,ref res_ass);
+            bool res = replace_policy.Calculate_Rep(assoc, index, cache, ref res_ass);
             if (Config.DEBUG_CACHE)
                 DEBUG.WriteLine("-- Shared Cache : Load data : [" + reqt_ + "] [0x" + block_addr_.ToString("X") + "]");
             if (!res)
@@ -97,10 +180,10 @@ namespace SimplePIM.Procs
             }
             else
             {
-                
+                //replacement
                 if (cache[res_ass, index].dirty)
-                    res_addr= cache[res_ass, index].block_addr;
-              
+                    res_addr = cache[res_ass, index].block_addr;
+
                 cache[res_ass, index].block_addr = block_addr_;
                 cache[res_ass, index].pid = pid_;
                 cache[res_ass, index].timestamp = cycle;
@@ -114,18 +197,21 @@ namespace SimplePIM.Procs
             }
 
             return res_addr;
-            
-
-
-
         }
-        public bool search_block(UInt64 block_addr_,RequestType reqt_)
+
+        /// <summary>
+        /// Search for a cacheline in cache.
+        /// </summary>
+        /// <param name="block_addr_">target block address</param>
+        /// <param name="reqt_">related request type</param>
+        /// <returns></returns>
+        public bool search_block(UInt64 block_addr_, RequestType reqt_)
         {
             cycle++;
-            
+
             UInt64 index = block_addr_ % (uint)max_set;
 
-            for(int i = 0; i < assoc; i++)
+            for (int i = 0; i < assoc; i++)
             {
                 if (cache[i, index].block_addr == block_addr_)
                 {
@@ -147,6 +233,11 @@ namespace SimplePIM.Procs
             return false;
         }
 
+        /// <summary>
+        /// Remove target cache line.
+        /// </summary>
+        /// <param name="block_addr_">target block address</param>
+        /// <returns></returns>
         public bool remove(UInt64 block_addr_)
         {
             cycle++;
@@ -166,6 +257,8 @@ namespace SimplePIM.Procs
             }
             return false;
         }
+
+        #endregion
 
     }
 }
