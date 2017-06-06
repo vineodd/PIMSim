@@ -66,11 +66,11 @@ namespace SimplePIM.Memory.DDR
                     }
 
                     //update state table
-                    bankStates[(int)packet.bank].nextPrecharge = Math.Max(bankStates[(int)packet.bank].nextPrecharge, currentClockCycle + Config.dram_config.READ_TO_PRE_DELAY());
+                    bankStates[(int)packet.bank].nextPrecharge = Math.Max(bankStates[(int)packet.bank].nextPrecharge, currentClockCycle + Config.dram_config.READ_TO_PRE_DELAY);
                     for (int i = 0; i < Config.dram_config.NUM_BANKS; i++)
                     {
                         bankStates[i].nextRead = Math.Max(bankStates[i].nextRead, currentClockCycle + Math.Max(Config.dram_config.tCCD, Config.dram_config.BL / 2));
-                        bankStates[i].nextWrite = Math.Max(bankStates[i].nextWrite, currentClockCycle + Config.dram_config.READ_TO_WRITE_DELAY());
+                        bankStates[i].nextWrite = Math.Max(bankStates[i].nextWrite, currentClockCycle + Config.dram_config.READ_TO_WRITE_DELAY);
                     }
 
                     //get the read data and put it in the storage which delays until the appropriate time (RL)
@@ -80,7 +80,7 @@ namespace SimplePIM.Memory.DDR
                         packet.busPacketType = BusPacketType.DATA;
 
                     readReturnPacket.Add(packet);
-                    readReturnCountdown.Add(Config.dram_config.RL());
+                    readReturnCountdown.Add(Config.dram_config.RL);
                     break;
                 case BusPacketType.READ_P:
                     //make sure a read is allowed
@@ -94,12 +94,12 @@ namespace SimplePIM.Memory.DDR
 
                     //update state table
                     bankStates[(int)packet.bank].currentBankState = CurrentBankState.Idle;
-                    bankStates[(int)packet.bank].nextActivate = Math.Max(bankStates[(int)packet.bank].nextActivate, currentClockCycle + Config.dram_config.READ_AUTOPRE_DELAY());
+                    bankStates[(int)packet.bank].nextActivate = Math.Max(bankStates[(int)packet.bank].nextActivate, currentClockCycle + Config.dram_config.READ_AUTOPRE_DELAY);
                     for (int i = 0; i < Config.dram_config.NUM_BANKS; i++)
                     {
                         //will set next read/write for all banks - including current (which shouldnt matter since its now idle)
                         bankStates[i].nextRead = Math.Max(bankStates[i].nextRead, currentClockCycle + Math.Max(Config.dram_config.BL / 2, Config.dram_config.tCCD));
-                        bankStates[i].nextWrite = Math.Max(bankStates[i].nextWrite, currentClockCycle + Config.dram_config.READ_TO_WRITE_DELAY());
+                        bankStates[i].nextWrite = Math.Max(bankStates[i].nextWrite, currentClockCycle + Config.dram_config.READ_TO_WRITE_DELAY);
                     }
 
                     //get the read data and put it in the storage which delays until the appropriate time (RL)
@@ -110,7 +110,7 @@ namespace SimplePIM.Memory.DDR
 
 
                     readReturnPacket.Add(packet);
-                    readReturnCountdown.Add(Config.dram_config.RL());
+                    readReturnCountdown.Add(Config.dram_config.RL);
                     break;
                 case BusPacketType.WRITE:
                     //make sure a write is allowed
@@ -124,10 +124,10 @@ namespace SimplePIM.Memory.DDR
                     }
 
                     //update state table
-                    bankStates[(int)packet.bank].nextPrecharge = Math.Max(bankStates[(int)packet.bank].nextPrecharge, currentClockCycle + Config.dram_config.WRITE_TO_PRE_DELAY());
+                    bankStates[(int)packet.bank].nextPrecharge = Math.Max(bankStates[(int)packet.bank].nextPrecharge, currentClockCycle + Config.dram_config.WRITE_TO_PRE_DELAY);
                     for (int i = 0; i < Config.dram_config.NUM_BANKS; i++)
                     {
-                        bankStates[i].nextRead = Math.Max(bankStates[i].nextRead, currentClockCycle + Config.dram_config.WRITE_TO_READ_DELAY_B());
+                        bankStates[i].nextRead = Math.Max(bankStates[i].nextRead, currentClockCycle + Config.dram_config.WRITE_TO_READ_DELAY_B);
                         bankStates[i].nextWrite = Math.Max(bankStates[i].nextWrite, currentClockCycle + Math.Max(Config.dram_config.BL / 2, Config.dram_config.tCCD));
                     }
 
@@ -150,11 +150,11 @@ namespace SimplePIM.Memory.DDR
 
                     //update state table
                     bankStates[(int)packet.bank].currentBankState = CurrentBankState.Idle;
-                    bankStates[(int)packet.bank].nextActivate = Math.Max(bankStates[(int)packet.bank].nextActivate, currentClockCycle + Config.dram_config.WRITE_AUTOPRE_DELAY());
+                    bankStates[(int)packet.bank].nextActivate = Math.Max(bankStates[(int)packet.bank].nextActivate, currentClockCycle + Config.dram_config.WRITE_AUTOPRE_DELAY);
                     for (int i = 0; i < Config.dram_config.NUM_BANKS; i++)
                     {
                         bankStates[i].nextWrite = Math.Max(bankStates[i].nextWrite, currentClockCycle + Math.Max(Config.dram_config.tCCD, Config.dram_config.BL / 2));
-                        bankStates[i].nextRead = Math.Max(bankStates[i].nextRead, currentClockCycle + Config.dram_config.WRITE_TO_READ_DELAY_B());
+                        bankStates[i].nextRead = Math.Max(bankStates[i].nextRead, currentClockCycle + Config.dram_config.WRITE_TO_READ_DELAY_B);
                     }
 
                     //take note of where data is going when it arrives

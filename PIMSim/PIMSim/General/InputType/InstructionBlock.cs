@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.Configs;
+using SimplePIM.Statistics;
 #endregion
 
 namespace SimplePIM.General
@@ -23,14 +24,16 @@ namespace SimplePIM.General
         /// </summary>
         private List<Instruction> ins = new List<Instruction>();
 
-        /// <summary>
-        /// Cycle when get processed.
-        /// </summary>
-        private UInt64 servetime = NULL;
+
 
         #endregion
 
         #region Public Varibles
+
+        /// <summary>
+        /// Cycle when get processed.
+        /// </summary>
+        public UInt64 servetime = NULL;
 
         /// <summary>
         /// Instruction Count.
@@ -41,6 +44,8 @@ namespace SimplePIM.General
         /// Block name
         /// </summary>
         public string name = "";
+
+        public UInt64 start_time => ins[0].cycle;
 
         #endregion
 
@@ -91,6 +96,19 @@ namespace SimplePIM.General
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Print Block
+        /// </summary>
+        /// <returns></returns>
+        public override string ToString()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("BLOCK [" + name+"]");
+            sb.Append(" Ins [" + ins_count + "] ");
+            sb.Append(" Cycle [" + start_time + "]");
+            return sb.ToString();
         }
 
         #endregion 

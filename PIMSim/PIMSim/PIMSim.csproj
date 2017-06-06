@@ -66,7 +66,7 @@
     <Compile Include="Memory\DDR\CommandQueue.cs" />
     <Compile Include="Memory\DDR\DDRMem.cs" />
     <Compile Include="Memory\DDR\Deque.cs" />
-    <Compile Include="Memory\DDR\DRAMConfig.cs" />
+    <Compile Include="Configs\DRAMConfig.cs" />
     <Compile Include="Memory\DDR\GenericDeque.cs" />
     <Compile Include="Memory\DDR\GenericDeque.Enumerator.cs" />
     <Compile Include="Memory\DDR\GenericDeque.Node.cs" />
@@ -103,6 +103,7 @@
     <Compile Include="PIM\ComputationalUnit.cs" />
     <Compile Include="PIM\Consistency.cs" />
     <Compile Include="PIM\CU_Pre_Set\Adder.cs" />
+    <Compile Include="PIM\CU_Pre_Set\Multipliercs.cs" />
     <Compile Include="PIM\PIMInterface.cs" />
     <Compile Include="PIM\PIM.cs" />
     <Compile Include="PIM\PIMProc.cs" />

@@ -203,7 +203,7 @@ namespace SimplePIM.Memory.DDR
                     //	reset flags and rank pointer
                     if (!foundActiveOrTooEarly && bankStates[(int)refreshRank][0].currentBankState != CurrentBankState. PowerDown)
                     {
-                        busPacket = new BusPacket(BusPacketType.REFRESH, 0, 0, 0, refreshRank, 0, 0, 0, 0, false, dramsim_log);
+                        busPacket = new BusPacket(BusPacketType.REFRESH, 0, 0, 0, refreshRank, 0, 0, 0, null, false, dramsim_log);
                         refreshRank = -1;
                         refreshWaiting = false;
                         sendingREF = true;
@@ -340,7 +340,7 @@ namespace SimplePIM.Memory.DDR
                             if (closeRow && currentClockCycle >= bankStates[refreshRank][b].nextPrecharge)
                             {
                                 rowAccessCounters[refreshRank][b] = 0;
-                                busPacket = new BusPacket(BusPacketType. PRECHARGE, 0, 0, 0, refreshRank, (uint)b,  0,0,0,false, dramsim_log);
+                                busPacket = new BusPacket(BusPacketType. PRECHARGE, 0, 0, 0, refreshRank, (uint)b,  0,0,null,false, dramsim_log);
                                 sendingREForPRE = true;
                             }
                             break;
@@ -359,7 +359,7 @@ namespace SimplePIM.Memory.DDR
                     //	reset flags and rank pointer
                     if (sendREF && bankStates[refreshRank][0].currentBankState != CurrentBankState. PowerDown)
                     {
-                        busPacket = new BusPacket(BusPacketType. REFRESH, 0, 0, 0, refreshRank, 0, 0,0,0,false, dramsim_log);
+                        busPacket = new BusPacket(BusPacketType. REFRESH, 0, 0, 0, refreshRank, 0, 0,0,null,false, dramsim_log);
                         refreshRank = -1;
                         refreshWaiting = false;
                         sendingREForPRE = true;
@@ -485,7 +485,7 @@ namespace SimplePIM.Memory.DDR
                                     {
                                         sendingPRE = true;
                                         rowAccessCounters[(int)nextRankPRE][(int)nextBankPRE] = 0;
-                                        busPacket = new BusPacket(BusPacketType. PRECHARGE, 0, 0, 0, (int)nextRankPRE, nextBankPRE,  0,0,0,false, dramsim_log);
+                                        busPacket = new BusPacket(BusPacketType. PRECHARGE, 0, 0, 0, (int)nextRankPRE, nextBankPRE,  0,0,null,false, dramsim_log);
                                         break;
                                     }
                                 }

@@ -7,6 +7,7 @@ using SimplePIM.Procs;
 using SimplePIM.Configs;
 using SimplePIM.PIM;
 
+
 namespace SimplePIM.Memory.DDR
 {
 
@@ -18,31 +19,33 @@ namespace SimplePIM.Memory.DDR
         public UInt64 data;
         public UInt64 timeAdded;
         public UInt64 timeReturned;
-        public UInt64 block_addr;
-        public int pid;
-        public bool pim;
+
+        public CallBackInfo callback = new CallBackInfo();
         
         // friend ostream &operator<<(ostream &os, const Transaction &t);
         //functions
-        public Transaction(TransactionType transType, UInt64 addr, UInt64 dat, UInt64 block, int pid_,bool pim_)
+        public Transaction(TransactionType transType, CallBackInfo call_)// UInt64 addr, UInt64 dat, UInt64 block, int pid_,bool pim_)
         {
-
-            block_addr = block;
+            callback = call_;
+        //    block_addr = block;
             transactionType = transType;
-            address = addr;
-            data = dat;
-            pid = pid_;
-            pim = pim_;
+            address = call_.address;
+            //address = addr;
+            data = call_.data;
+            //pid = pid_;
+            //pim = pim_;
         }
         public Transaction(Transaction t)
         {
    
             transactionType = t.transactionType;
+            callback = t.callback;
+            //  address = t.address;
+               data = t.data;
             address = t.address;
-            data = 0;
             timeAdded = t.timeAdded;
             timeReturned = t.timeReturned;
-            pid = t.pid;
+          //  pid = t.pid;
         }
 
         public BusPacketType getBusPacketType()
@@ -187,17 +190,30 @@ namespace SimplePIM.Memory.DDR
             {
                 if (!callback.pim)
                 {
-                    (callback.getsource as Proc).read_callback(callback.block_addr, callback.address);
+                    foreach(var proc in (callback.getsource() as List<Proc>))
+                    {
+                        proc.read_callback(callback.block_addr, callback.address);
+                    }
+                    
                 }
                 else
                 {
-                    if (Config.pim_config.unit_type == PIM_Unit_Type.Processors)
+                    if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
                     {
-                        (callback.getsource as PIMProc).read_callback(callback.block_addr, callback.address);
+                        foreach (var pimproc in (callback.getsource() as List<PIMProc>))
+                        {
+                            pimproc.read_callback(callback.block_addr, callback.address);
+                        }
+
+                      
                     }
                     else
                     {
-                        (callback.getsource as ComputationalUnit).read_callback(callback.address);
+                        foreach (var pimunit in (callback.getsource() as List<ComputationalUnit>))
+                        {
+                            pimunit.read_callback(callback.block_addr, callback.address);
+                        }
+                       
                     }
                 }
             }
@@ -218,10 +234,10 @@ namespace SimplePIM.Memory.DDR
 
             
         }
-       public void write_complete(uint id, UInt64 address, UInt64 block_addr, UInt64 done_cycle,bool pim_)
+       public void write_complete(uint id, CallBackInfo callback)//UInt64 address, UInt64 block_addr, UInt64 done_cycle,bool pim_)
         {
 
-            int it = find(pendingWriteRequests, address);
+            int it = find(pendingWriteRequests, callback.address);
             if (it == pendingWriteRequests.Count())
             {
                 Console.WriteLine("ERROR  : Cant find a pending read for this one");
@@ -236,25 +252,25 @@ namespace SimplePIM.Memory.DDR
                 }
             }
 
-            UInt64 added_cycle = pendingWriteRequests[address].First();
-            UInt64 latency = done_cycle - added_cycle;
+            UInt64 added_cycle = pendingWriteRequests[callback.address].First();
+            UInt64 latency = callback.done_cycle - added_cycle;
 
             //   for (int i = 0; i < proc.Count(); i++)
 
-            proc[(int)id].write_callback(block_addr,address);
+            proc[(int)id].write_callback(callback.block_addr, callback.address);
            if (Coherence. consistency == Consistency.SpinLock)
             {
-                if (pim_)
+                if (callback.pim)
                 {
-                    Coherence.spin_lock.relese_lock(address);
+                    Coherence.spin_lock.relese_lock(callback.address);
                 }
             }
            
           
-            pendingWriteRequests[address].RemoveAt(0);
-            if (pendingWriteRequests[address].Count() == 0)
-                pendingWriteRequests.Remove(address);
-            Console.WriteLine("Write Callback: 0x" + address.ToString("X") + " latency=" + latency + "cycles (" + done_cycle + "->" + added_cycle + ")");
+            pendingWriteRequests[callback.address].RemoveAt(0);
+            if (pendingWriteRequests[callback.address].Count() == 0)
+                pendingWriteRequests.Remove(callback.address);
+            Console.WriteLine("Write Callback: 0x" + callback.address.ToString("X") + " latency=" + latency + "cycles (" + callback.done_cycle + "->" + added_cycle + ")");
         }
     }
 }

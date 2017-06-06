@@ -424,7 +424,7 @@ namespace SimplePIM.Memory.DDR
         {
             if (parentMemorySystem.ReturnReadData != null)
             {
-                parentMemorySystem.ReturnReadData(parentMemorySystem.systemID, trans.address,trans.block_addr, currentClockCycle,trans.pim);
+                parentMemorySystem.ReturnReadData(parentMemorySystem.systemID, new CallBackInfo(trans.address,trans.callback. block_addr, currentClockCycle,trans.callback. pim,trans.callback.pid));
             }
         }
         public void receiveFromBus(ref BusPacket bpacket)
@@ -441,9 +441,14 @@ namespace SimplePIM.Memory.DDR
                 Console.WriteLine(" -- MC Receiving From Data Bus : ");
                 bpacket.print();
             }
-
+            CallBackInfo callback = new CallBackInfo();
+            callback.address = bpacket.physicalAddress;
+            callback.block_addr = bpacket.block_addr;
+            callback.data = bpacket.data;
+            callback.pid = bpacket.pid;
+            callback.pim = bpacket.pim;
             //add to return read data queue
-            returnTransaction.Add(new Transaction(TransactionType. RETURN_DATA, bpacket.physicalAddress,bpacket.block_addr, bpacket.data,bpacket.pid,bpacket.pim));
+            returnTransaction.Add(new Transaction(TransactionType. RETURN_DATA, callback));
             totalReadsPerBank[SEQUENTIAL((int)bpacket.rank, (int)bpacket.bank)]++;
 
             // this delete statement saves a mindboggling amount of memory
@@ -513,7 +518,7 @@ namespace SimplePIM.Memory.DDR
                     //inform upper levels that a write is done
                     if (parentMemorySystem.WriteDataDone != null)
                     {
-                        parentMemorySystem.WriteDataDone(parentMemorySystem.systemID, outgoingDataPacket.physicalAddress, outgoingDataPacket.block_addr,currentClockCycle,outgoingDataPacket.pim);
+                        parentMemorySystem.WriteDataDone(parentMemorySystem.systemID, new CallBackInfo( outgoingDataPacket.physicalAddress, outgoingDataPacket.block_addr,currentClockCycle,outgoingDataPacket.pim,outgoingDataPacket.pid));
                     }
 
                     ranks[(int)outgoingDataPacket.rank].receiveFromBus(ref outgoingDataPacket);
@@ -593,7 +598,7 @@ namespace SimplePIM.Memory.DDR
                     writeDataToSend.Add(new BusPacket(BusPacketType. DATA, poppedBusPacket.physicalAddress, poppedBusPacket.column,
                                                         poppedBusPacket.row, (int)poppedBusPacket.rank, poppedBusPacket.bank,
                                                         poppedBusPacket.data,poppedBusPacket.block_addr, poppedBusPacket.pid,poppedBusPacket.pim, dramsim_log));
-                    writeDataCountdown.Add(Config.dram_config.WL());
+                    writeDataCountdown.Add(Config.dram_config.WL);
                 }
 
                 //
@@ -616,14 +621,14 @@ namespace SimplePIM.Memory.DDR
                         {
                             //Don't bother setting next read or write times because the bank is no longer active
                             //bankStates[rank][bank].currentBankState = Idle;
-                            bankStates[rank][bank].nextActivate = Math.Max(currentClockCycle + Config.dram_config.READ_AUTOPRE_DELAY(),
+                            bankStates[rank][bank].nextActivate = Math.Max(currentClockCycle + Config.dram_config.READ_AUTOPRE_DELAY,
                                     bankStates[rank][bank].nextActivate);
                             bankStates[rank][bank].lastCommand =BusPacketType. READ_P;
-                            bankStates[rank][bank].stateChangeCountdown = (int)Config.dram_config.READ_TO_PRE_DELAY();
+                            bankStates[rank][bank].stateChangeCountdown = (int)Config.dram_config.READ_TO_PRE_DELAY;
                         }
                         else if (poppedBusPacket.busPacketType ==BusPacketType. READ)
                         {
-                            bankStates[rank][bank].nextPrecharge = Math.Max(currentClockCycle + Config.dram_config.READ_TO_PRE_DELAY(),
+                            bankStates[rank][bank].nextPrecharge = Math.Max(currentClockCycle + Config.dram_config.READ_TO_PRE_DELAY,
                                     bankStates[rank][bank].nextPrecharge);
                             bankStates[rank][bank].lastCommand =BusPacketType. READ;
 
@@ -639,14 +644,14 @@ namespace SimplePIM.Memory.DDR
                                     if (bankStates[i][j].currentBankState == CurrentBankState. RowActive)
                                     {
                                         bankStates[i][j].nextRead = Math.Max(currentClockCycle + Config.dram_config.BL / 2 + Config.dram_config.tRTRS, bankStates[i][j].nextRead);
-                                        bankStates[i][j].nextWrite = Math.Max(currentClockCycle + Config.dram_config.READ_TO_WRITE_DELAY(),
+                                        bankStates[i][j].nextWrite = Math.Max(currentClockCycle + Config.dram_config.READ_TO_WRITE_DELAY,
                                                 bankStates[i][j].nextWrite);
                                     }
                                 }
                                 else
                                 {
                                     bankStates[i][j].nextRead = Math.Max(currentClockCycle + Math.Max(Config.dram_config.tCCD, Config.dram_config.BL / 2), bankStates[i][j].nextRead);
-                                    bankStates[i][j].nextWrite = Math.Max(currentClockCycle + Config.dram_config.READ_TO_WRITE_DELAY(),
+                                    bankStates[i][j].nextWrite = Math.Max(currentClockCycle + Config.dram_config.READ_TO_WRITE_DELAY,
                                             bankStates[i][j].nextWrite);
                                 }
                             }
@@ -666,14 +671,14 @@ namespace SimplePIM.Memory.DDR
                     case BusPacketType.WRITE:
                         if (poppedBusPacket.busPacketType ==BusPacketType. WRITE_P)
                         {
-                            bankStates[rank][bank].nextActivate = Math.Max(currentClockCycle + Config.dram_config.WRITE_AUTOPRE_DELAY(),
+                            bankStates[rank][bank].nextActivate = Math.Max(currentClockCycle + Config.dram_config.WRITE_AUTOPRE_DELAY,
                                     bankStates[rank][bank].nextActivate);
                             bankStates[rank][bank].lastCommand =BusPacketType. WRITE_P;
-                            bankStates[rank][bank].stateChangeCountdown = (int)Config.dram_config.WRITE_TO_PRE_DELAY();
+                            bankStates[rank][bank].stateChangeCountdown = (int)Config.dram_config.WRITE_TO_PRE_DELAY;
                         }
                         else if (poppedBusPacket.busPacketType ==BusPacketType. WRITE)
                         {
-                            bankStates[rank][bank].nextPrecharge = Math.Max(currentClockCycle + Config.dram_config.WRITE_TO_PRE_DELAY(),
+                            bankStates[rank][bank].nextPrecharge = Math.Max(currentClockCycle + Config.dram_config.WRITE_TO_PRE_DELAY,
                                     bankStates[rank][bank].nextPrecharge);
                             bankStates[rank][bank].lastCommand =BusPacketType. WRITE;
                         }
@@ -695,14 +700,14 @@ namespace SimplePIM.Memory.DDR
                                     if (bankStates[i][j].currentBankState == CurrentBankState. RowActive)
                                     {
                                         bankStates[i][j].nextWrite = Math.Max(currentClockCycle + Config.dram_config.BL / 2 + Config.dram_config.tRTRS, bankStates[i][j].nextWrite);
-                                        bankStates[i][j].nextRead = Math.Max(currentClockCycle + Config.dram_config.WRITE_TO_READ_DELAY_R(),
+                                        bankStates[i][j].nextRead = Math.Max(currentClockCycle + Config.dram_config.WRITE_TO_READ_DELAY_R,
                                                 bankStates[i][j].nextRead);
                                     }
                                 }
                                 else
                                 {
                                     bankStates[i][j].nextWrite = Math.Max(currentClockCycle + Math.Max(Config.dram_config.BL / 2, Config.dram_config.tCCD), bankStates[i][j].nextWrite);
-                                    bankStates[i][j].nextRead = Math.Max(currentClockCycle + Config.dram_config.WRITE_TO_READ_DELAY_B(),
+                                    bankStates[i][j].nextRead = Math.Max(currentClockCycle + Config.dram_config.WRITE_TO_READ_DELAY_B,
                                             bankStates[i][j].nextRead);
                                 }
                             }
@@ -838,13 +843,13 @@ namespace SimplePIM.Memory.DDR
                     //create activate command to the row we just translated
                     BusPacket ACTcommand = new BusPacket(BusPacketType. ACTIVATE, transaction.address,
                            (uint) newTransactionColumn, (uint)newTransactionRow, newTransactionRank,
-                           (uint)newTransactionBank, 0, 0,0,false, dramsim_log);
+                           (uint)newTransactionBank, 0, 0,null,false, dramsim_log);
 
                     //create read or write command and enqueue it
                     BusPacketType bpType = transaction.getBusPacketType();
                     BusPacket command = new BusPacket(bpType, transaction.address,
                             (uint)newTransactionColumn, (uint)newTransactionRow, newTransactionRank,
-                           (uint)newTransactionBank, transaction.data, transaction.block_addr,transaction.pid,transaction.pim, dramsim_log);
+                           (uint)newTransactionBank, transaction.data, transaction.callback.block_addr,transaction.callback.pid,transaction.callback.pim, dramsim_log);
 
 
 
@@ -1131,7 +1136,6 @@ namespace SimplePIM.Memory.DDR
             Console.Write("   Total Return Transactions : " + totalTransactions);
             Console.WriteLine(" (" + totalBytesTransferred + " bytes) aggregate average bandwidth " + totalBandwidth + "GB/s");
 
-            double totalAggregateBandwidth = 0.0;
             for (int r = 0; r < Config.dram_config.NUM_RANKS; r++)
             {
 

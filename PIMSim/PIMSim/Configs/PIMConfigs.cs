@@ -1,4 +1,5 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,35 +7,109 @@ using System.Threading.Tasks;
 using SimplePIM.PIM;
 using System.IO;
 using SimplePIM.Statistics;
+#endregion
 
 namespace SimplePIM.Configs
 {
-    public class PIMConfigs
+    /// <summary>
+    /// PIM config class
+    /// </summary>
+    public static class PIMConfigs
     {
-        public PIM_Unit_Type unit_type;
-        public int PIM_add_ability = 2;
-        public int PIM_multi_ability = 1;
-        public int PIM_clock_factor = 1;
-        public Consistency Consistency_Model = Consistency.SpinLock;
-        public UInt64 Load_latency = 5;
-        public PIM_input_type PIM_Fliter = PIM_input_type.All;
-        public RAM_TYPE ram_type = RAM_TYPE.DRAM;
-        public List<string> PIM_Ins_List = new List<string>();
-        public int max_pim_block = 15;
-        public int pim_cu_count => CU_Name.Count();
-        public bool func_general = false;
-        public int N = 1;
-        public int IPC = 1;
-        public bool use_l1_cache = true;
-        public string PIM_Settings => Config.config_file + @"\PIM_Settings.ini";
-        public List<string> CU_Name = new List<string>();
-        public int stage = 0;
-        public bool wb = true;
-        public List<string> stage_name = new List<string>();
-        public PIM_Load_Method memory_method = PIM_Load_Method.Bypass;
-        public void initConfig()
+        #region Public Variables
+
+        /// <summary>
+        /// PIM unit type
+        /// </summary>
+        public static PIM_Unit_Type unit_type;
+
+
+        public static int PIM_adder_count = 2;
+        public static int PIM_multi_count = 1;
+        public static int PIM_clock_factor = 1;
+
+        public static Consistency Consistency_Model = Consistency.SpinLock;
+
+        /// <summary>
+        /// how PIM get inputs
+        /// </summary>
+        public static PIM_input_type PIM_Fliter = PIM_input_type.Specified;
+
+        /// <summary>
+        /// ins type that must be executed at memory-side.
+        /// used when PIM_Fliter = ALL
+        /// </summary>
+        public static List<string> PIM_Ins_List = new List<string>();
+
+        /// <summary>
+        /// MAX PIM unit count
+        /// </summary>
+        public static int max_pim_block = 15;
+
+
+        public static int pim_cu_count => CU_Name.Count();
+
+        /// <summary>
+        /// PIMProc count
+        /// used when unit_type = Processors
+        /// </summary>
+        public static int N = 1;
+
+        /// <summary>
+        /// used when unit_type = Processors
+        /// </summary>
+        public static int IPC = 1;
+
+        /// <summary>
+        /// used when unit_type = Processors
+        /// </summary>
+        public static bool use_l1_cache = true;
+
+        /// <summary>
+        /// CU names
+        /// </summary>
+        public static List<string> CU_Name = new List<string>();
+
+        public static int stage = 0;
+
+        /// <summary>
+        /// used when unit_type = Processors
+        /// </summary>
+        public static bool writeback = true;
+
+        /// <summary>
+        /// Stages
+        /// </summary>
+        public static List<string> stage_name = new List<string>();
+
+        /// <summary>
+        /// Memory methods
+        /// Bypass : addictional circuits added to suport none-conventional fast data storing and loading operations. 
+        /// Conventional : add to MTRL
+        /// </summary>
+        public static PIM_Load_Method memory_method = PIM_Load_Method.Bypass;
+
+        //cache
+        public static int max_l1cache_bit = 16;
+        public static int l1cache_size;
+        public static int l1cache_assoc = 4;
+        public static int ins_w_size = 256;
+        public static int writeback_queue_size = 128;
+        public static int mshr_size = 32;
+        public static uint l1_cacheline_size = 64;
+
+        public static UInt64 l1cache_hit_latency = 1;
+
+        #endregion
+
+        #region Methods
+
+        /// <summary>
+        /// read config file
+        /// </summary>
+        public static void initConfig()
         {
-            FileStream fs = new FileStream(PIM_Settings, FileMode.Open);
+            FileStream fs = new FileStream(Config.pim_config_file, FileMode.Open);
             StreamReader sr = new StreamReader(fs);
             string line = "";
             while ((line = sr.ReadLine()) != null)
@@ -60,7 +135,7 @@ namespace SimplePIM.Configs
                     }
                     continue;
                 }
-                if ((split[1] == "Consistency_Model"))
+                if ((split[0] == "Consistency_Model"))
                 {
                     if (split[1] == "SpinLock") Consistency_Model = Consistency.SpinLock;
                     else
@@ -133,25 +208,33 @@ namespace SimplePIM.Configs
             sr.Close();
             fs.Close();
         }
-        public bool SetValue(string name, object value)
+
+        /// <summary>
+        /// set value by variable name
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static bool SetValue(string name, object value)
         {
             try
             {
-                var s = typeof(PIMConfigs).GetField(name).GetValue(this);
-                typeof(PIMConfigs).GetField(name).SetValue(this, Convert.ChangeType(value, s.GetType()));
+                var s = typeof(Config).GetField(name).GetValue(name);
+                typeof(Config).GetField(name).SetValue(name, Convert.ChangeType(value, s.GetType()));
             }
-            catch
+            catch 
             {
-                DEBUG.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
+                Console.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
                 return false;
             }
             return true;
         }
+        #endregion
     }
     public enum PIM_Unit_Type
     {
-        Processors,
-        Pipeline
+        Processors,     //Assume PIM CU are processors
+        Pipeline        //Assume PIM CU are pipeline
     }
     public enum PIM_Load_Method
     {

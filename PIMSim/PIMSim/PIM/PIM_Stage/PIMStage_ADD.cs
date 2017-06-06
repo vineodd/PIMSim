@@ -44,9 +44,10 @@ namespace SimplePIM.PIM
             }
             return false;
         }
-       public PIMStage_ADD(int i)
+       public PIMStage_ADD(int i,object parent)
         {
             latency = new Counter(i, i);
+            Parent = parent;
         }
         public override bool read_input()
         {

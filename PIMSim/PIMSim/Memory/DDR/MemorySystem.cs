@@ -99,10 +99,16 @@ namespace SimplePIM.Memory.DDR
         {
             return memoryController.addTransaction(ref trans);
         }
-        public bool addTransaction(bool isWrite, UInt64 addr,UInt64 block_addr_,int pid_,bool pim_)
+        public bool addTransaction(bool isWrite, UInt64 addr,UInt64 block_addr_,List<int> pid_,bool pim_)
         {
             TransactionType type = isWrite ? TransactionType.DATA_WRITE : TransactionType.DATA_READ;
-            Transaction trans = new Transaction(type, addr, 0,block_addr_,pid_,pim_);
+            CallBackInfo callback = new CallBackInfo();
+            callback.address = addr;
+            callback.data = 0;
+            callback.block_addr = block_addr_;
+            callback.pid = pid_;
+            callback.pim = pim_;
+            Transaction trans = new Transaction(type, callback);
             // push_back in memoryController will make a copy of this during
             // addTransaction so it's kosher for the reference to be local 
 

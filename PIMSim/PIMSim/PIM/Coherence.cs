@@ -17,7 +17,7 @@ namespace SimplePIM.PIM
         public static void init()
         {
 
-            consistency = Config.pim_config. Consistency_Model;
+            consistency = PIMConfigs.Consistency_Model;
             if(consistency== Consistency.SpinLock)
             {
                 spin_lock = new SpinLock();

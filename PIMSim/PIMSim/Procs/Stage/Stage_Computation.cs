@@ -1,29 +1,55 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.General;
 
+#endregion
+
 namespace SimplePIM.Procs
 {
-    public class Stage_Computation : Stage
+    /// <summary>
+    /// Computing Stage
+    /// </summary>
+    public class Stage_Computing : Stage
     {
+        #region Private Variables
+
         private Counter add;
         private Counter multi;
         private int add_ = 0;
         private int multi_ = 0;
 
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// set counter
+        /// </summary>
+        /// <param name="multi_"></param>
         public void set_multi_counter(ref Counter multi_)
         {
             multi = multi_;
         }
+
+
+        /// <summary>
+        /// set counter
+        /// </summary>
+        /// <param name="add_"></param>
         public void set_add_counter(ref Counter add_)
         {
             add = add_;
         }
 
-
+        /// <summary>
+        /// set stage input
+        /// </summary>
+        /// <param name="obj"></param>
         public override void set_input(object obj)
         {
             if (last != null)
@@ -38,6 +64,10 @@ namespace SimplePIM.Procs
             }
         }
 
+        /// <summary>
+        /// internal step
+        /// </summary>
+        /// <returns></returns>
         public override bool Step()
         {
 
@@ -155,6 +185,11 @@ namespace SimplePIM.Procs
             }
         }
 
+
+        /// <summary>
+        /// read input
+        /// </summary>
+        /// <returns></returns>
         public override bool read_input()
         {
             if (input_ready && input != null)
@@ -167,6 +202,6 @@ namespace SimplePIM.Procs
             return false;
         }
 
-
+        #endregion
     }
 }

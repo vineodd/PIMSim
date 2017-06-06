@@ -54,7 +54,7 @@ namespace SimplePIM.General
             total_length = total_length + (ulong)output.Count() * Config.address_bit;
             //in software simulation, we use string "name" to indicate corresponding units.
             //but in fact, we use id. Each fuction id take in log2(id) bit.
-            total_length = total_length + (uint)(Math.Log(Config.pim_config.pim_cu_count) / Math.Log(2));
+            total_length = total_length + (uint)(Math.Log(PIMConfigs.pim_cu_count) / Math.Log(2));
             return total_length;
 
         }

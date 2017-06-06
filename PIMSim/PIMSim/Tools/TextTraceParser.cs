@@ -1,4 +1,5 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,9 +7,13 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
+#endregion
 
-namespace SimplePIM.TraceParser
+namespace SimplePIM.Tools
 {
+    /// <summary>
+    /// Transfer GEM5 trace to usable trace file
+    /// </summary>
     public class TextTraceParser
     {
         public const string spliter = "|";

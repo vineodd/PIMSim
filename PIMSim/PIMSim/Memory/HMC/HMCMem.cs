@@ -21,7 +21,7 @@ namespace SimplePIM.Memory.HMC
         public int current_statue = Macros.HMC_OK;
         public FileStream fs;
         public uint tag = 0;
-        public List<Tuple<UInt64, int, UInt64, UInt64,bool>> callback = new List<Tuple<ulong, int, ulong, ulong,bool>>();
+        public List<Tuple<UInt64, List<int>, UInt64, UInt64,bool>> callback = new List<Tuple<ulong, List<int>, ulong, ulong,bool>>();
         public override bool addTransation(MemRequest req_)
         {
             this.TransationQueue.Enqueue(req_);
@@ -183,7 +183,7 @@ namespace SimplePIM.Memory.HMC
                     current_statue = hmc.hmcsim_send(packet);
                     if (current_statue == 0)
                     {
-                        callback.Add(new Tuple<ulong, int, ulong, ulong,bool>(tag - 1, req.pid, req.block_addr, req.address,req.pim));
+                        callback.Add(new Tuple<ulong, List<int>, ulong, ulong,bool>(tag - 1, req.pid, req.block_addr, req.address,req.pim));
                         TransationQueue.Dequeue();
                         current_statue = Macros.HMC_OK;
                         while (current_statue != Macros.HMC_STALL)
@@ -227,14 +227,21 @@ namespace SimplePIM.Memory.HMC
 
                                     }
 
-
                                     if (d_type == hmc_response.RD_RS)
-                                        proc[callback[item].Item2].read_callback(callback[item].Item3, callback[item].Item4);
+                                    {
+                                        foreach (var id in callback[item].Item2)
+                                        {
+                                            proc[id].read_callback(callback[item].Item3, callback[item].Item4);
+                                        }
+                                    }
                                     else
                                     {
                                         if (d_type == hmc_response.WR_RS)
                                         {
-                                            proc[callback[item].Item2].write_callback(callback[item].Item3, callback[item].Item4);
+                                            foreach (var id in callback[item].Item2)
+                                            {
+                                                proc[id].write_callback(callback[item].Item3, callback[item].Item4);
+                                            }
                                         }
                                         else
                                         {
@@ -242,7 +249,6 @@ namespace SimplePIM.Memory.HMC
                                             Environment.Exit(0);
                                         }
                                     }
-
                                     if (Coherence.consistency == Consistency.SpinLock)
                                     {
                                         if (callback[item].Item5)
@@ -288,7 +294,7 @@ namespace SimplePIM.Memory.HMC
             }
             else
             {
-                recv:
+
                 uint cub = 0;
                 UInt64[] packet = new UInt64[Macros.HMC_MAX_UQ_PACKET];
                 uint d_length = 0;
@@ -347,12 +353,20 @@ namespace SimplePIM.Memory.HMC
                         }
 
                         if (d_type == hmc_response.RD_RS)
-                            proc[callback[item].Item2].read_callback(callback[item].Item3, callback[item].Item4);
+                        {
+                            foreach (var id in callback[item].Item2)
+                            {
+                                proc[id].read_callback(callback[item].Item3, callback[item].Item4);
+                            }
+                        }
                         else
                         {
                             if (d_type == hmc_response.WR_RS)
                             {
-                                proc[callback[item].Item2].write_callback(callback[item].Item3, callback[item].Item4);
+                                foreach (var id in callback[item].Item2)
+                                {
+                                    proc[id].write_callback(callback[item].Item3, callback[item].Item4);
+                                }
                             }
                             else
                             {

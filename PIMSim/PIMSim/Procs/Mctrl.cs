@@ -139,7 +139,7 @@ namespace SimplePIM.Procs
                 {
                     if (Config.DEBUG_MTRL)
                         DEBUG.WriteLine("-- Issue ProcRequest : [" + peek.type + "] [0x"+peek.block_addr.ToString("X")+ "] [0x" + peek.actual_addr.ToString("X") + "]");
-                    if (Config.pim_config.Consistency_Model == Consistency.SpinLock)
+                    if (PIMConfigs.Consistency_Model == Consistency.SpinLock)
                     {
                         //if (Config.DEBUG_MTRL)
                         //    DEBUG.WriteLine("-- Use Coherence : [" + Config.pim_config.Consistency_Model.ToString() + "]");
@@ -188,7 +188,7 @@ namespace SimplePIM.Procs
             trans.address = MemorySelector.resize( pro_req_.actual_addr);
             trans.data = 0;     //actully we need no data here, but we'll take it in the future.
             trans.block_addr = pro_req_.block_addr;
-            trans.pid = pro_req_.pid;
+            trans.pid.Add(pro_req_.pid);
             switch (pro_req_.type)
             {
                 case RequestType.READ:

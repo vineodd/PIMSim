@@ -355,7 +355,7 @@ namespace SimplePIM.Memory.DDR
             uint channelNumber = findChannelNumber(trans.address);
             return channels[(int)channelNumber].addTransaction(trans);
         }
-        public bool addTransaction(bool isWrite, UInt64 addr, UInt64 block_addr_, int pid_, bool pim_)
+        public bool addTransaction(bool isWrite, UInt64 addr, UInt64 block_addr_, List<int> pid_, bool pim_)
         {
             uint channelNumber = findChannelNumber(addr);
             return channels[(int)channelNumber].addTransaction(isWrite, addr, block_addr_, pid_, pim_);
@@ -434,10 +434,10 @@ namespace SimplePIM.Memory.DDR
 
         public void InitOutputFiles(string tracefilename)
         {
-            int lastSlash;
+
 
             string sim_description_str = null;
-            string deviceName;
+
 
             string sim_description = Environment.GetEnvironmentVariable("SIM_DESC");
             if (sim_description != null)

@@ -37,6 +37,8 @@ namespace SimplePIM.General
         public bool input_ready = false;
         public bool output_ready = false;
 
+
+        public bool stall = false;
         /// <summary>
         /// Linked last pipeline stage.
         /// </summary>
@@ -46,6 +48,9 @@ namespace SimplePIM.General
         /// Return delegate.
         /// </summary>
         public delegate void returnT();
+
+        public object Parent;
+
 
         #endregion
 

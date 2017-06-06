@@ -64,16 +64,16 @@ namespace SimplePIM.Procs
             return divide_pim_sent[i] / 8 //byte
                 / 1024//KB
                 / 1024//MB
-                / cycle //MB/cycle
-                * Config.proc_frequent;
+                *1.0 / cycle //MB/cycle
+                * OverallClock.reference_clock;
         }
         public double PIMBandWidth()
         {
             return total_pim_sent / 8 //byte
                 / 1024//KB
                 / 1024//MB
-                / cycle //MB/cycle
-                * Config.proc_frequent;
+                *1.0 / cycle //MB/cycle
+                * OverallClock.reference_clock;
         }
         #endregion
 
@@ -92,7 +92,7 @@ namespace SimplePIM.Procs
                 divide_host_sent.Add(0);
             }
             pim_ins = new List<Queue<InputType>>();
-            for (int i = 0; i < Config.pim_config.pim_cu_count; i++)
+            for (int i = 0; i < PIMConfigs.pim_cu_count; i++)
             {
                 pim_ins.Add(new Queue<InputType>());
                 divide_pim_reqs.Add(0);
@@ -224,7 +224,7 @@ namespace SimplePIM.Procs
                     if (!eof[i])
                     {
                         //not running out of traces.
-                        if (all_ins[i].Count() >= Config.max_insp_count)
+                        if (all_ins[i].Count() >= Config.max_insp_waitting_queue)
                         {
                             //input waitting queue is full
                             continue;

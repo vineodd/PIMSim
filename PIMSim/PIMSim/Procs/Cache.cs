@@ -118,19 +118,27 @@ namespace SimplePIM.Procs
         /// <summary>
         /// Construction Function
         /// </summary>
-        public Cache()
+        public Cache(bool pim)
         {
             replace_policy = (new LRU() as CacheReplacePolicy);
 
             cycle = 0;
             int set_size = 0;
 
-
-            assoc = Config.l1cache_assoc;
-            set_size = Config.block_size * assoc;
-            max_set = Config.l1cache_size / set_size;
-            assoc = Config.l1cache_assoc;
-
+            if (!pim)
+            {
+                assoc = Config.l1cache_assoc;
+                set_size = Config.block_size * assoc;
+                max_set = Config.l1cache_size / set_size;
+                assoc = Config.l1cache_assoc;
+            }
+            else
+            {
+                assoc = PIMConfigs. l1cache_assoc;
+                set_size = Config.block_size * assoc;
+                max_set = PIMConfigs.l1cache_size / set_size;
+                assoc = PIMConfigs.l1cache_assoc;
+            }
 
             cache = new CacheEntity[assoc, max_set];
 

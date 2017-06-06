@@ -23,9 +23,9 @@ namespace SimplePIM.Memory.DDR
         public UInt64 data;
 
         public UInt64 block_addr;
-        public int pid;
+        public List<int> pid;
         public bool pim;
-        public BusPacket(BusPacketType packtype, UInt64 physicalAddr, uint col, uint rw, int r, uint b, UInt64 dat,UInt64 block_add,int pid_, bool pim_,Stream dramsim_log_)
+        public BusPacket(BusPacketType packtype, UInt64 physicalAddr, uint col, uint rw, int r, uint b, UInt64 dat,UInt64 block_add,List<int> pid_, bool pim_,Stream dramsim_log_)
         {
             dramsim_log = dramsim_log_;
             block_addr = block_add;

@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.General;
 using SimplePIM.Procs;
+using SimplePIM.Statistics;
 
 #endregion
 
@@ -25,6 +26,7 @@ namespace SimplePIM.PIM
         /// </summary>
         public Stage[] pipeline = new Stage[4];
 
+        public string name = "ADDer";
         public int latency_load = 1;
         public int latnecy_store = 1;
         public int latency_op = 1;
@@ -32,9 +34,14 @@ namespace SimplePIM.PIM
         public Function curr = null;
         //for static 
         public double energy = 0;
+        private UInt64 total_load = 0;
+        private UInt64 total_latency = 0;
+        private double avg_latency => total_load != 0 ? total_latency / total_load : 0;
 
-        public Adder(int id_,ref InsPartition insp_)
+
+        public Adder(int id_, ref InsPartition insp_)
         {
+            
             this.id = id_;
             input_count = 2;
             output_count = 1;
@@ -44,7 +51,7 @@ namespace SimplePIM.PIM
             //**           Stage 1-1:   Load Data                   **
             //**                                                    **
             //********************************************************
-            var item_stage1 = new PIMStage_LoadData(latency_load);
+            var item_stage1 = new PIMStage_LoadData(latency_load, this);
             pipeline[0] = (item_stage1 as Stage);
             item_stage1 = null;
 
@@ -53,7 +60,7 @@ namespace SimplePIM.PIM
             //**                Stage 1-2:   Load data              **
             //**                                                    **
             //********************************************************
-            var item_stage2 = new PIMStage_LoadData(latency_load);
+            var item_stage2 = new PIMStage_LoadData(latency_load, this);
             pipeline[1] = item_stage2 as Stage;
             item_stage2 = null;
 
@@ -62,7 +69,7 @@ namespace SimplePIM.PIM
             //**           Stage 3:     Calculation                 **
             //**                                                    **
             //********************************************************
-            var item_stage3 = new PIMStage_ADD(latency_op);
+            var item_stage3 = new PIMStage_ADD(latency_op, this);
             item_stage3.set_link(ref pipeline[0]);
             item_stage3.set_link(ref pipeline[1]);
             pipeline[2] = item_stage3 as Stage;
@@ -72,53 +79,72 @@ namespace SimplePIM.PIM
             //**       Stage 4:     Write results back              **
             //**                                                    **
             //********************************************************
-            var item_stage4 = new PIMStage_Store();
+            var item_stage4 = new PIMStage_Store(this);
             item_stage4.set_link(ref pipeline[2]);
             pipeline[3] = item_stage4 as Stage;
 
+            //init callback
+            read_callback = new ReadCallBack(handle_read_callback);
+            write_callback = new WriteCallBack(handle_write_callback);
+
         }
+
+        private void handle_write_callback(ulong block_addr, ulong act_addr)
+        {
+            bandwidth_bit += 64;
+        }
+
+        private void handle_read_callback(ulong block_addr, ulong act_addr)
+        {
+            bandwidth_bit += 64;
+        }
+
         public override void Step()
         {
             cycle++;
-            
+
+
             if (curr == null)
             {
                 get_input();
                 //Nothing happend
-                pipeline[0].set_input(curr.input[0]);
-                pipeline[1].set_input(curr.input[1]);
+                if (curr != null)
+                {
+                    bandwidth_bit += curr.Length();
+                    pipeline[0].set_input(curr.input[0]);
+                    pipeline[1].set_input(curr.input[1]);
+                }
 
             }
-            
+
             for (int i = pipeline.Count() - 1; i >= 0; i--)
             {
 
-                bool ok = pipeline[i].Step();
-                if (!ok)
+                pipeline[i].Step();
+                bool stalled = pipeline[i].stall;
+                if (stalled)
                 {
                     //stall++
                 }
                 if (i == pipeline.Count() - 1)
                 {
-                    
-                }
-                if (i == 0)
-                {
-
-                    if (ok)
+                    if (pipeline[i].output_ready)
                     {
-                        object addr = NULL;
-                        pipeline[0].get_output(ref addr);
-                        if (Coherence.consistency == Consistency.SpinLock)
+                        if (curr != null)
                         {
-                            Coherence.spin_lock.relese_lock(curr.input[0]);
-                            Coherence.spin_lock.relese_lock(curr.input[1]);
-                            Coherence.spin_lock.relese_lock(curr.output[0]);
+                            object addr = NULL;
 
+                            if (Coherence.consistency == Consistency.SpinLock)
+                            {
+                                Coherence.spin_lock.relese_lock(curr.input[0]);
+                                Coherence.spin_lock.relese_lock(curr.input[1]);
+                                Coherence.spin_lock.relese_lock(curr.output[0]);
+
+                            }
+                            pipeline[i].get_output(ref addr);
+                            curr = null;
                         }
-                        curr = null;
                     }
-
                 }
 
             }
@@ -149,5 +175,14 @@ namespace SimplePIM.PIM
         {
             throw new NotImplementedException();
         }
+
+        public override void PrintStatus()
+        {
+            DEBUG.WriteLine("-------PIM Unit " + name + "Statistics------");
+            DEBUG.WriteLine("    total functions : " + total_load);
+            DEBUG.WriteLine("    average latency : " + avg_latency);
+            DEBUG.WriteLine("    average bandwidth: " + interal_bandwidth);
+        }
+
     }
 }

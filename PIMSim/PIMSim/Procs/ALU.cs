@@ -63,8 +63,8 @@ namespace SimplePIM.Procs
             
             ins = new Queue<KeyValuePair<ulong, Instruction>>();
 
-            add_count = new Counter(Config.add_ability, Config.add_ability);
-            multi_count = new Counter(Config.multi_ability, Config.multi_ability);
+            add_count = new Counter(Config.adder_count, Config.adder_count);
+            multi_count = new Counter(Config.multi_count, Config.multi_count);
             //init pipeline stage
 
             //********************************************************
@@ -90,7 +90,7 @@ namespace SimplePIM.Procs
             //**           Stage 3:     Calculation                 **
             //**                                                    **
             //********************************************************
-            var item_stage3 = new Stage_Computation();
+            var item_stage3 = new Stage_Computing();
             item_stage3.set_add_counter(ref add_count);
             item_stage3.set_multi_counter(ref multi_count);
             item_stage3.set_link(ref pipeline[1]);
@@ -106,8 +106,6 @@ namespace SimplePIM.Procs
             item_stage4.set_link(ref pipeline[2]);
             pipeline[3] = item_stage4 as Stage;
 
-            if (Config.DEBUG_ALU)
-                DEBUG.WriteLine("-- ALU : Initialed.");
 
         }
 

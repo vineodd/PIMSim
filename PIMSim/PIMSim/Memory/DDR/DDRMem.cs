@@ -7,6 +7,7 @@ using System.IO;
 using SimplePIM.Memory;
 using SimplePIM.Procs;
 using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.DDR
 {
@@ -20,12 +21,11 @@ namespace SimplePIM.Memory.DDR
         public MultiChannelMemorySystem memorySystem;
         public Callback_t read_cb;
         public Callback_t write_cb;
-        public Queue<MemRequest> TransationQueue;
+        public List<MemRequest> TransationQueue;
         public UInt64 clockCycle = 0;
         public List<Proc> proc;
         public List<Mctrl> mctrl;
         TransactionType transType = TransactionType.RETURN_DATA;
-        UInt64 data = 0;
         Transaction trans = null;
         bool pendingTrans = false;
         UInt64 addr = 0;
@@ -41,7 +41,7 @@ namespace SimplePIM.Memory.DDR
             proc = proc_;
             transactionReceiver = new TransactionReceiver(ref proc);
 
-            memorySystem = new MultiChannelMemorySystem(Config.dram_config.systemIniFilename, pwdString, megsOfMemory);
+            memorySystem = new MultiChannelMemorySystem(Config.dram_config_file, pwdString, megsOfMemory);
             memorySystem.setCPUClockSpeed(0);
             if (Config.dram_config.RETURN_TRANSACTIONS)
             {
@@ -53,12 +53,12 @@ namespace SimplePIM.Memory.DDR
                  //  new Callback<TransactionReceiver, void, unsigned, uint64_t, uint64_t>(&transactionReceiver, &TransactionReceiver::write_complete);
                 memorySystem.RegisterCallbacks(read_cb, write_cb, null);
             }
-            TransationQueue = new Queue<MemRequest>();
+            TransationQueue = new List<MemRequest>();
 
         }
         public override bool addTransation(MemRequest req_)
         {
-            this.TransationQueue.Enqueue(req_);
+            this.TransationQueue.Add(req_);
             return false;
         }
         public void alignTransactionAddress(ref Transaction trans)
@@ -78,15 +78,34 @@ namespace SimplePIM.Memory.DDR
             {
                 while (m.get_req(this.pid, ref req_))
                 {
-                    TransationQueue.Enqueue(req_);
+                    TransationQueue.Add(req_);
                 }
             }
+            bool restart = false;
+            while (!restart)
+            {
+                restart = true;
+                for (int i = 0; i < TransationQueue.Count; i++)
+                {
+                    for (int j = 0; j < TransationQueue.Count; j++)
+                    {
+                        if (i != j && TransationQueue[i].address == TransationQueue[j].address && TransationQueue[i].pim == TransationQueue[j].pim)
+                        {
+                            foreach (var id in TransationQueue[j].pid)
+                                TransationQueue[i].pid.Add(id);
+                            TransationQueue.RemoveAt(j);
 
+                            restart = false;
+                            continue;
+                        }
+                    }
+                }
+            }
             if (!pendingTrans)
             {
                 if (TransationQueue.Count() > 0)
                 {
-                    MemRequest req = TransationQueue.Peek();
+                    MemRequest req = TransationQueue[0];
                     switch (req.memtype)
                     {
                         case MemReqType.READ:
@@ -102,15 +121,21 @@ namespace SimplePIM.Memory.DDR
                             transType = TransactionType.RETURN_DATA;
                             break;
 
-
                     }
-                    addr = req.address;
-                    data = req.data;
-                    clockCycle = req.cycle;
-                    TransationQueue.Dequeue();
+                    //  addr = req.address;
+                    //   data = req.data;
+                    //   clockCycle = req.cycle;
+                    TransationQueue.RemoveAt(0);
                     if (transType != TransactionType.DATA_READ && transType != TransactionType.DATA_WRITE)
                         return;
-                    trans = new Transaction(transType, addr, data, req.block_addr, req.pid, req.pim);
+                    CallBackInfo callback = new CallBackInfo();
+                    callback.address= req.address;
+                    callback.data = req.data;
+                    callback.done_cycle= req.cycle;
+                    callback.block_addr = req.block_addr;
+                    callback.pid = req.pid;
+                    callback.pim = req.pim;
+                    trans = new Transaction(transType, callback);//addr, data, req.block_addr, req.pid, req.pim);
                     Console.WriteLine("ADD transaction: addr=" + addr.ToString("X"));
 
 

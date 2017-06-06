@@ -24,7 +24,7 @@ namespace SimplePIM.Memory
         public MemReqType memtype;
         public UInt64 cycle = 0;
         public bool pim = false;
-        public int pid = 0;
+        public List<int> pid = new List<int>();
 
         #endregion
 

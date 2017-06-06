@@ -1,14 +1,22 @@
-﻿using System;
+﻿#region Reference 
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 
+#endregion
+
 namespace SimplePIM.Configs
 {
+    /// <summary>
+    /// HMC configs
+    /// </summary>
     public class HMCConfig
     {
+        #region Public Variables
         public UInt32 num_devs = 0;
         public UInt32 num_links = 0;
         public UInt32 num_vaults = 0;
@@ -18,7 +26,9 @@ namespace SimplePIM.Configs
         public UInt32 capacity = 0;
         public UInt32 xbar_depth = 0;
         public UInt32 bsize = 128;
+        #endregion
 
+        #region Public Methods
         public void initConfig(string path)
         {
             FileStream fs = new FileStream(path, FileMode.Open);
@@ -40,7 +50,7 @@ namespace SimplePIM.Configs
                 var s = typeof(HMCConfig).GetField(name).GetValue(this);
                 typeof(HMCConfig).GetField(name).SetValue(this, Convert.ChangeType(value, s.GetType()));
             }
-            catch (Exception e)
+            catch 
             {
                 Console.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
 
@@ -48,5 +58,6 @@ namespace SimplePIM.Configs
             }
             return true;
         }
+        #endregion
     }
 }

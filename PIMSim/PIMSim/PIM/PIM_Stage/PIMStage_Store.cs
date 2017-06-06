@@ -22,7 +22,10 @@ namespace SimplePIM.PIM
                 input_ready = false;
 
         }
-
+        public PIMStage_Store(object parent)
+        {
+            Parent = parent;
+        }
         public override bool read_input()
         {
             if (input_ready)
@@ -46,6 +49,7 @@ namespace SimplePIM.PIM
           if(read_input())
             {
                 write_output();
+                (Parent as ComputationalUnit).write_callback(0, 0);
                 return true;
             }
             

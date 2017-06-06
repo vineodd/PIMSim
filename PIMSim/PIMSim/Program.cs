@@ -25,11 +25,11 @@ namespace SimplePIM
                 Config.sw.Close();
             }
         }
-
+        public static PIMSimulator pimsim;
         static void Main(string[] args)
         {
             AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
-            PIMSimulator pimsim = new PIMSimulator(args);
+            pimsim = new PIMSimulator(args);
             pimsim.run();
             pimsim.PrintStatus();
             Console.ReadKey();

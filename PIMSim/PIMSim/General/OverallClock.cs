@@ -19,7 +19,7 @@ namespace SimplePIM.General
     {
         #region Static Varibales
 
-        private readonly static int reference_clock = 1;
+        public readonly static UInt64 reference_clock = Config.proc_frequent;
 
         #endregion
 
@@ -28,7 +28,12 @@ namespace SimplePIM.General
         private static List<double> host_cpu_clock_factor = new List<double>();
         private static List<double> ram_clock_factor = new List<double>();
         private static List<double> pimunit_clock_factor = new List<double>();
-        private static UInt64 cycle = 0;
+
+
+        #endregion
+
+        #region Public Variables
+        public static UInt64 cycle = 0;
 
         #endregion
 
@@ -45,11 +50,11 @@ namespace SimplePIM.General
             }
             for(int i=0;i< MemorySelector.get_mem_count; i++)
             {
-                ram_clock_factor.Add(60);
+                ram_clock_factor.Add(1);
             }
-            for (int i = 0; i < Config.pim_config.pim_cu_count; i++)
+            for (int i = 0; i < PIMConfigs.pim_cu_count; i++)
             {
-                pimunit_clock_factor.Add(2);
+                pimunit_clock_factor.Add(1);
             }
 
         }

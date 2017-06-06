@@ -15,8 +15,12 @@ namespace SimplePIM.General
     /// </summary>
     public class Register 
     {
+        #region Public Variables
         public string name;
         public object value;
+        #endregion
+
+        #region Public Methods
         public Register (string name_)
         {
             name = name_;
@@ -26,5 +30,6 @@ namespace SimplePIM.General
             name = name_;
             value = value_;
         }
+        #endregion
     }
 }

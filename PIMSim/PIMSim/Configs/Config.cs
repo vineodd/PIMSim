@@ -1,4 +1,6 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,45 +10,162 @@ using System.IO;
 using SimplePIM.PIM;
 using SimplePIM.Memory.DDR;
 using SimplePIM.Statistics;
+using SimplePIM.Memory;
+
+#endregion
 
 namespace SimplePIM.Configs
 {
     public static class Config
     {
-        //------------processor configs------------------
-        static public int N = 1;
-        static public int IPC = 1;
-        static public bool wb = true;         //true: enable write-back mode   false :enable write-through mode
-        static public bool shared_cache = true;    //true: 
-        static public bool use_cache = true;
-        static public int l1cache_size;
-        static public int l1cache_assoc=4 ;
-        static public int shared_cache_size;
-        static public int shared_cache_assoc=16;
-        static public int block_size;
+        #region Processor Config
+        /// <summary>
+        /// Processor count
+        /// </summary>
+        public static int N = 1;
 
-        static public int max_l1cache_bit=16;
-        static public int max_scache_bit=21;
-        static public int max_block_size_bit=6;
+        /// <summary>
+        /// Instruction per cycle
+        /// </summary>
+        public static int IPC = 1;
 
-        static public int ins_w_size = 256;
-        static public int writeback_queue_size = 128;
-        static public int mshr_size = 32;
+        /// <summary>
+        /// writeback enable
+        /// true: enable write-back mode   false :enable write-through mode
+        /// </summary>
+        public static bool writeback = true;         
 
-        static public UInt64 l1cache_hit_latency = 1;
-        static public UInt64 share_cache_hit_lantecy = 200;
+        /// <summary>
+        /// Block size
+        /// </summary>
+        public static int block_size;
 
-        //MCRTL settings
-        static public int crtl_queue_max = 128;
-        static public int mc_latency = 0;
+        /// <summary>
+        /// Log2(block_size)
+        /// </summary>
+        public static int block_size_bit = 6;
 
-        //Instruction Partitioner configs
-        static public int max_insp_count = 100;
+        /// <summary>
+        /// Instruction Window queue size
+        /// </summary>
+        public static int ins_w_size = 256;
 
-        //DEBUG tag
+        /// <summary>
+        /// writeback queue depth
+        /// </summary>
+        public static int writeback_queue_size = 128;
 
-        static public bool DEBUG_CACHE = true;
-        static public bool DEBUG_TRACE = true;
+        /// <summary>
+        /// mshr entries
+        /// </summary>
+        public static int mshr_size = 32;
+
+        /// <summary>
+        /// memory queue depth
+        /// </summary>
+        public static int crtl_queue_max = 128;
+
+        /// <summary>
+        /// memory queue latency
+        /// </summary>
+        public static int mc_latency = 0;
+
+        /// <summary>
+        /// Page size
+        /// </summary>
+        public static UInt64 page_size = 4 * 1024;
+
+        //ALU settings
+        public static int adder_count = 2;
+
+        public static int multi_count = 1;
+
+        public static uint operationcode_length = 32;
+
+        /// <summary>
+        /// for x86 and x64 architecture, only 48 of 64 bit is vaild.
+        /// </summary>
+        public static uint address_bit = 48;
+
+        /// <summary>
+        /// clock factor
+        /// </summary>
+        public static double host_clock_factor = 1;
+
+        /// <summary>
+        /// core frequent
+        /// </summary>
+        public static UInt64 proc_frequent = 4 * (UInt64)Math.Pow(2, 30);
+
+        #endregion
+
+        #region Cache Config
+
+        /// <summary>
+        /// use shared cache
+        /// </summary>
+        public static bool shared_cache = true;
+
+        /// <summary>
+        /// use cache
+        /// </summary>
+        public static bool use_cache = true;
+
+        /// <summary>
+        /// private cache size
+        /// </summary>
+        public static int l1cache_size;
+
+        /// <summary>
+        /// log2(l1cache_size) 
+        /// </summary>
+        public static int max_l1cache_bit = 16;
+
+        /// <summary>
+        /// l1cache associativity
+        /// </summary>
+        public static int l1cache_assoc = 4;
+
+        /// <summary>
+        /// shared cache size
+        /// </summary>
+        public static int shared_cache_size;
+
+        /// <summary>
+        /// shared cache associativity
+        /// </summary>
+        public static int shared_cache_assoc = 16;
+
+        /// <summary>
+        /// log2(shared_cache_size)
+        /// </summary>
+        public static int max_scache_bit = 21;
+
+        /// <summary>
+        /// private hit latency
+        /// </summary>
+        public static UInt64 l1cache_hit_latency = 1;
+
+        /// <summary>
+        /// shared cache latency
+        /// </summary>
+        public static UInt64 share_cache_hit_latecy = 200;
+        #endregion
+
+        #region Instruction Partitioner Config
+
+        /// <summary>
+        /// max ins_p buffer queue
+        /// </summary>
+        public static int max_insp_waitting_queue = 100;
+
+        #endregion
+
+        #region Debug Flags
+
+
+        public static bool DEBUG_CACHE = true;
+        public static bool DEBUG_TRACE = true;
         public static bool DEBUG_MTRL = true;
         public static bool DEBUG_COHERENCE = true;
         public static bool DEBUG_PROC = true;
@@ -54,64 +173,97 @@ namespace SimplePIM.Configs
         public static bool DEBUG_PIM = true;
         public static bool DEBUG_INSP = true;
 
-        //trace settings
-        static public string trace_path = "";
-        static public string config_file = "";
+        #endregion
+
+        #region Trace Config
+        /// <summary>
+        /// trace folder path
+        /// </summary>
+        public static string trace_path = "";
+
+        /// <summary>
+        /// config_file path
+        /// </summary>
+        public static string config_path = "";
+
+        /// <summary>
+        /// output file 
+        /// </summary>
         public static string output_file = "";
-        public static string hmc_config_path => config_file + @"\hmc_config.ini";
 
-        //static settings
-        static public UInt64 static_period = 10000;
+        public static string dram_config_file => config_path + @"\DRAM.ini";
+        public static string hmc_config_file => config_path + @"\hmc_config.ini";
+        public static string config_file => config_path + @"\config.ini";
 
-        //simulation settings
-        static public UInt64 sim_cycle = 10000;
-        static public SIM_TYPE sim_type = SIM_TYPE.cycle;
+        public static string pim_config_file => Config.config_path + @"\PIM_Settings.ini";
 
+        #endregion
 
-        //RAM settings
-        static public int channel=1;
-        static public int rank=0;
-        static public int bank=0;
-        static public UInt64 page_size = 4 * 1024;
-        static public UInt64 block_max;
+        #region Statistics Config
 
-        static public int xbar_latency = 16;
+        public static UInt64 proc_static_period = 10000;
+        public static UInt64 pim_static_period = 10000;
 
-        //ALU settings
-        static public int add_ability = 2;
-        static public int multi_ability = 1;
-        static public int para_load = 2;
+        #endregion
 
-        static public FileStream fs;
-        static public StreamWriter sw;
+        #region Memory Config
+        public static RAM_TYPE ram_type = RAM_TYPE.DRAM;
 
-        //PIM settings
-        public static PIMConfigs pim_config = new PIMConfigs();
-        //
+        /// <summary>
+        /// Memory list
+        /// </summary>
+        public static List<KeyValuePair<string, int>> memory = new List<KeyValuePair<string, int>>();
+        public static int channel = 1;
+        public static int rank = 0;
+        public static int bank = 0;
+
         public static DRAMConfig dram_config = null;
 
         public static HMCConfig hmc_config = null;
 
-        public static uint operationcode_length = 32;
-        public static uint address_bit = 48;
-        public static double host_clock_factor = 1;
-        public static UInt64 proc_frequent = 4 * (UInt64)Math.Pow(2, 30);
-        //  public 
 
-        public static bool SetValue(string name,object value)
+        #endregion
+
+        #region  Simulation Config
+
+        public static UInt64 sim_cycle = 10000;
+        public static SIM_TYPE sim_type = SIM_TYPE.cycle;
+
+        #endregion
+
+        #region File Handle
+
+        public static FileStream fs;
+        public static StreamWriter sw;
+
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Set value by name
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static bool SetValue(string name, object value)
         {
             try
             {
                 var s = typeof(Config).GetField(name).GetValue(name);
                 typeof(Config).GetField(name).SetValue(name, Convert.ChangeType(value, s.GetType()));
             }
-            catch(Exception e)
+            catch
             {
                 Console.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
                 return false;
             }
             return true;
         }
+
+        /// <summary>
+        /// revise numbers
+        /// </summary>
         public static void checkAllReady()
         {
             if (dram_config != null)
@@ -133,17 +285,20 @@ namespace SimplePIM.Configs
 
         }
 
+        /// <summary>
+        /// calculate cache size and init ram
+        /// </summary>
         public static void initial()
         {
             Calulate_CacheSize();
-            
-            if(pim_config.ram_type == RAM_TYPE.DRAM|| pim_config.ram_type ==RAM_TYPE.PCM)
+
+            if (ram_type == RAM_TYPE.DRAM || ram_type == RAM_TYPE.PCM)
             {
                 dram_config = new DRAMConfig();
-                Config.dram_config.ReadIniFile(Config.config_file + @"\" + Config.dram_config.systemIniFilename);
+                Config.dram_config.ReadIniFile(Config.dram_config_file);
 
                 // If we have any overrides, set them now before creating all of the memory objects
-                
+
                 Config.dram_config.InitEnumsFromStrings();
                 if (!Config.dram_config.CheckIfAllSet())
                 {
@@ -161,27 +316,58 @@ namespace SimplePIM.Configs
             }
             else
             {
-                if (pim_config.ram_type == RAM_TYPE.HMC)
+                if (ram_type == RAM_TYPE.HMC)
                 {
                     hmc_config = new HMCConfig();
-                    hmc_config.initConfig(hmc_config_path);
+                    hmc_config.initConfig(hmc_config_file);
                 }
                 else
                 {
                     //hybrid
+                    if (memory.Any(s => s.Key == "HMC"))
+                    {
+                        hmc_config = new HMCConfig();
+                        hmc_config.initConfig(hmc_config_file);
+                    }
+                    if(memory.Any(s => s.Key == "DRAM")|| memory.Any(s => s.Key == "PCM"))
+                    {
+                        dram_config = new DRAMConfig();
+                        Config.dram_config.ReadIniFile(Config.dram_config_file);
 
+                        // If we have any overrides, set them now before creating all of the memory objects
+
+                        Config.dram_config.InitEnumsFromStrings();
+                        if (!Config.dram_config.CheckIfAllSet())
+                        {
+                            Environment.Exit(-1);
+                        }
+                        if (Config.dram_config.NUM_CHANS == 0)
+                        {
+                            Console.WriteLine("ERROR:  Zero channels");
+                            Environment.Exit(-1);
+                        }
+                        if (Config.dram_config.NUM_RANKS == 0)
+                        {
+                            Config.dram_config.NUM_RANKS = 1;
+                        }
+                    }
 
                 }
             }
             checkAllReady();
-            
+
 
         }
+
+        /// <summary>
+        /// calculate cache size
+        /// </summary>
+        /// <returns></returns>
         public static bool Calulate_CacheSize()
         {
             try
             {
-                block_size = 1 << max_block_size_bit;
+                block_size = 1 << block_size_bit;
                 if (use_cache)
                 {
                     l1cache_size = 1 << max_l1cache_bit;
@@ -189,7 +375,7 @@ namespace SimplePIM.Configs
                         shared_cache_size = 1 << max_scache_bit;
                 }
             }
-            catch (Exception e)
+            catch
             {
                 Console.WriteLine("ERROR : Faield to set $ and block size.");
                 Environment.Exit(1);    //exit code 1: config set failed
@@ -197,6 +383,10 @@ namespace SimplePIM.Configs
             }
             return true;
         }
+
+        /// <summary>
+        /// read config file
+        /// </summary>
         public static void read_configs()
         {
             try
@@ -206,31 +396,57 @@ namespace SimplePIM.Configs
                 string line = "";
                 while ((line = sr.ReadLine()) != null)
                 {
-                    line = line.Substring(0, line.IndexOf(";"));
+                    if (line.Contains(";"))
+                        line = line.Substring(0, line.IndexOf(";"));
                     if (line.StartsWith("#"))
                         continue;
                     if (line.Contains("="))
                     {
-                        string[] split = line.Substring(0,line.IndexOf(";")) .Replace(" ", "").Split('=');
-                        if(line.Count()%2!=0)
+
+                        string[] split = line.Replace(" ", "").Split('=');
+                        if (line.Count() % 2 != 0)
                         {
                             Console.WriteLine("Please make sure the line is correct: " + line);
                             continue;
                         }
+                        if (split[0] == "RAM")
+                        {
+                            string[] ram = split[1].Replace("[", "").Replace("]", "").Split(',');
+                            if (ram.Count() % 2 != 0)
+                            {
+                                Console.WriteLine("Please make sure the line is correct: " + line);
+                                Environment.Exit(2);
+                            }
+                            for (int i = 0; i < ram.Count(); i += 2)
+                            {
+                                memory.Add(new KeyValuePair<string, int>(ram[i + 1], Int16.Parse(ram[i])));
+                            }
+                            continue;
+                        }
                         SetValue(split[0], split[1]);
-                    }     
+                    }
                 }
             }
-            catch (Exception e)
+            catch
             {
                 Console.WriteLine("ERROR : cannot read configs. ");
 
             }
         }
-         
+
+        #endregion
+
     }
-    public enum PIM_input_type { Specified, All }
-    public enum SIM_TYPE { cycle, file }
+    public enum PIM_input_type
+    {
+        Specified,  //use "PIM_" label to identify what should be executed at memory-side.
+        All     //specify a type of ins so that they are all executed at memory-side
+    }
+    public enum SIM_TYPE
+    {
+        cycle,  
+        file    //while running out of trace files
+    }
     public enum RAM_TYPE
     {
         DRAM,

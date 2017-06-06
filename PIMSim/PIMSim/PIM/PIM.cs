@@ -1,4 +1,5 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,28 +9,44 @@ using SimplePIM.Procs;
 using SimplePIM.General;
 using System.IO;
 using SimplePIM.Statistics;
+#endregion
 
 namespace SimplePIM.PIM
 {
-    public class PIM_ : SimulatorObj
+    /// <summary>
+    /// PIM defination
+    /// </summary>
+    public class PIM : SimulatorObj
     {
-        public List<ComputationalUnit> unit;
-        public InsPartition ins_p;
-        public List<Function> cur = new List<Function>();
-        public StringBuilder sb = new StringBuilder();
+        #region Private Variables
+        /// <summary>
+        /// attached instruction partationer
+        /// </summary>
+        private InsPartition ins_p;
 
-        public PIM_(ref InsPartition ins_p_, ref Mctrl mctrl_)
+        #endregion
+
+        #region Public Variables
+        /// <summary>
+        /// all computational unit includes procs and pipelines
+        /// </summary>
+        public List<ComputationalUnit> unit;
+
+        #endregion
+
+        #region Public Methods
+        public PIM(ref InsPartition ins_p_, ref Mctrl mctrl_)
         {
             if (Config.DEBUG_PIM)
                 DEBUG.WriteLine("PIM Module Initialed.");
             ins_p = ins_p_;
 
             unit = new List<ComputationalUnit>();
-            if (Config.pim_config.unit_type == PIM_Unit_Type.Processors)
+            if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
             {
                 if (Config.DEBUG_PIM)
                     DEBUG.WriteLine("PIM Unit Type : Processors.");
-                for (int i = 0; i < Config.pim_config.N; i++)
+                for (int i = 0; i < PIMConfigs.N; i++)
                 {
                     var p = new PIMProc(ref ins_p, i);
                     p.attach_memctrl(ref mctrl_);
@@ -44,19 +61,17 @@ namespace SimplePIM.PIM
                 //pipeline mode
                 // When PIMSim runs into pipeline mode, input should always be a Function. 
 
-                for (int i = 0; i < Config.pim_config.CU_Name.Count; i++)
+                for (int i = 0; i < PIMConfigs.CU_Name.Count; i++)
                 {
-                    if (Config.pim_config.CU_Name[i] == "Customied")
+                    if (PIMConfigs.CU_Name[i] == "Customied")
                     {
-                        //add here
+                        //add your code here
                     }
                     else
                     {
-                        if (Config.pim_config.CU_Name[i] == "Adder")
+                        if (PIMConfigs.CU_Name[i] == "Adder")
                         {
                             unit.Add(new Adder(i, ref ins_p) as ComputationalUnit);
-
-
                             return;
                         }
 
@@ -75,6 +90,7 @@ namespace SimplePIM.PIM
                 unit[i].Step();
             }
         }
+        #endregion
 
     }
 }

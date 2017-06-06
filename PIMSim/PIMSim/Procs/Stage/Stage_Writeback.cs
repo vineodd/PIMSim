@@ -1,15 +1,24 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.General;
+#endregion
 
 namespace SimplePIM.Procs
 {
+    /// <summary>
+    /// Write data back to cache or registers
+    /// </summary>
     public class Stage_Writeback : Stage
     {
-
+        #region Public Methods
+        /// <summary>
+        /// set input
+        /// </summary>
+        /// <param name="obj"></param>
         public override void set_input(object obj)
         {
             if (last != null)
@@ -23,6 +32,11 @@ namespace SimplePIM.Procs
                 }
             }
         }
+
+        /// <summary>
+        /// read input
+        /// </summary>
+        /// <returns></returns>
         public override bool read_input()
         {
             if (input_ready && input != null)
@@ -35,6 +49,10 @@ namespace SimplePIM.Procs
             return false;
         }
 
+        /// <summary>
+        /// internal step
+        /// </summary>
+        /// <returns></returns>
         public override bool Step()
         {
             //add code to load data
@@ -43,6 +61,7 @@ namespace SimplePIM.Procs
             write_output();
             return true;
         }
+        #endregion
 
     }
 }

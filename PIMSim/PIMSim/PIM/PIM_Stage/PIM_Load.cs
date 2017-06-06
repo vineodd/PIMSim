@@ -10,9 +10,10 @@ namespace SimplePIM.PIM
     public class PIMStage_LoadData : Stage
     {
         public int latency = 0;
-        public PIMStage_LoadData(int lat)
+        public PIMStage_LoadData(int lat,object parent)
         {
             latency = lat;
+            Parent = parent;
         }
         public override void set_input(object obj)
         {
@@ -50,7 +51,7 @@ namespace SimplePIM.PIM
             if (read_input())
             {
                 write_output();
-
+                (Parent as ComputationalUnit).read_callback(0, 0);
                 return true;
             }
             return false;

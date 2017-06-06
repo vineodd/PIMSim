@@ -15,27 +15,42 @@ using SimplePIM.PIM;
 using SimplePIM.Memory.HMC;
 using SimplePIM.Statistics;
 #endregion
+
 namespace SimplePIM.General
 {
+    /// <summary>
+    /// PIMSimulator
+    /// </summary>
     public class PIMSimulator
     {
+        #region Public Methods
 
+        /// <summary>
+        /// Instruction Partitioner
+        /// </summary>
         public InsPartition ins_p;
+
+        /// <summary>
+        /// host-side proceeors
+        /// </summary>
         public List<Proc> proc;
-        public MemObject mem;
+
+
         public TraceFetcher trace;
         public Mctrl[] mctrl;
         public PageConverter pg;
         public Shared_Cache shared_cache;
-        public PIM_ pim;
+        public PIM.PIM pim;
+
+        #endregion
         public PIMSimulator(string[] args)
         {
-            // Config.config_file = Environment.CurrentDirectory + @"\Test\4cpu2pu_1function";
+
             initAllconfigs(args);
             mctrl = new Mctrl[2];
             trace = new TraceFetcher();
             trace.SET_trace_path(Config.trace_path);
-            //    trace.SET_trace_path(Environment.CurrentDirectory+ @"\Test\4cpu2pu_1function");
+
 
             ins_p = new InsPartition();
             ins_p.attach_tracefetcher(ref trace);
@@ -54,11 +69,13 @@ namespace SimplePIM.General
                 to_add.attach_tlb(ref pg);
                 proc.Add(to_add);
             }
-            if (Config.pim_config.ram_type == RAM_TYPE.DRAM)
+
+            MemObject mem = null;
+            if (Config.ram_type == RAM_TYPE.DRAM)
                 mem = new DDRMem(ref proc, 0) as MemObject;
             else
             {
-                if (Config.pim_config.ram_type == RAM_TYPE.HMC)
+                if (Config.ram_type == RAM_TYPE.HMC)
                 {
                     mem = new HMCMem(ref proc) as MemObject;
                 }
@@ -72,7 +89,7 @@ namespace SimplePIM.General
             mctrl[1] = new Mctrl(true);
             mctrl[1].init_queue();
             mem.attach_mctrl(ref mctrl[1]);
-            pim = new PIM_(ref ins_p, ref mctrl[1]);
+            pim = new PIM.PIM(ref ins_p, ref mctrl[1]);
             Coherence.init();
             Coherence.linkproc(proc);
             OverallClock.InitClock();
@@ -97,8 +114,6 @@ namespace SimplePIM.General
                 }
                 if (OverallClock.ifPIMUnitStep(0))
                     pim.Step();
-                if (i % 100 == 0)
-                    Console.WriteLine("Cycle: " + i);
                 OverallClock.Step();
             }
         }
@@ -110,7 +125,7 @@ namespace SimplePIM.General
 
             Config.read_configs();
             Config.initial();
-            Config.pim_config.initConfig();
+            PIMConfigs.initConfig();
             
 
         }
@@ -141,7 +156,7 @@ namespace SimplePIM.General
                 {
                     if (command.Equals("config_path", StringComparison.OrdinalIgnoreCase) || command.Equals("c"))
                     {
-                        Config.config_file = args[i + 1];
+                        Config.config_path = args[i + 1];
                     }
                     else
                     {
@@ -182,7 +197,9 @@ namespace SimplePIM.General
         {
             foreach (var item in proc)
                 item.PrintStatus();
-            ins_p.PrintStatus();   
+            ins_p.PrintStatus();
+            foreach (var item in pim.unit)
+                item.PrintStatus();
         }
     }
 }

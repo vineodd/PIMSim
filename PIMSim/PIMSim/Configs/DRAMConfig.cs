@@ -1,16 +1,20 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+#endregion
 
 namespace SimplePIM.Memory.DDR
 {
-
+    /// <summary>
+    /// DRAM Configs
+    /// </summary>
     public class DRAMConfig
     {
-        public string systemIniFilename = "DRAM.ini";
+        #region Public Variables
         public bool RETURN_TRANSACTIONS = true;
         public bool LOG_OUTPUT = false;
         public FileStream cmd_verify_out; //used in Rank.cpp and MemoryController.cpp if VERIFICATION_OUTPUT is set
@@ -71,21 +75,17 @@ namespace SimplePIM.Memory.DDR
         public uint IDD6L;
         public uint IDD7;
         public bool NO_STORAGE = false;
-        public uint READ_TO_PRE_DELAY() { return (AL + BL / 2 + Math.Max(tRTP, tCCD) - tCCD); }
-        public uint WRITE_TO_PRE_DELAY() { return (WL() + BL / 2 + tWR); }
-        public uint READ_TO_WRITE_DELAY() { return (RL() + BL / 2 + tRTRS - WL()); }
-        public uint READ_AUTOPRE_DELAY() { return (AL + tRTP + tRP); }
-        public uint WRITE_AUTOPRE_DELAY() { return (WL() + BL / 2 + tWR + tRP); }
-        public uint WRITE_TO_READ_DELAY_B() { return (WL() + BL / 2 + tWTR); } //interbank
-        public uint WRITE_TO_READ_DELAY_R() { return (WL() + BL / 2 + tRTRS - RL()); } //interrank
-        public uint RL()
-        {
-            return (CL + AL);
-        }
-        public uint WL()
-        {
-            return RL() - 1;
-        }
+        public uint READ_TO_PRE_DELAY=> (AL + BL / 2 + Math.Max(tRTP, tCCD) - tCCD); 
+        public uint WRITE_TO_PRE_DELAY=>(WL + BL / 2 + tWR); 
+        public uint READ_TO_WRITE_DELAY=>(RL + BL / 2 + tRTRS - WL); 
+        public uint READ_AUTOPRE_DELAY=>(AL + tRTP + tRP); 
+        public uint WRITE_AUTOPRE_DELAY=>(WL + BL / 2 + tWR + tRP); 
+        public uint WRITE_TO_READ_DELAY_B=>(WL + BL / 2 + tWTR);  //interbank
+        public uint WRITE_TO_READ_DELAY_R=>(WL + BL / 2 + tRTRS - RL);  //interrank
+        public uint RL=>(CL + AL);
+        
+        public uint WL=>RL - 1;
+        
 
         //in bytes
         public uint JEDEC_DATA_BUS_BITS;
@@ -126,6 +126,9 @@ namespace SimplePIM.Memory.DDR
         public uint NUM_DEVICES;
         public uint NUM_RANKS;
         public uint NUM_RANKS_LOG;
+        #endregion
+
+        #region Public Methods
         public uint log2(ulong value)
         {
             uint logbase2 = 0;
@@ -239,7 +242,7 @@ namespace SimplePIM.Memory.DDR
                             {
                                 intValue = UInt32.Parse(valueString);
                             }
-                            catch (Exception e)
+                            catch 
                             {
                                 Console.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
                             }
@@ -261,7 +264,7 @@ namespace SimplePIM.Memory.DDR
                             {
                                 int64Value = UInt64.Parse(valueString);
                             }
-                            catch (Exception e)
+                            catch 
                             {
                                 Console.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
                             }
@@ -282,7 +285,7 @@ namespace SimplePIM.Memory.DDR
                             {
                                 floatValue = float.Parse(valueString);
                             }
-                            catch (Exception e)
+                            catch 
                             {
                                 Console.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
                             }
@@ -362,7 +365,7 @@ namespace SimplePIM.Memory.DDR
                 fs = new FileStream( filename, FileMode.Open);
                 sr = new StreamReader(fs);
             }
-            catch (Exception e)
+            catch 
             {
 
             }
@@ -570,7 +573,6 @@ namespace SimplePIM.Memory.DDR
             }
             return true;
         }
-        public void WriteValuesOut(Stream visDataOut) { }
         public int getBool(string field, ref bool val)
         {
             for (int i = 0; i < configMap.Count; i++)
@@ -624,6 +626,7 @@ namespace SimplePIM.Memory.DDR
             }
             return -1;
         }
+        #endregion
     }
     public enum varType { STRING, UINT, UINT64, FLOAT, BOOL }
     public enum paramType { SYS_PARAM, DEV_PARAM }

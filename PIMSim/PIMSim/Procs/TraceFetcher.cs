@@ -97,10 +97,10 @@ namespace SimplePIM.Procs
                 ins.cycle = UInt64.Parse(split_ins[0]);
                 ins.pid = pid_;
 
-                if (Config.pim_config.PIM_Fliter == PIM_input_type.All)
+                if (PIMConfigs.PIM_Fliter == PIM_input_type.All)
                 {
                     //set all insruction to pim
-                    ins.pim = Config.pim_config.PIM_Ins_List.Any(s => s == ins.Operation) ? true : false;
+                    ins.pim = PIMConfigs.PIM_Ins_List.Any(s => s == ins.Operation) ? true : false;
                 }
                 else
                 {
@@ -110,8 +110,8 @@ namespace SimplePIM.Procs
                 //read address and data.
                 if (split_ins.Length >= 4)
                 {
-                    ins.type = (split_ins[2] == "R") ? InstructionType.READ : InstructionType.EOF;
-                    ins.type = (split_ins[2] == "W") ? InstructionType.WRITE : InstructionType.EOF;
+                    ins.type = (split_ins[2] == "R") ? InstructionType.READ : InstructionType.WRITE;
+                  //  ins.type = (split_ins[2] == "W") ? InstructionType.WRITE : InstructionType.CALCULATION;
 
 
 
@@ -207,7 +207,7 @@ namespace SimplePIM.Procs
                                 currentline = currentline.Substring(0, currentline.IndexOf(";") + 1);
                             to_add.add_ins(parse_ins(currentline, pid_));
                             block_size++;
-                            if (block_size > Config.pim_config.max_pim_block)
+                            if (block_size > PIMConfigs.max_pim_block)
                             {
                                 //error
                                 Environment.Exit(1);

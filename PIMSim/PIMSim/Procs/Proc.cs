@@ -128,11 +128,11 @@ namespace SimplePIM.Procs
         private UInt64 stall_cycle = 0;
         private UInt64 memory_cycle = 0;
         private UInt64 total_read_latency => ins_w.total_read_latency;
-        private UInt64 avg_read_latency => total_read_latency / read_reqs;
-        private UInt64 avg_write_latency => total_write_latency / write_reqs;
+        private UInt64 avg_read_latency => read_reqs != 0 ? total_read_latency / read_reqs : 0;
+        private UInt64 avg_write_latency => write_reqs != 0 ? total_write_latency / write_reqs : 0;
         private UInt64 total_write_latency => ins_w.total_write_latency;
         private UInt64 total_latency => total_read_latency + total_write_latency;
-        private UInt64 avg_latency => total_latency / memory_reqs;
+        private UInt64 avg_latency => memory_reqs != 0 ? total_latency / memory_reqs : 0;
         private UInt64 l1cache_hit => L1Cache.hits;
         private UInt64 l1cache_miss => L1Cache.miss;
         private UInt64 l1cache_loaded => l1cache_hit + l1cache_miss;
@@ -205,7 +205,7 @@ namespace SimplePIM.Procs
         }
 
         /// <summary>
-        /// Initial Processor
+        /// Processor Construction Function
         /// </summary>
         /// <param name="insp_"> Shared Instruction Partitioner </param>
         /// <param name="pid_"> Processor ID</param>
@@ -217,7 +217,7 @@ namespace SimplePIM.Procs
             IPC = Config.IPC;
 
             //init private cache
-            L1Cache = new Cache();
+            L1Cache = new Cache(false);
 
             //init instruction window
             ins_w = new InstructionWindow(Config.ins_w_size, pid);
@@ -226,7 +226,7 @@ namespace SimplePIM.Procs
             if (Config.use_cache)
                 cache_req_queue = new Queue<ProcRequest>();
             MSHR = new List<ProcRequest>(Config.mshr_size);
-            if (Config.wb)
+            if (Config.writeback)
                 writeback_req = new List<ProcRequest>();
 
             //restrict
@@ -242,7 +242,7 @@ namespace SimplePIM.Procs
         }
 
         /// <summary>
-        /// Get instruction form instruction partitioner.
+        /// Get instruction from instruction partitioner.
         /// We assume that host core can only process intructions(Not Functions and InstrcutionBlocks).
         /// When core encountered a non-instruction, return error.
         /// </summary>
@@ -339,7 +339,7 @@ namespace SimplePIM.Procs
         /// <param name="if_shared"> if shared cache</param>
         public void add_to_cache(ProcRequest req_, bool if_shared = false)
         {
-            req_.ts_departure = cycle + (if_shared ? Config.share_cache_hit_lantecy : Config.l1cache_hit_latency);
+            req_.ts_departure = cycle + (if_shared ? Config.share_cache_hit_latecy : Config.l1cache_hit_latency);
             cache_req_queue.Enqueue(req_);
             curr_ins.ready = false;
             curr_ins.is_mem = true;
@@ -349,7 +349,7 @@ namespace SimplePIM.Procs
         }
 
         /// <summary>
-        /// Add to Cache
+        /// update cache
         /// </summary>
         public void handle_cache_req()
         {
@@ -378,8 +378,6 @@ namespace SimplePIM.Procs
         /// <param name="addr_">Actual address</param>
         public void handle_read_callback(UInt64 block_addr, UInt64 addr_)
         {
-            if (Coherence.consistency == Consistency.SpinLock)
-                Coherence.spin_lock.relese_lock(addr_);
             ins_w.set_ready(block_addr, this.cycle);
             MSHR.RemoveAll(x => x.block_addr == block_addr);
 
@@ -389,10 +387,10 @@ namespace SimplePIM.Procs
                 UInt64 addr = NULL;
                 if (!shared_cache.search_block(block_addr, General.RequestType.READ))
                 {
-                    addr = shared_cache.add(block_addr, General.RequestType.READ, 0);
+                    addr = shared_cache.add(block_addr, General.RequestType.READ, this.pid);
                     if (!L1Cache.search_block(block_addr, General.RequestType.READ))
                     {
-                        L1Cache.add(block_addr, General.RequestType.READ, 0);
+                        L1Cache.add(block_addr, General.RequestType.READ, this.pid);
                     }
                     L1Cache.remove(addr);
                 }
@@ -426,10 +424,10 @@ namespace SimplePIM.Procs
                 UInt64 addr = NULL;
                 if (!shared_cache.search_block(block_addr, General.RequestType.READ))
                 {
-                    addr = shared_cache.add(block_addr, General.RequestType.WRITE, 0);
+                    addr = shared_cache.add(block_addr, General.RequestType.WRITE, this.pid);
                     if (!L1Cache.search_block(block_addr, General.RequestType.READ))
                     {
-                        L1Cache.add(block_addr, General.RequestType.WRITE, 0);
+                        L1Cache.add(block_addr, General.RequestType.WRITE, this.pid);
                     }
                     L1Cache.remove(addr);
                 }
@@ -446,9 +444,9 @@ namespace SimplePIM.Procs
                 }
             }
         }
+
         /// <summary>
         /// update instruction window
-        /// For 
         /// </summary>
         public void update_ins_w()
         {
@@ -517,7 +515,13 @@ namespace SimplePIM.Procs
                 //success
                 mshr_retry = false;
 
-                bool false_miss = ins_w.if_exist(curr_req.block_addr);
+                if (ins_w.if_exist(curr_req.block_addr))
+                {
+                    if (Config.DEBUG_PROC)
+                    {
+                        DEBUG.WriteLine("-- InsWd : Instruction had been loaded.");
+                    }
+                }
 
 
 
@@ -647,6 +651,7 @@ namespace SimplePIM.Procs
             }
 
         }
+
         /// <summary>
         /// Reset restriction of memory and calculation
         /// </summary>
@@ -674,7 +679,7 @@ namespace SimplePIM.Procs
             reset_restrict();
 
             //period statics
-            if (cycle % Config.static_period == 0 && cycle != 0)
+            if (cycle % Config.proc_static_period == 0 && cycle != 0)
             {
                 //static 
             }
@@ -723,7 +728,7 @@ namespace SimplePIM.Procs
                 memory_cycle++;
             }
 
-            if (Config.wb)
+            if (Config.writeback)
             {
                 //handle write-back queue
                 if (writeback_req.Count > 0)
@@ -743,15 +748,12 @@ namespace SimplePIM.Procs
 
             }
 
-
-            // if MSHR or MCTRL queue are full last cycle , system has to process last request
-
             bool prcessed = false;
             if (mshr_retry || mctrl_retry)
             {
                 if (ins_w.full())
                 {
-                    // Stat.procs[pid].stall_inst_wnd.Collect();
+
                     if (Config.DEBUG_PROC)
                     {
                         DEBUG.WriteLine("-- InsWd : Queue Full.");
@@ -765,8 +767,7 @@ namespace SimplePIM.Procs
                 if (!prcessed)
                     return;
 
-                //reissue success
-                //  Dbg.Assert(!mshr_ok && !mctrl_ok);
+
                 mem_restrict.WaitOne();
                 curr_ins = null;
                 curr_ins = get_ins_from_insp();
@@ -793,7 +794,7 @@ namespace SimplePIM.Procs
         /// </summary>
         public void PrintStatus()
         {
-            DEBUG.WriteLine("=====================Processor [" + pid + "] Statics=====================");
+            DEBUG.WriteLine("=====================Processor [" + pid + "] Statistics=====================");
             DEBUG.WriteLine();
             DEBUG.WriteLine("        Total Instructions Served : " + total_instruction);
             DEBUG.WriteLine("        Read Instructions         : " + read_reqs);
