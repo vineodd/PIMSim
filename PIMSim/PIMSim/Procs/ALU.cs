@@ -8,6 +8,7 @@ using SimplePIM.Configs;
 using SimplePIM.General;
 using SimplePIM.Statistics;
 #endregion 
+
 namespace SimplePIM.Procs
 {
     /// <summary>
@@ -28,8 +29,8 @@ namespace SimplePIM.Procs
         private Stage[] pipeline = new Stage[4];
 
         // calculation limitation.
-        private Counter add_count;
-        private Counter multi_count;
+        private int add_count;
+        private int multi_count;
 
         #endregion
 
@@ -63,8 +64,8 @@ namespace SimplePIM.Procs
             
             ins = new Queue<KeyValuePair<ulong, Instruction>>();
 
-            add_count = new Counter(Config.adder_count, Config.adder_count);
-            multi_count = new Counter(Config.multi_count, Config.multi_count);
+            add_count = Config.adder_count;
+            multi_count = Config.multi_count;
             //init pipeline stage
 
             //********************************************************
@@ -91,8 +92,8 @@ namespace SimplePIM.Procs
             //**                                                    **
             //********************************************************
             var item_stage3 = new Stage_Computing();
-            item_stage3.set_add_counter(ref add_count);
-            item_stage3.set_multi_counter(ref multi_count);
+            item_stage3.set_add_counter(add_count);
+            item_stage3.set_multi_counter(multi_count);
             item_stage3.set_link(ref pipeline[1]);
             pipeline[2] = item_stage3 as Stage;
            

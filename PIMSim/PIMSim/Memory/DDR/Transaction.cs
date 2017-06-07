@@ -187,7 +187,7 @@ namespace SimplePIM.Memory.DDR
             UInt64 latency = callback.done_cycle - added_cycle;
 
             //   for (int i = 0; i < proc.Count(); i++)
-            {
+            
                 if (!callback.pim)
                 {
                     foreach(var proc in (callback.getsource() as List<Proc>))
@@ -216,16 +216,16 @@ namespace SimplePIM.Memory.DDR
                        
                     }
                 }
-            }
+            
             
 
-            if (Coherence.consistency == Consistency.SpinLock)
-            {
-                if (callback.pim)
-                {
-                    Coherence.spin_lock.relese_lock(callback.address);
-                }
-            }
+            //if (Coherence.consistency == Consistency.SpinLock)
+            //{
+            //    if (callback.pim)
+            //    {
+            //        Coherence.spin_lock.relese_lock(callback.address);
+            //    }
+            //}
 
             pendingReadRequests[callback.address].RemoveAt(0);
             if (pendingReadRequests[callback.address].Count() == 0)
@@ -257,16 +257,45 @@ namespace SimplePIM.Memory.DDR
 
             //   for (int i = 0; i < proc.Count(); i++)
 
-            proc[(int)id].write_callback(callback.block_addr, callback.address);
-           if (Coherence. consistency == Consistency.SpinLock)
+            // proc[(int)id].write_callback(callback.block_addr, callback.address);
+            if (!callback.pim)
             {
-                if (callback.pim)
+                foreach (var proc in (callback.getsource() as List<Proc>))
                 {
-                    Coherence.spin_lock.relese_lock(callback.address);
+                    proc.write_callback(callback.block_addr, callback.address);
+                }
+
+            }
+            else
+            {
+                if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                {
+                    foreach (var pimproc in (callback.getsource() as List<PIMProc>))
+                    {
+                        pimproc.write_callback(callback.block_addr, callback.address);
+                    }
+
+
+                }
+                else
+                {
+                    foreach (var pimunit in (callback.getsource() as List<ComputationalUnit>))
+                    {
+                        pimunit.write_callback(callback.block_addr, callback.address);
+                    }
+
                 }
             }
-           
-          
+
+            //if (Coherence. consistency == Consistency.SpinLock)
+            // {
+            //     if (callback.pim)
+            //     {
+            //         Coherence.spin_lock.relese_lock(callback.address);
+            //     }
+            // }
+
+
             pendingWriteRequests[callback.address].RemoveAt(0);
             if (pendingWriteRequests[callback.address].Count() == 0)
                 pendingWriteRequests.Remove(callback.address);

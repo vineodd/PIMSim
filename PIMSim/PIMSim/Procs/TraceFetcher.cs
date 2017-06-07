@@ -216,20 +216,21 @@ namespace SimplePIM.Procs
                     }
                     else
                     {
-                        if (currentline.Contains("PIM_") && currentline.Contains("FUNCTION_START"))
+                        if (currentline.Contains("FUNCTION_") && currentline.Contains("_START"))
                         {
                             Function func = new Function();
-                            func.cycle = UInt64.Parse(currentline.Substring(0, currentline.IndexOf("|") + 1));
+                            func.cycle = UInt64.Parse(currentline.Substring(0, currentline.IndexOf("|") ));
+                            func.name = currentline.Split('_')[1];
                             while (true)
                             {
-                                currentline = sr[pid_].ReadLine();
+                                currentline = sr[pid_].ReadLine().Replace("\t", "").Replace(" ", "");
                                 if (currentline == null)
                                 {
                                     return new Instruction(InstructionType.EOF);
                                 }
                                 if (currentline.StartsWith("#") || currentline.StartsWith(";"))
                                     continue;
-                                if (currentline.Contains("PIM_") && currentline.Contains("FUNCTION_END"))
+                                if (currentline.Contains("FUNCTION_") && currentline.Contains("_END"))
                                 {
 
                                     return func;
@@ -240,13 +241,13 @@ namespace SimplePIM.Procs
                                 string[] tp = currentline.Split('=');
                                 if (tp[0].Equals("input"))
                                 {
-                                    func.input.Add(UInt64.Parse(tp[1].Replace("0x", "")));
+                                    func.input.Add(UInt64.Parse(tp[1].Replace("0x", ""), System.Globalization.NumberStyles.AllowHexSpecifier));
                                 }
                                 else
                                 {
                                     if (tp[0].Equals("output"))
                                     {
-                                        func.output.Add(UInt64.Parse(tp[1].Replace("0x", "")));
+                                        func.output.Add(UInt64.Parse(tp[1].Replace("0x", ""), System.Globalization.NumberStyles.AllowHexSpecifier));
                                     }
                                     else
                                     {
@@ -256,7 +257,8 @@ namespace SimplePIM.Procs
                                         }
                                         else
                                         {
-                                            //Wow you get it!
+                                            ///?????
+                                            ///
                                             Environment.Exit(1);
 
                                         }

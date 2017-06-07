@@ -44,6 +44,7 @@ namespace SimplePIM.PIM
 
         public override bool Step()
         {
+            stall = false;
             //add code to load data
             set_input(null);
           if(read_input())

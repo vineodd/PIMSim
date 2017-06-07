@@ -51,14 +51,14 @@ namespace SimplePIM.General
         /// <returns></returns>
         public bool WaitOne()
         {
-            if (max < 0)
+            if (count < 0)
                 throw new ArgumentException();
-            if (max == 0)
+            if (count == 0)
             {
                 return false;
             }
-            max--;
-            if (max < 0)
+            count--;
+            if (count < 0)
                 throw new ArgumentException();
             return true;
         }
@@ -91,7 +91,7 @@ namespace SimplePIM.General
         {
             if (count + 1 > max)
                 return;
-            max++;
+            count++;
         }
 
         /// <summary>

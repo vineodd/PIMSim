@@ -64,6 +64,15 @@ namespace SimplePIM.General
 
         public int output_count => output.Count();
 
+        /// <summary>
+        /// Set served time
+        /// </summary>
+        /// <param name="time"></param>
+        public void getServed(UInt64 time)
+        {
+            servetime = time;
+        }
+
         #endregion
     }
 }

@@ -21,7 +21,8 @@ namespace SimplePIM.Memory.HMC
         public int current_statue = Macros.HMC_OK;
         public FileStream fs;
         public uint tag = 0;
-        public List<Tuple<UInt64, List<int>, UInt64, UInt64,bool>> callback = new List<Tuple<ulong, List<int>, ulong, ulong,bool>>();
+        //  public List<Tuple<UInt64, List<int>, UInt64, UInt64,bool>> callback = new List<Tuple<ulong, List<int>, ulong, ulong,bool>>();
+        public List<Tuple<UInt64, CallBackInfo>> callback = new List<Tuple<ulong, CallBackInfo>>();
         public override bool addTransation(MemRequest req_)
         {
             this.TransationQueue.Enqueue(req_);
@@ -183,7 +184,7 @@ namespace SimplePIM.Memory.HMC
                     current_statue = hmc.hmcsim_send(packet);
                     if (current_statue == 0)
                     {
-                        callback.Add(new Tuple<ulong, List<int>, ulong, ulong,bool>(tag - 1, req.pid, req.block_addr, req.address,req.pim));
+                        callback.Add(new Tuple<ulong, CallBackInfo>(tag - 1, new CallBackInfo(req.address, req.block_addr, req.pim, req.pid)));
                         TransationQueue.Dequeue();
                         current_statue = Macros.HMC_OK;
                         while (current_statue != Macros.HMC_STALL)
@@ -222,25 +223,73 @@ namespace SimplePIM.Memory.HMC
                                     var item = callback.FindIndex(s => s.Item1 == d_tag);
                                     if (item < 0)
                                     {
-                                        //error
+                                        //read none
                                         Console.WriteLine("");
 
                                     }
 
                                     if (d_type == hmc_response.RD_RS)
                                     {
-                                        foreach (var id in callback[item].Item2)
+                                        if (!callback[item].Item2.pim)
                                         {
-                                            proc[id].read_callback(callback[item].Item3, callback[item].Item4);
+                                            foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
+                                            {
+                                                proc.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                            }
+
+                                        }
+                                        else
+                                        {
+                                            if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                                            {
+                                                foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                                {
+                                                    pimproc.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                }
+
+
+                                            }
+                                            else
+                                            {
+                                                foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                                {
+                                                    pimunit.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                }
+
+                                            }
                                         }
                                     }
                                     else
                                     {
                                         if (d_type == hmc_response.WR_RS)
                                         {
-                                            foreach (var id in callback[item].Item2)
+                                            if (!callback[item].Item2.pim)
                                             {
-                                                proc[id].write_callback(callback[item].Item3, callback[item].Item4);
+                                                foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
+                                                {
+                                                    proc.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                }
+
+                                            }
+                                            else
+                                            {
+                                                if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                                                {
+                                                    foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                                    {
+                                                        pimproc.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                    }
+
+
+                                                }
+                                                else
+                                                {
+                                                    foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                                    {
+                                                        pimunit.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                    }
+
+                                                }
                                             }
                                         }
                                         else
@@ -249,13 +298,13 @@ namespace SimplePIM.Memory.HMC
                                             Environment.Exit(0);
                                         }
                                     }
-                                    if (Coherence.consistency == Consistency.SpinLock)
-                                    {
-                                        if (callback[item].Item5)
-                                        {
-                                            Coherence.spin_lock.relese_lock(callback[item].Item4);
-                                        }
-                                    }
+                                    //if (Coherence.consistency == Consistency.SpinLock)
+                                    //{
+                                    //    if (callback[item].Item5)
+                                    //    {
+                                    //        Coherence.spin_lock.relese_lock(callback[item].Item4);
+                                    //    }
+                                    //}
 
                                     callback.RemoveAt(item);
                                 }
@@ -354,18 +403,66 @@ namespace SimplePIM.Memory.HMC
 
                         if (d_type == hmc_response.RD_RS)
                         {
-                            foreach (var id in callback[item].Item2)
+                            if (!callback[item].Item2.pim)
                             {
-                                proc[id].read_callback(callback[item].Item3, callback[item].Item4);
+                                foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
+                                {
+                                    proc.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                }
+
+                            }
+                            else
+                            {
+                                if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                                {
+                                    foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                    {
+                                        pimproc.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                    }
+
+
+                                }
+                                else
+                                {
+                                    foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                    {
+                                        pimunit.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                    }
+
+                                }
                             }
                         }
                         else
                         {
                             if (d_type == hmc_response.WR_RS)
                             {
-                                foreach (var id in callback[item].Item2)
+                                if (!callback[item].Item2.pim)
                                 {
-                                    proc[id].write_callback(callback[item].Item3, callback[item].Item4);
+                                    foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
+                                    {
+                                        proc.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                    }
+
+                                }
+                                else
+                                {
+                                    if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                                    {
+                                        foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                        {
+                                            pimproc.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                        }
+
+
+                                    }
+                                    else
+                                    {
+                                        foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                        {
+                                            pimunit.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                        }
+
+                                    }
                                 }
                             }
                             else
@@ -374,13 +471,13 @@ namespace SimplePIM.Memory.HMC
                                 Environment.Exit(0);
                             }
                         }
-                        if (Coherence.consistency == Consistency.SpinLock)
-                        {
-                            if (callback[item].Item5)
-                            {
-                                Coherence.spin_lock.relese_lock(callback[item].Item4);
-                            }
-                        }
+                        //if (Coherence.consistency == Consistency.SpinLock)
+                        //{
+                        //    if (callback[item].Item5)
+                        //    {
+                        //        Coherence.spin_lock.relese_lock(callback[item].Item4);
+                        //    }
+                        //}
                         callback.RemoveAt(item);
                         // all_recv++;
                     }

@@ -28,9 +28,7 @@ namespace SimplePIM.PIM
             {
                 if (Coherence.consistency == Consistency.SpinLock)
                 {
-                   var locked= Coherence.spin_lock.get_lock_state((UInt64)input);
-                    if (locked)
-                        return false;
+                 
                     Coherence.spin_lock.setlock((UInt64)input);
                 }
                 latency--;
@@ -47,6 +45,7 @@ namespace SimplePIM.PIM
 
         public override bool Step()
         {
+            stall = false;
             //add code to load data
             if (read_input())
             {

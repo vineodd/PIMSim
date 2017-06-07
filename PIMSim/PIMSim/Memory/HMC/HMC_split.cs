@@ -51,15 +51,15 @@ namespace SimplePIM.Memory.HMC
 
         public void HMCSIM_PRINT_ADDR_TRACE(string s, UInt64 a)
         {
-            Console.WriteLine("HCMSIM_TRACE %s:%d : %s : 0x%016llx", s, a);
+            Console.WriteLine("HCMSIM_TRACE {0}: {1} : {0} : 0x%016llx", s, a);
         }
         public void HMCSIM_PRINT_INT_TRACE(string s, int d)
         {
-            Console.WriteLine("HCMSIM_TRACE %s:%d : %s : %d", s, d);
+            Console.WriteLine("HCMSIM_TRACE {0} : {1} : {0} : {1}", s, d);
         }
         public void HMCSIM_PRINT_TRACE(string s)
         {
-            Console.WriteLine("HCMSIM_TRACE %s:%d : %s", s);
+            Console.WriteLine("HCMSIM_TRACE {0} : {0} : {0}", s);
         }
         public int hmcsim_util_zero_packet(ref hmc_queue queue)
         {

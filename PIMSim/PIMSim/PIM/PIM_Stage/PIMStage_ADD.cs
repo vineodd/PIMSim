@@ -29,6 +29,7 @@ namespace SimplePIM.PIM
 
         public override bool Step()
         {
+            stall = false;
             set_input(null);
             if (read_input())
             {

@@ -68,6 +68,13 @@ namespace SimplePIM.Procs
             pim = p;
             pid = pid_;
         }
+        public CallBackInfo(UInt64 addr, UInt64 blockaddr,  bool p, List<int> pid_)
+        {
+            address = addr;
+            block_addr = blockaddr;
+            pim = p;
+            pid = pid_;
+        }
         public CallBackInfo()
         {
 

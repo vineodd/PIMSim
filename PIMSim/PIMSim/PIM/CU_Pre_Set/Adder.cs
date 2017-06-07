@@ -110,6 +110,8 @@ namespace SimplePIM.PIM
                 //Nothing happend
                 if (curr != null)
                 {
+                    total_load++;
+                    curr.getServed(OverallClock.cycle);
                     bandwidth_bit += curr.Length();
                     pipeline[0].set_input(curr.input[0]);
                     pipeline[1].set_input(curr.input[1]);
@@ -142,6 +144,9 @@ namespace SimplePIM.PIM
 
                             }
                             pipeline[i].get_output(ref addr);
+
+                            total_latency += OverallClock.cycle - curr.servetime;
+
                             curr = null;
                         }
                     }
