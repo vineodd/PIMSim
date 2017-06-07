@@ -53,7 +53,7 @@ namespace SimplePIM.PIM
 
         public SpinLock()
         {
-            page_index = MemorySelector.get_RAM_size() / size;
+            page_index = MemorySelector.get_RAM_size() / size +1;
 
             lock_table = new List<string>();
             //foreach block entry, set lock table false.

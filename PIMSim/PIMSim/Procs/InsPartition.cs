@@ -266,14 +266,18 @@ namespace SimplePIM.Procs
             DEBUG.WriteLine();
             DEBUG.WriteLine("        Total Requests Sent   : " + total_reqs);
             DEBUG.WriteLine("        Total PIM Requests    : " + total_pim_reqs);
-            for(int i=0;i<divide_pim_reqs.Count();i++)
+            DEBUG.WriteLine();
+            for (int i=0;i<divide_pim_reqs.Count();i++)
             {
-                DEBUG.WriteLine("-------PIM Unit : " + i + " ---------");
-                DEBUG.WriteLine("             Reqs             : " + divide_pim_reqs[i]);
-                DEBUG.WriteLine("          Bandwidth           : " + PIMBandWidth(i) + "MB/s");
-                DEBUG.WriteLine();
+            DEBUG.WriteLine("-------------- PIM Unit [" + i + "] Messages Statistics ---------");
+            DEBUG.WriteLine();
+            DEBUG.WriteLine("         Sent Messages        : " + divide_pim_reqs[i]);
+            DEBUG.WriteLine("      Messages Percentage     : " + (total_reqs!=0?divide_pim_reqs[i]*100.0/ total_reqs: 100)+"%");
+            DEBUG.WriteLine("          Bandwidth           : " + PIMBandWidth(i) + "MB/s");
+            DEBUG.WriteLine();
             }
             DEBUG.WriteLine("        Total Bandwidth           : " + PIMBandWidth() + "MB/s");
+            DEBUG.WriteLine();
         }
         #endregion
     }

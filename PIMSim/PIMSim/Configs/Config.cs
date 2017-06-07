@@ -97,6 +97,7 @@ namespace SimplePIM.Configs
         /// </summary>
         public static UInt64 proc_frequent = 4 * (UInt64)Math.Pow(2, 30);
 
+
         #endregion
 
         #region Cache Config
@@ -170,8 +171,10 @@ namespace SimplePIM.Configs
         public static bool DEBUG_COHERENCE = true;
         public static bool DEBUG_PROC = true;
         public static bool DEBUG_ALU = true;
+        public static bool DEBUG_ALU_PIPELINE = true;
         public static bool DEBUG_PIM = true;
         public static bool DEBUG_INSP = true;
+        
 
         #endregion
 
@@ -227,7 +230,7 @@ namespace SimplePIM.Configs
         #region  Simulation Config
 
         public static UInt64 sim_cycle = 10000;
-        public static SIM_TYPE sim_type = SIM_TYPE.cycle;
+        public static SIM_TYPE sim_type = SIM_TYPE.file;
 
         #endregion
 
@@ -406,7 +409,7 @@ namespace SimplePIM.Configs
                         string[] split = line.Replace(" ", "").Split('=');
                         if (line.Count() % 2 != 0)
                         {
-                            Console.WriteLine("Please make sure the line is correct: " + line);
+                            DEBUG.WriteLine("Please make sure the line is correct: " + line);
                             continue;
                         }
                         if (split[0] == "RAM")
@@ -414,12 +417,47 @@ namespace SimplePIM.Configs
                             string[] ram = split[1].Replace("[", "").Replace("]", "").Split(',');
                             if (ram.Count() % 2 != 0)
                             {
-                                Console.WriteLine("Please make sure the line is correct: " + line);
+                                DEBUG.WriteLine("Please make sure the line is correct: " + line);
                                 Environment.Exit(2);
                             }
                             for (int i = 0; i < ram.Count(); i += 2)
                             {
                                 memory.Add(new KeyValuePair<string, int>(ram[i + 1], Int16.Parse(ram[i])));
+                            }
+                            if (memory.Count <= 0)
+                            {
+                                DEBUG.Error("No Memory?");
+                                Environment.Exit(2);
+                            }
+                            else
+                            {
+                                if (memory.Count == 1)
+                                {
+                                    if (memory[0].Key == "HMC")
+                                        Config.ram_type = RAM_TYPE.HMC;
+                                    else
+                                    {
+                                        if (memory[0].Key == "DRAM" )
+                                            Config.ram_type = RAM_TYPE.DRAM;
+                                        else
+                                        {
+                                            if(memory[0].Key == "PCM")
+                                            {
+                                                Config.ram_type = RAM_TYPE.PCM;
+                                            }
+                                            else
+                                            {
+                                                DEBUG.Error("Error in input Memory Type.");
+                                                Environment.Exit(2);
+                                            }
+                                                
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    Config.ram_type = RAM_TYPE.HYBRID;
+                                }
                             }
                             continue;
                         }

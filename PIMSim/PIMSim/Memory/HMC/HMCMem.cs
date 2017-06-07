@@ -14,8 +14,8 @@ namespace SimplePIM.Memory.HMC
     public class HMCMem : MemObject
     {
         public List<Mctrl> mctrl;
-        public List<Proc> proc;
-        public Queue<MemRequest> TransationQueue;
+
+        public List<MemRequest> TransationQueue;
 
         public HMCSim hmc;
         public int current_statue = Macros.HMC_OK;
@@ -25,7 +25,7 @@ namespace SimplePIM.Memory.HMC
         public List<Tuple<UInt64, CallBackInfo>> callback = new List<Tuple<ulong, CallBackInfo>>();
         public override bool addTransation(MemRequest req_)
         {
-            this.TransationQueue.Enqueue(req_);
+            this.TransationQueue.Add(req_);
             return false;
         }
 
@@ -33,10 +33,10 @@ namespace SimplePIM.Memory.HMC
         {
             mctrl.Add(  mctrl_);
         }
-        public HMCMem(ref List<Proc> proc_)
+        public HMCMem(int id_)
         {
 
-            proc = proc_;
+            this.id = id_;
             mctrl = new List<Mctrl>();
             hmc = new HMCSim();
             hmc.hmcsim_init(Config.hmc_config.num_devs, Config.hmc_config.num_links,
@@ -83,7 +83,7 @@ namespace SimplePIM.Memory.HMC
         Macros.HMC_TRACE_CMD |
         Macros.HMC_TRACE_STALL |
         Macros.HMC_TRACE_LATENCY));
-            TransationQueue = new Queue<MemRequest>();
+            TransationQueue = new List<MemRequest>();
         }
         ~HMCMem()
         {
@@ -98,12 +98,32 @@ namespace SimplePIM.Memory.HMC
             {
                 while (m.get_req(this.pid, ref req_))
                 {
-                    TransationQueue.Enqueue(req_);
+                    TransationQueue.Add(req_);
+                }
+            }
+            bool restart = false;
+            while (!restart)
+            {
+                restart = true;
+                for (int i = 0; i < TransationQueue.Count; i++)
+                {
+                    for (int j = 0; j < TransationQueue.Count; j++)
+                    {
+                        if (i != j && TransationQueue[i].address == TransationQueue[j].address && TransationQueue[i].pim == TransationQueue[j].pim)
+                        {
+                            foreach (var id in TransationQueue[j].pid)
+                                TransationQueue[i].pid.Add(id);
+                            TransationQueue.RemoveAt(j);
+
+                            restart = false;
+                            continue;
+                        }
+                    }
                 }
             }
             if (TransationQueue.Count() > 0)
             {
-                MemRequest req = TransationQueue.Peek();
+                MemRequest req = TransationQueue[0];
                 UInt64[] packet = new UInt64[Macros.HMC_MAX_UQ_PACKET];
                 hmc_rqst type = hmc_rqst.RD64;
                 UInt64 d_response_head = 0;
@@ -185,7 +205,7 @@ namespace SimplePIM.Memory.HMC
                     if (current_statue == 0)
                     {
                         callback.Add(new Tuple<ulong, CallBackInfo>(tag - 1, new CallBackInfo(req.address, req.block_addr, req.pim, req.pid)));
-                        TransationQueue.Dequeue();
+                        TransationQueue.RemoveAt(0);
                         current_statue = Macros.HMC_OK;
                         while (current_statue != Macros.HMC_STALL)
                         {
@@ -405,9 +425,9 @@ namespace SimplePIM.Memory.HMC
                         {
                             if (!callback[item].Item2.pim)
                             {
-                                foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
+                                foreach (var procs in (callback[item].Item2.getsource() as List<Proc>))
                                 {
-                                    proc.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                    procs.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
                                 }
 
                             }

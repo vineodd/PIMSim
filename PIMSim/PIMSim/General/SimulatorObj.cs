@@ -16,6 +16,10 @@ namespace SimplePIM.General
 
         public UInt64 cycle = 0;
 
+        public string name = "";
+
+        public int id = 0;
+
         #endregion
 
         #region Static Variables
@@ -23,6 +27,7 @@ namespace SimplePIM.General
         /// NULL marks Invaild Data Or Blank Address.
         /// </summary>
         public static readonly UInt64 NULL = UInt64.MaxValue;
+
 
         #endregion
 

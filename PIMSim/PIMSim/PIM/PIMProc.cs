@@ -322,6 +322,7 @@ namespace SimplePIM.PIM
             {
                 DEBUG.WriteLine();
                 DEBUG.WriteLine("----------PIM CPU [" + this.pid + "] Update [Cycle " + cycle + "]------------");
+                DEBUG.WriteLine();
 
             }
             //reset all restriction
@@ -671,7 +672,7 @@ namespace SimplePIM.PIM
                     (tp as Instruction).block_addr = tlb.scan_page((tp as Instruction).address);
 
                 if (Config.DEBUG_PIM)
-                    DEBUG.WriteLine("-- Fetched Instruction : " + (tp as Instruction).ToString());
+                    DEBUG.WriteLine("-- Current Instruction : " + (tp as Instruction).ToString());
                 bandwidth_bit = bandwidth_bit + (tp as Instruction).Length();
                 return (tp as Instruction);
             }

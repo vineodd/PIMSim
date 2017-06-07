@@ -102,12 +102,8 @@ namespace SimplePIM.Memory.DDR
     {
         public SortedDictionary<UInt64, List<UInt64>> pendingReadRequests = new SortedDictionary<ulong, List<ulong>>();
         public SortedDictionary<UInt64, List<UInt64>> pendingWriteRequests = new SortedDictionary<ulong, List<ulong>>();
-        public List<Proc> proc;
-        public TransactionReceiver(ref List<Proc> proc_)
-        {
-            proc = proc_;
 
-        }
+
         public void add_pending(Transaction t, UInt64 cycle)
         {
             // C++ lists are ordered, so the list will always push to the back and

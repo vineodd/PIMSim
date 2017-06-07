@@ -59,8 +59,9 @@ namespace SimplePIM.Procs
         /// Constructed Function;
         /// </summary>
         /// <param name="pim_">if this MTRL is at memory-side</param>
-        public Mctrl(bool pim_ = false)
+        public Mctrl(int id_ = 0, bool pim_ = false)
         {
+            id = id_;
             PIM = pim_;
             wait_queue = new List<ProcRequest>();
             send_queue = new List<Queue<MemRequest>>();
@@ -116,7 +117,7 @@ namespace SimplePIM.Procs
             req_ = send_queue[pid].Peek();
             req_.pim = PIM ? true : false;
             if (Config.DEBUG_MTRL)
-                DEBUG.WriteLine("--" + (PIM ? "PIM " : "") + " MTRL -- [" + pid + "] : Push Requests : [" + req_.memtype + "] [0x" + req_.address.ToString("X") + "]");
+                DEBUG.WriteLine("--" + (PIM ? "PIM " : "") + " MTRL [" + pid + "] : Push Requests : [" + req_.memtype + "] [0x" + req_.address.ToString("X") + "]");
             send_queue[pid].Dequeue();
             return true;
         }
@@ -130,7 +131,7 @@ namespace SimplePIM.Procs
             if (Config.DEBUG_MTRL)
             {
                 DEBUG.WriteLine();
-                DEBUG.WriteLine("----------Memory Controller Update [Cycle " + cycle + "]------------");
+                DEBUG.WriteLine("----------Memory Controller ["+id+"] Update [Cycle " + cycle + "]------------");
             }
             for (int i = 0; i < wait_queue.Count(); i++)
             {
@@ -173,7 +174,7 @@ namespace SimplePIM.Procs
             }
             if (Config.DEBUG_MTRL)
             {
-                DEBUG.WriteLine("--------------------------------------------");
+                DEBUG.WriteLine();
             }
         }
 
@@ -209,9 +210,11 @@ namespace SimplePIM.Procs
         /// </summary>
         public void PrintStatus()
         {
+            DEBUG.WriteLine("---------------  MTRL ["+id+"] Statistics  -----------");
             DEBUG.WriteLine("    Total reqs added : " + total_add);
             DEBUG.WriteLine("    Total regs stalled : " + add_failed);
             DEBUG.WriteLine(" Total Stalled by Coherence :" + stalled_reqs_by_coherence);
+            DEBUG.WriteLine();
         }
 
         #endregion

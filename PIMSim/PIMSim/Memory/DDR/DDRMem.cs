@@ -23,7 +23,7 @@ namespace SimplePIM.Memory.DDR
         public Callback_t write_cb;
         public List<MemRequest> TransationQueue;
         public UInt64 clockCycle = 0;
-        public List<Proc> proc;
+
         public List<Mctrl> mctrl;
         TransactionType transType = TransactionType.RETURN_DATA;
         Transaction trans = null;
@@ -34,12 +34,12 @@ namespace SimplePIM.Memory.DDR
         {
             mctrl.Add(mctrl_);
         }
-        public DDRMem(ref List<Proc> proc_, int pid_)
+        public DDRMem( int pid_)
         {
             this.pid = pid_;
             mctrl = new List<Mctrl>();
-            proc = proc_;
-            transactionReceiver = new TransactionReceiver(ref proc);
+
+            transactionReceiver = new TransactionReceiver();
 
             memorySystem = new MultiChannelMemorySystem(Config.dram_config_file, pwdString, megsOfMemory);
             memorySystem.setCPUClockSpeed(0);

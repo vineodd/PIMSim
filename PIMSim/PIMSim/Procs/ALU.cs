@@ -156,10 +156,11 @@ namespace SimplePIM.Procs
             for (int i = pipeline.Count()-1; i >=0; i--)
             {
                 
-                bool stall = pipeline[i].Step();
-                if (Config.DEBUG_ALU)
+                pipeline[i].Step();
+                bool stall = pipeline[i].stall;
+                if (Config.DEBUG_ALU_PIPELINE)
                 {
-                    sb.Insert(0, "\n-- Pipieline Stage " + pipeline[i].ToString().Substring(16) + " " + (stall ? "UnStalled" : "Statlled"));
+                    sb.Insert(0, "\n-- Pipieline Stage " + pipeline[i].ToString().Substring(16) + " " + (stall ? "Statlled": "UnStalled" ));
                 }
                 if (!stall)
                 {
@@ -176,10 +177,10 @@ namespace SimplePIM.Procs
                 //ALU stalled
                 total_stalled++;
             }
-            if (Config.DEBUG_ALU)
+            if (Config.DEBUG_ALU_PIPELINE)
             {
                 DEBUG.WriteLine(sb.ToString());
-                DEBUG.WriteLine("---------------------------------------------");
+                DEBUG.WriteLine();
             }
 
         }

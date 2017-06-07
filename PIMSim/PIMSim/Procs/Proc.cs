@@ -279,7 +279,7 @@ namespace SimplePIM.Procs
                 }
 
                 if (Config.DEBUG_PROC)
-                    DEBUG.WriteLine("-- Fetched Instruction : " + (tp as Instruction).ToString());
+                    DEBUG.WriteLine("-- Current Instruction : " + (tp as Instruction).ToString());
                 return (tp as Instruction);
             }
             else
@@ -299,7 +299,20 @@ namespace SimplePIM.Procs
         /// <returns>False when MSHR is full; else true.</returns>
         public bool add_to_mshr(ProcRequest req_)
         {
-            if (MSHR.Count >= Config.mshr_size)
+            if(MSHR.Exists(x => x.actual_addr == req_.actual_addr && x.block_addr == req_.block_addr))
+            {
+                for(int i = 0; i < MSHR.Count; i++)
+                {
+                    if(MSHR[i].actual_addr == req_.actual_addr && MSHR[i].block_addr == req_.block_addr)
+                    {
+                        if (Config.DEBUG_PROC)
+                            DEBUG.WriteLine("-- MSHR : Merge Reqs : [" + req_.type + "] [0x" + req_.actual_addr.ToString("X") + "]");
+                        return true;
+                    }
+                }
+            }
+
+            if (MSHR.Count > Config.mshr_size)
             {
                 if (Config.DEBUG_PROC)
                     DEBUG.WriteLine("-- MSHR : Failed to add Req to MSHR.");
@@ -673,7 +686,7 @@ namespace SimplePIM.Procs
             {
                 DEBUG.WriteLine();
                 DEBUG.WriteLine("----------Host CPU [" + this.pid + "] Update [Cycle " + cycle + "]------------");
-
+                DEBUG.WriteLine();
             }
             //reset all restriction
             reset_restrict();
@@ -825,6 +838,7 @@ namespace SimplePIM.Procs
                     DEBUG.WriteLine("        Shared Cache Total Loaded : " + scache_loaded);
                 }
             }
+            DEBUG.WriteLine();
         }
         #endregion
     }

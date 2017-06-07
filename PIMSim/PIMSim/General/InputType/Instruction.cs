@@ -174,12 +174,12 @@ namespace SimplePIM.General
                 sb.Append(Operand2 + " ");
             if (Operand3 != "")
                 sb.Append(Operand3 + " ");
-            sb.Append("Cycle [" + cycle+"]");
+            sb.Append(" [" + cycle+"]");
             sb.Append(" [" + type+"]");
             if (address != 0)
-                sb.Append(" A : [0x" + address.ToString("X") + "]");
+                sb.Append(" [0x" + address.ToString("X") + "]");
             if (data != 0)
-                sb.Append(" D : [0x" + data.ToString("X") + "]");
+                sb.Append(" [0x" + data.ToString("X") + "]");
             return sb.ToString();
 
         }

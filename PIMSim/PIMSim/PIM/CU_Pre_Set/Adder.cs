@@ -32,12 +32,15 @@ namespace SimplePIM.PIM
         public int latency_op = 1;
         public InsPartition isp;
         public Function curr = null;
-        //for static 
+
+        #region Statistics Variables
         public double energy = 0;
+        private UInt64 total_stall = 0;
         private UInt64 total_load = 0;
         private UInt64 total_latency = 0;
         private double avg_latency => total_load != 0 ? total_latency / total_load : 0;
 
+        #endregion
 
         public Adder(int id_, ref InsPartition insp_)
         {
@@ -118,7 +121,7 @@ namespace SimplePIM.PIM
                 }
 
             }
-
+            bool final= false;
             for (int i = pipeline.Count() - 1; i >= 0; i--)
             {
 
@@ -127,6 +130,7 @@ namespace SimplePIM.PIM
                 if (stalled)
                 {
                     //stall++
+                    final = true;
                 }
                 if (i == pipeline.Count() - 1)
                 {
@@ -153,7 +157,10 @@ namespace SimplePIM.PIM
                 }
 
             }
-
+            if (final)
+            {
+                total_stall++;
+            }
 
         }
 
@@ -183,10 +190,12 @@ namespace SimplePIM.PIM
 
         public override void PrintStatus()
         {
-            DEBUG.WriteLine("-------PIM Unit " + name + "Statistics------");
-            DEBUG.WriteLine("    total functions : " + total_load);
-            DEBUG.WriteLine("    average latency : " + avg_latency);
-            DEBUG.WriteLine("    average bandwidth: " + interal_bandwidth);
+            DEBUG.WriteLine("---------------- PIM Unit [" + name + "] Statistics -------------");
+            DEBUG.WriteLine();
+            DEBUG.WriteLine("    Total Functions served : " + total_load);
+            DEBUG.WriteLine("    Average latency        : " + avg_latency);
+            DEBUG.WriteLine("    Internal Bandwidth     : " + interal_bandwidth + " MB/s");
+            DEBUG.WriteLine();
         }
 
     }
