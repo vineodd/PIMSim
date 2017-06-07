@@ -191,11 +191,11 @@ namespace SimplePIM.Configs
         /// </summary>
         public static string output_file = "";
 
-        public static string dram_config_file => config_path + @"\DRAM.ini";
-        public static string hmc_config_file => config_path + @"\hmc_config.ini";
-        public static string config_file => config_path + @"\config.ini";
+        public static string dram_config_file => config_path + Path.DirectorySeparatorChar+"DRAM.ini";
+        public static string hmc_config_file => config_path + Path.DirectorySeparatorChar+"hmc_config.ini";
+        public static string config_file => config_path + Path.DirectorySeparatorChar+"config.ini";
 
-        public static string pim_config_file => Config.config_path + @"\PIM_Settings.ini";
+        public static string pim_config_file => Config.config_path + Path.DirectorySeparatorChar+"PIM_Settings.ini";
 
         #endregion
 

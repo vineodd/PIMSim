@@ -59,7 +59,7 @@ namespace SimplePIM.Procs
                 sr = new List<StreamReader>(Config.N);
                 for (int i = 0; i < Config.N; i++)
                 {
-                    trace.Add(new FileStream(path + @"\CPU" + i + ".trace", FileMode.Open));
+                    trace.Add(new FileStream(path + Path.DirectorySeparatorChar+"CPU" + i + ".trace", FileMode.Open));
                     sr.Add(new StreamReader(trace[i]));
                 }
 
