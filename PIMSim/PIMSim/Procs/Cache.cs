@@ -266,6 +266,25 @@ namespace SimplePIM.Procs
             return false;
         }
 
+        public bool ifdirty(UInt64 block_addr_)
+        {
+            cycle++;
+            UInt64 index = block_addr_ % (uint)max_set;
+            for (int i = 0; i < assoc; i++)
+            {
+                if (cache[i, index].block_addr == block_addr_)
+                {
+
+                    if (cache[i, index].dirty)
+
+                        return true;
+                    else
+                        return false;
+                }
+            }
+            return false;
+        }
+
         #endregion
 
     }

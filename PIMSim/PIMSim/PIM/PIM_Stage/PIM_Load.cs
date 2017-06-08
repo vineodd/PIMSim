@@ -4,14 +4,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.General;
+using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.PIM
 {
     public class PIMStage_LoadData : Stage
     {
         public int latency = 0;
-        public PIMStage_LoadData(int lat,object parent)
+
+        public PIMStage_LoadData(object parent,int id_, int lat=0)
         {
+            id = id_;
             latency = lat;
             Parent = parent;
         }
@@ -23,23 +27,67 @@ namespace SimplePIM.PIM
 
         public override bool read_input()
         {
-            
-            if (input_ready && input != null)
+            if(status == Status.Complete)
             {
-                if (Coherence.consistency == Consistency.SpinLock)
-                {
-                 
-                    Coherence.spin_lock.setlock((UInt64)input);
-                }
-                latency--;
-                if (latency == 0)
-                {
-                    intermid = input;
-                    input_ready = false;
-                    input = null;
-                    return true;
-                }
+                intermid = input;
+                input_ready = false;
+                input = null;
+                status = Status.NoOP;
+                return true;
             }
+            if (status == Status.NoOP)
+            {
+                if (input_ready && input != null)
+                {
+                    if (Coherence.consistency == Consistency.SpinLock)
+                    {
+
+                        Coherence.spin_lock.setlock((UInt64)input);
+
+
+                        if (!Coherence.flush((UInt64)input, true))
+                        {
+                            Coherence.spin_lock.relese_lock((UInt64)input);
+                            DEBUG.WriteLine("-- Waiting Host cores flushing data : [0x" + ((UInt64)input).ToString("X") + "]");
+                            stall = true;
+                            return false;
+                        }
+
+
+                    }
+                    if (PIMConfigs.memory_method == PIM_Load_Method.Bypass)
+                    {
+                        latency--;
+                        if (latency == 0)
+                        {
+                            intermid = input;
+                            input_ready = false;
+                            input = null;
+                            return true;
+                        }
+                        return false;
+                    }
+                    else
+                    {
+
+                        PIMRequest req = new PIMRequest();
+                        req.actual_addr = (UInt64)input;
+                        req.cycle = OverallClock.cycle;
+                        req.if_mem = true;
+                        req.pid = (Parent as ComputationalUnit).id;
+                        req.stage_id.Add(this.id);
+                        req.type = RequestType.LOAD;
+                        PIMMctrl.add_to_mctrl(req);
+                        status = Status.Outstanding;
+                        
+
+                        stall = true;
+                        return false;
+                    }
+                }
+                return false;
+            }
+            stall = true;
             return false;
         }
 
@@ -50,7 +98,7 @@ namespace SimplePIM.PIM
             if (read_input())
             {
                 write_output();
-                (Parent as ComputationalUnit).read_callback(0, 0);
+                (Parent as ComputationalUnit).read_callback(null);
                 return true;
             }
             return false;
@@ -58,7 +106,4 @@ namespace SimplePIM.PIM
 
        
     }
-
-
-
 }

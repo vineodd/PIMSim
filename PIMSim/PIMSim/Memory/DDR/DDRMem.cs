@@ -8,6 +8,7 @@ using SimplePIM.Memory;
 using SimplePIM.Procs;
 using SimplePIM.Configs;
 using SimplePIM.Statistics;
+using SimplePIM.PIM;
 
 namespace SimplePIM.Memory.DDR
 {
@@ -23,21 +24,14 @@ namespace SimplePIM.Memory.DDR
         public Callback_t write_cb;
         public List<MemRequest> TransationQueue;
         public UInt64 clockCycle = 0;
-
-        public List<Mctrl> mctrl;
         TransactionType transType = TransactionType.RETURN_DATA;
         Transaction trans = null;
         bool pendingTrans = false;
         UInt64 addr = 0;
 
-        public override void attach_mctrl(ref Mctrl mctrl_)
-        {
-            mctrl.Add(mctrl_);
-        }
         public DDRMem( int pid_)
         {
             this.pid = pid_;
-            mctrl = new List<Mctrl>();
 
             transactionReceiver = new TransactionReceiver();
 
@@ -74,13 +68,20 @@ namespace SimplePIM.Memory.DDR
         {
             cycle++;
             MemRequest req_ = new MemRequest();
-            foreach (var m in mctrl)
+
+
+            while (Mctrl.get_req(this.pid, ref req_))
             {
-                while (m.get_req(this.pid, ref req_))
+                TransationQueue.Add(req_);
+            }
+            if (Config.use_pim)
+            {
+                while (PIMMctrl.get_req(this.pid, ref req_))
                 {
                     TransationQueue.Add(req_);
                 }
             }
+
             bool restart = false;
             while (!restart)
             {
@@ -117,6 +118,15 @@ namespace SimplePIM.Memory.DDR
                         case MemReqType.RETURN_DATA:
                             transType = TransactionType.RETURN_DATA;
                             break;
+                        case MemReqType.FLUSH:
+                            transType = TransactionType.DATA_WRITE;
+                            break;
+                        case MemReqType.LOAD:
+                            transType = TransactionType.DATA_READ;
+                            break;
+                        case MemReqType.STORE:
+                            transType = TransactionType.DATA_WRITE;
+                            break;
                         default:
                             transType = TransactionType.RETURN_DATA;
                             break;
@@ -130,12 +140,27 @@ namespace SimplePIM.Memory.DDR
                         return;
                     CallBackInfo callback = new CallBackInfo();
                     callback.address= req.address;
-                    callback.data = req.data;
-                    callback.done_cycle= req.cycle;
                     callback.block_addr = req.block_addr;
                     callback.pid = req.pid;
                     callback.pim = req.pim;
-                    trans = new Transaction(transType, callback);//addr, data, req.block_addr, req.pid, req.pim);
+                    if(req.memtype== MemReqType.FLUSH)
+                    {
+                        callback.flush = true;
+                        transType = TransactionType.DATA_WRITE;
+                    }
+                    if (req.memtype == MemReqType.LOAD)
+                    {
+                        callback.load = true;
+                        transType = TransactionType.DATA_READ;
+                        callback.stage_id = req.stage_id;
+                    }
+                    if (req.memtype == MemReqType.STORE)
+                    {
+                        callback.store = true;
+                        transType = TransactionType.DATA_WRITE;
+                        callback.stage_id = req.stage_id;
+                    }
+                    trans = new Transaction(transType,req.address,req.data, callback);//addr, data, req.block_addr, req.pid, req.pim);
                     Console.WriteLine("ADD transaction: addr=" + addr.ToString("X"));
 
 

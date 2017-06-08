@@ -11,6 +11,7 @@ using SimplePIM.Memory;
 using SimplePIM.General;
 using SimplePIM.Memory.DDR;
 using SimplePIM.Statistics;
+using mctrl = SimplePIM.PIM.PIMMctrl;
 
 #endregion
 
@@ -50,10 +51,7 @@ namespace SimplePIM.PIM
         /// </summary>
         private int IPC;
 
-        /// <summary>
-        /// [Memory Controller]
-        /// </summary>
-        private Mctrl mctrl;
+
 
         /// <summary>
         /// [Arithmetic Logic Unit]
@@ -190,15 +188,7 @@ namespace SimplePIM.PIM
             this.tlb = tlb_;
         }
 
-        /// <summary>
-        /// Attach Memory Controller.
-        /// Used when Shared Memory Controller.
-        /// </summary>
-        /// <param name="ctrl_">Linked Memory Controller</param>
-        public void attach_memctrl(ref Mctrl ctrl_)
-        {
-            mctrl = ctrl_;
-        }
+
 
         /// <summary>
         /// Add a Processor Request to Memory Controller.
@@ -407,7 +397,7 @@ namespace SimplePIM.PIM
             {
                 if (ins_w.full())
                 {
-                    // Stat.procs[pid].stall_inst_wnd.Collect();
+
                     if (Config.DEBUG_PROC)
                     {
                         DEBUG.WriteLine("-- InsWd : Queue Full.");
@@ -422,7 +412,7 @@ namespace SimplePIM.PIM
                     return;
 
                 //reissue success
-                //  Dbg.Assert(!mshr_ok && !mctrl_ok);
+
                 prcessed = true;
                 curr_ins = null;
                 curr_ins = get_ins_from_insp();
@@ -714,8 +704,11 @@ namespace SimplePIM.PIM
         /// </summary>
         /// <param name="block_addr">Block address</param>
         /// <param name="addr_">Actual address</param>
-        public void handle_read_callback(UInt64 block_addr, UInt64 addr_)
+        public void handle_read_callback(CallBackInfo callback)
         {
+
+            var block_addr = callback.block_addr;
+            var addr_ = callback.address;
             if (Coherence.consistency == Consistency.SpinLock)
                 Coherence.spin_lock.relese_lock(addr_);
             ins_w.set_ready(block_addr, this.cycle);
@@ -725,20 +718,24 @@ namespace SimplePIM.PIM
                 if (!L1Cache.search_block(block_addr, General.RequestType.READ))
                 {
                     L1Cache.add(block_addr, General.RequestType.READ, this.pid);
+
                 }
+                bandwidth_bit = bandwidth_bit + PIMConfigs.l1_cacheline_size * 8;
             }
-            bandwidth_bit = bandwidth_bit + PIMConfigs.l1_cacheline_size * 8;
+            
         }
 
         /// <summary>
         /// Write Complete Callback
         /// </summary>
         /// <param name="block_addr">Block address</param>
-        public void handle_write_callback(UInt64 block_addr, UInt64 addr_)
+        public void handle_write_callback(CallBackInfo callback)
         {
+            var block_addr = callback.block_addr;
+            var addr_ = callback.address;
             //if (Coherence.consistency == Consistency.SpinLock)
             //    Coherence.spin_lock.relese_lock(addr_);
-            bandwidth_bit = bandwidth_bit + 128 ;
+            bandwidth_bit = bandwidth_bit +  128;
             ins_w.set_ready(block_addr, this.cycle);
             MSHR.RemoveAll(x => x.block_addr == block_addr);
             //update cache
@@ -749,8 +746,9 @@ namespace SimplePIM.PIM
                 {
                     L1Cache.add(block_addr, General.RequestType.READ, this.pid);
                 }
+                bandwidth_bit = bandwidth_bit + PIMConfigs.l1_cacheline_size * 8;
             }
-            bandwidth_bit = bandwidth_bit + PIMConfigs.l1_cacheline_size * 8;
+            
         }
 
         /// <summary>

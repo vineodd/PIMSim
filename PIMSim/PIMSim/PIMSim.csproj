@@ -102,12 +102,15 @@
     <Compile Include="PIM\Coherence.cs" />
     <Compile Include="PIM\ComputationalUnit.cs" />
     <Compile Include="PIM\Consistency.cs" />
+    <Compile Include="PIM\CU_Pre_Set\Adder_Conventional.cs" />
     <Compile Include="PIM\CU_Pre_Set\Adder.cs" />
     <Compile Include="PIM\CU_Pre_Set\Multiplier.cs" />
     <Compile Include="PIM\PIMInterface.cs" />
     <Compile Include="PIM\PIM.cs" />
+    <Compile Include="PIM\PIMMctrl.cs" />
     <Compile Include="PIM\PIMProc.cs" />
-    <Compile Include="PIM\PIM_Stage\PIMStage_ADD.cs" />
+    <Compile Include="PIM\PIMRequest.cs" />
+    <Compile Include="PIM\PIM_Stage\PIMStage_Computation.cs" />
     <Compile Include="PIM\PIM_Stage\PIMStage_Store.cs" />
     <Compile Include="PIM\PIM_Stage\PIM_Load.cs" />
     <Compile Include="PIM\SpinLock.cs" />

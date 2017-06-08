@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SimplePIM.Procs;
 
 #endregion
 
@@ -17,14 +18,14 @@ namespace SimplePIM.General
     /// </summary>
     /// <param name="block_addr">Target block address.</param>
     /// <param name="act_addr">Target actual address.</param>
-    public delegate void ReadCallBack(UInt64 block_addr,UInt64 act_addr);
+    public delegate void ReadCallBack(CallBackInfo callback);
 
     /// <summary>
     /// Callback when memory write complete.
     /// </summary>
     /// <param name="block_addr">Target block address.</param>
     /// <param name="act_addr">Target actual address.</param>
-    public delegate void WriteCallBack(UInt64 block_addr, UInt64 act_addr);
+    public delegate void WriteCallBack(CallBackInfo callback);
 
     #endregion
 }

@@ -13,22 +13,19 @@ namespace SimplePIM.Memory.DDR
     {
         public Stream dramsim_log;
 
-        public List<Proc> proc;
 
-    public MemorySystem(uint id, uint megsOfMemory, ref Stream dramsim_log_,ref List<Proc> proc_)
+        public MemorySystem(uint id, uint megsOfMemory, ref Stream dramsim_log_)
         {
-            proc = proc_;
             dramsim_log = dramsim_log_;
             ReturnReadData = null;
             WriteDataDone = null;
-            // memoryController = new MemoryController();
 
 
             currentClockCycle = 0;
 
             Console.WriteLine("===== MemorySystem " + systemID + " =====");
 
-            UInt64 megsOfStoragePerRank = ((((UInt64)Config.dram_config. NUM_ROWS * (Config.dram_config.NUM_COLS * Config.dram_config.DEVICE_WIDTH) * Config.dram_config.NUM_BANKS) *((UInt64)Config.dram_config.JEDEC_DATA_BUS_BITS / Config.dram_config.DEVICE_WIDTH)) / 8) >> 20;
+            UInt64 megsOfStoragePerRank = ((((UInt64)Config.dram_config.NUM_ROWS * (Config.dram_config.NUM_COLS * Config.dram_config.DEVICE_WIDTH) * Config.dram_config.NUM_BANKS) * ((UInt64)Config.dram_config.JEDEC_DATA_BUS_BITS / Config.dram_config.DEVICE_WIDTH)) / 8) >> 20;
 
             // If this is set, effectively override the number of ranks
             if (megsOfMemory != 0)
@@ -48,7 +45,7 @@ namespace SimplePIM.Memory.DDR
             Console.WriteLine("CH. " + systemID + " TOTAL_STORAGE : " + Config.dram_config.TOTAL_STORAGE + "MB | " + Config.dram_config.NUM_RANKS + " Ranks | " + Config.dram_config.NUM_DEVICES + " Devices per rank");
 
 
-            memoryController = new MemoryController(this, dramsim_log,ref proc);
+            memoryController = new MemoryController(this, dramsim_log);
 
             // TODO: change to other vector constructor?
             ranks = new List<Rank>();
@@ -95,20 +92,15 @@ namespace SimplePIM.Memory.DDR
 
             //PRINT("\n"); // two new lines
         }
-       public  bool addTransaction(Transaction trans)
+        public bool addTransaction(Transaction trans)
         {
             return memoryController.addTransaction(ref trans);
         }
-        public bool addTransaction(bool isWrite, UInt64 addr,UInt64 block_addr_,List<int> pid_,bool pim_)
+        public bool addTransaction(bool isWrite, UInt64 addr, CallBackInfo callback)
         {
             TransactionType type = isWrite ? TransactionType.DATA_WRITE : TransactionType.DATA_READ;
-            CallBackInfo callback = new CallBackInfo();
-            callback.address = addr;
-            callback.data = 0;
-            callback.block_addr = block_addr_;
-            callback.pid = pid_;
-            callback.pim = pim_;
-            Transaction trans = new Transaction(type, callback);
+
+            Transaction trans = new Transaction(type, addr, 0, callback);
             // push_back in memoryController will make a copy of this during
             // addTransaction so it's kosher for the reference to be local 
 
@@ -126,11 +118,11 @@ namespace SimplePIM.Memory.DDR
         {
             memoryController.printStats(finalStats);
         }
-       public  bool WillAcceptTransaction()
+        public bool WillAcceptTransaction()
         {
             return memoryController.WillAcceptTransaction();
         }
-        public void RegisterCallbacks( Callback_t readCB, Callback_t writeCB, powerCallBack_t reportPower)
+        public void RegisterCallbacks(Callback_t readCB, Callback_t writeCB, powerCallBack_t reportPower)
         {
             ReturnReadData = readCB;
             WriteDataDone = writeCB;
@@ -138,9 +130,9 @@ namespace SimplePIM.Memory.DDR
         }
 
         //fields
-       public MemoryController memoryController;
+        public MemoryController memoryController;
         List<Rank> ranks;
-        Deque<Transaction> pendingTransactions=new Deque<Transaction>();
+        Deque<Transaction> pendingTransactions = new Deque<Transaction>();
 
 
         //function pointers
@@ -150,7 +142,7 @@ namespace SimplePIM.Memory.DDR
         public powerCallBack_t ReportPower;
         public uint systemID;
 
-      
+
     }
 
 

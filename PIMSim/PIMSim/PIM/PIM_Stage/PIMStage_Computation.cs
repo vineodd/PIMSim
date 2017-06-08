@@ -1,14 +1,33 @@
-﻿using System;
+﻿#region Reference
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SimplePIM.General;
+
+#endregion
+
 namespace SimplePIM.PIM
 {
-    public class PIMStage_ADD : Stage
+    /// <summary>
+    /// PIM pipeline stage : computation
+    /// </summary>
+    public class PIMStage_Computation : Stage
     {
+        #region Private Variables
+        /// <summary>
+        /// computing latency
+        /// </summary>
         private Counter latency;
+        #endregion
+
+        #region Public Methods
+        /// <summary>
+        /// read input of all last stage
+        /// </summary>
+        /// <param name="obj"></param>
         public override void set_input(object obj)
         {
             if (last != null && last.Count > 0)
@@ -16,17 +35,27 @@ namespace SimplePIM.PIM
                 bool all_ready = true;
                 foreach (var i in last)
                 {
-                    object tp = 0;
                     all_ready = i.Try_Fetch && all_ready;
                 }
+                // if all last stage ready, start to work
                 if (all_ready)
                 {
+                    foreach (var item in last)
+                        item.get_output();
                     input_ready = true;
+                }
+                else
+                {
+                    input_ready = false;
                 }
 
             }
         }
 
+        /// <summary>
+        /// internal step
+        /// </summary>
+        /// <returns></returns>
         public override bool Step()
         {
             stall = false;
@@ -41,18 +70,32 @@ namespace SimplePIM.PIM
                     write_output();
                     return true;
                 }
+                stall = true;
                 return false;
             }
             return false;
         }
-       public PIMStage_ADD(int i,object parent)
+
+        /// <summary>
+        /// Construction Function
+        /// </summary>
+        /// <param name="parent">parent cu</param>
+        /// <param name="id_">id</param>
+        /// <param name="lat">latency</param>
+        public PIMStage_Computation(object parent, int id_, int i = 0)
         {
+            id = id_;
             latency = new Counter(i, i);
             Parent = parent;
         }
+
+        /// <summary>
+        /// read input
+        /// </summary>
+        /// <returns></returns>
         public override bool read_input()
         {
-            if (input_ready )
+            if (input_ready)
             {
                 input_ready = false;
                 intermid = 0;
@@ -60,7 +103,7 @@ namespace SimplePIM.PIM
             }
             return false;
         }
+        #endregion
 
-      
     }
 }

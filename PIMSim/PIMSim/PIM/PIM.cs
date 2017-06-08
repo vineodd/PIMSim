@@ -32,10 +32,12 @@ namespace SimplePIM.PIM
         /// </summary>
         public List<ComputationalUnit> unit;
 
+
+
         #endregion
 
         #region Public Methods
-        public PIM(ref InsPartition ins_p_, ref Mctrl mctrl_)
+        public PIM(ref InsPartition ins_p_)
         {
             if (Config.DEBUG_PIM)
                 DEBUG.WriteLine("PIM Module Initialed.");
@@ -49,7 +51,6 @@ namespace SimplePIM.PIM
                 for (int i = 0; i < PIMConfigs.N; i++)
                 {
                     var p = new PIMProc(ref ins_p, i);
-                    p.attach_memctrl(ref mctrl_);
                     unit.Add(p);
 
                 }
@@ -71,7 +72,7 @@ namespace SimplePIM.PIM
                     {
                         if (PIMConfigs.CU_Name[i] == "Adder")
                         {
-                            unit.Add(new Adder(i, ref ins_p) as ComputationalUnit);
+                            unit.Add(new Adder_Conventional(i, ref ins_p) as ComputationalUnit);
                             return;
                         }
 

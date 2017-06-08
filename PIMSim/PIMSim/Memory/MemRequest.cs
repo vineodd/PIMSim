@@ -25,6 +25,7 @@ namespace SimplePIM.Memory
         public UInt64 cycle = 0;
         public bool pim = false;
         public List<int> pid = new List<int>();
+        public List<int> stage_id = new List<int>();
 
         #endregion
 
@@ -53,6 +54,9 @@ namespace SimplePIM.Memory
         READ,
         WRITE,
         RETURN_DATA,
+        FLUSH,
+        LOAD,
+        STORE,
         NULL
     }
 }

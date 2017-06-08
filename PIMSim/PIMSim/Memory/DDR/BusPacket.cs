@@ -4,15 +4,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using SimplePIM.Procs;
 
 namespace SimplePIM.Memory.DDR
 {
     public class BusPacket
     {
-        public BusPacket()
-        {
 
-        }
         public Stream dramsim_log;
         public BusPacketType busPacketType;
         public uint column;
@@ -22,20 +20,18 @@ namespace SimplePIM.Memory.DDR
         public UInt64 physicalAddress;
         public UInt64 data;
 
-        public UInt64 block_addr;
-        public List<int> pid;
-        public bool pim;
-        public BusPacket(BusPacketType packtype, UInt64 physicalAddr, uint col, uint rw, int r, uint b, UInt64 dat,UInt64 block_add,List<int> pid_, bool pim_,Stream dramsim_log_)
+        public CallBackInfo callback;
+        public BusPacket(BusPacketType packtype, UInt64 physicalAddr, uint col, uint rw, int r, uint b, UInt64 dat,CallBackInfo callback_,Stream dramsim_log_)
         {
             dramsim_log = dramsim_log_;
-            block_addr = block_add;
+            callback = callback_;
             busPacketType = packtype;
             column = col;
             row = rw;
             bank = b;
             physicalAddress = physicalAddr;
             data = dat;
-            pid = pid_;
+
         }
         public void print()
         {

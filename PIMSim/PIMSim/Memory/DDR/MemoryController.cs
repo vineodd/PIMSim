@@ -293,10 +293,9 @@ namespace SimplePIM.Memory.DDR
         {
             return (rank * (int)Config.dram_config. NUM_BANKS) + bank;
         }
-        public MemoryController(MemorySystem parent, Stream dramsim_log_, ref List<Proc> proc_)
+        public MemoryController(MemorySystem parent, Stream dramsim_log_)
         {
 
-            proc = proc_;
             dramsim_log = dramsim_log_;
             bankStates = new List<List<BankState>>((int)Config.dram_config.NUM_RANKS);
             for(int i = 0; i < (int)Config.dram_config.NUM_RANKS; i++)
@@ -424,7 +423,7 @@ namespace SimplePIM.Memory.DDR
         {
             if (parentMemorySystem.ReturnReadData != null)
             {
-                parentMemorySystem.ReturnReadData(parentMemorySystem.systemID, new CallBackInfo(trans.address,trans.callback. block_addr, currentClockCycle,trans.callback. pim,trans.callback.pid));
+                parentMemorySystem.ReturnReadData(parentMemorySystem.systemID,trans.address,currentClockCycle, trans.callback);
             }
         }
         public void receiveFromBus(ref BusPacket bpacket)
@@ -441,14 +440,9 @@ namespace SimplePIM.Memory.DDR
                 Console.WriteLine(" -- MC Receiving From Data Bus : ");
                 bpacket.print();
             }
-            CallBackInfo callback = new CallBackInfo();
-            callback.address = bpacket.physicalAddress;
-            callback.block_addr = bpacket.block_addr;
-            callback.data = bpacket.data;
-            callback.pid = bpacket.pid;
-            callback.pim = bpacket.pim;
+
             //add to return read data queue
-            returnTransaction.Add(new Transaction(TransactionType. RETURN_DATA, callback));
+            returnTransaction.Add(new Transaction(TransactionType. RETURN_DATA,bpacket.physicalAddress,bpacket.data, bpacket.callback));
             totalReadsPerBank[SEQUENTIAL((int)bpacket.rank, (int)bpacket.bank)]++;
 
             // this delete statement saves a mindboggling amount of memory
@@ -518,7 +512,7 @@ namespace SimplePIM.Memory.DDR
                     //inform upper levels that a write is done
                     if (parentMemorySystem.WriteDataDone != null)
                     {
-                        parentMemorySystem.WriteDataDone(parentMemorySystem.systemID, new CallBackInfo( outgoingDataPacket.physicalAddress, outgoingDataPacket.block_addr,currentClockCycle,outgoingDataPacket.pim,outgoingDataPacket.pid));
+                        parentMemorySystem.WriteDataDone(parentMemorySystem.systemID, outgoingDataPacket.physicalAddress, currentClockCycle,outgoingDataPacket.callback);//new CallBackInfo( , outgoingDataPacket.block_addr,currentClockCycle,outgoingDataPacket.pim,outgoingDataPacket.pid));
                     }
 
                     ranks[(int)outgoingDataPacket.rank].receiveFromBus(ref outgoingDataPacket);
@@ -597,7 +591,7 @@ namespace SimplePIM.Memory.DDR
 
                     writeDataToSend.Add(new BusPacket(BusPacketType. DATA, poppedBusPacket.physicalAddress, poppedBusPacket.column,
                                                         poppedBusPacket.row, (int)poppedBusPacket.rank, poppedBusPacket.bank,
-                                                        poppedBusPacket.data,poppedBusPacket.block_addr, poppedBusPacket.pid,poppedBusPacket.pim, dramsim_log));
+                                                        poppedBusPacket.data,poppedBusPacket.callback, dramsim_log));
                     writeDataCountdown.Add(Config.dram_config.WL);
                 }
 
@@ -843,13 +837,13 @@ namespace SimplePIM.Memory.DDR
                     //create activate command to the row we just translated
                     BusPacket ACTcommand = new BusPacket(BusPacketType. ACTIVATE, transaction.address,
                            (uint) newTransactionColumn, (uint)newTransactionRow, newTransactionRank,
-                           (uint)newTransactionBank, 0, 0,null,false, dramsim_log);
+                           (uint)newTransactionBank, 0, null, dramsim_log);
 
                     //create read or write command and enqueue it
                     BusPacketType bpType = transaction.getBusPacketType();
                     BusPacket command = new BusPacket(bpType, transaction.address,
                             (uint)newTransactionColumn, (uint)newTransactionRow, newTransactionRank,
-                           (uint)newTransactionBank, transaction.data, transaction.callback.block_addr,transaction.callback.pid,transaction.callback.pim, dramsim_log);
+                           (uint)newTransactionBank, transaction.data, transaction.callback, dramsim_log);
 
 
 

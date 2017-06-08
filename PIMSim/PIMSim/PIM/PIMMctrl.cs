@@ -9,14 +9,14 @@ using SimplePIM.PIM;
 using SimplePIM.Statistics;
 #endregion
 
-namespace SimplePIM.Procs
+namespace SimplePIM.PIM
 {
     /// <summary>
     /// [Memory Controller Defination] 
     /// This class performs as a managment of packets sending.
     /// The real memory controller is defined at \Memory\.
     /// </summary>
-    public static class Mctrl 
+    public static class PIMMctrl
     {
         #region Static Variables
         /// <summary>
@@ -50,7 +50,7 @@ namespace SimplePIM.Procs
         /// If that, PIM will ask host CPU flush vaild data into memory.
         /// </para>
         /// </summary>
-        public static bool pim = false;
+        public static bool pim = true;
 
         public static UInt64 cycle = 0;
 
@@ -74,9 +74,9 @@ namespace SimplePIM.Procs
         /// Constructed Function;
         /// </summary>
         /// <param name="pim_">if this MTRL is at memory-side</param>
-        static Mctrl()
+        static PIMMctrl()
         {
-            id = 0;
+            id = 1;
             wait_queue = new List<ProcRequest>();
             send_queue = new List<Queue<MemRequest>>();
         }
@@ -100,7 +100,7 @@ namespace SimplePIM.Procs
             if (wait_queue.Count > Config.crtl_queue_max - 1)
             {
                 if (Config.DEBUG_MTRL)
-                    DEBUG.WriteLine("-- MTRL : Add requests failed : wait_queue full --[" + req_.type + "] [0x" + req_.actual_addr.ToString("X")+"]");
+                    DEBUG.WriteLine("-- PIM MTRL : Add requests failed : wait_queue full --[" + req_.type + "] [0x" + req_.actual_addr.ToString("X") + "]");
                 add_failed++;
                 return false;
             }
@@ -108,7 +108,7 @@ namespace SimplePIM.Procs
             wait_queue.Add(req_);
 
             if (Config.DEBUG_MTRL)
-                DEBUG.WriteLine("-- MTRL : Add requests : [" + req_.type + "] [0x" + req_.actual_addr.ToString("X")+"]");
+                DEBUG.WriteLine("--PIM MTRL : Add requests : [" + req_.type + "] [0x" + req_.actual_addr.ToString("X") + "]");
             total_add++;
             return true;
         }
@@ -131,7 +131,7 @@ namespace SimplePIM.Procs
             req_ = send_queue[pid].Peek();
             req_.pim = pim ? true : false;
             if (Config.DEBUG_MTRL)
-                DEBUG.WriteLine("--" + (pim ? "PIM " : "") + " MTRL [" + pid + "] : Push Requests : [" + req_.memtype + "] [0x" + req_.address.ToString("X") + "]");
+                DEBUG.WriteLine("-- PIM  MTRL [" + pid + "] : Push Requests : [" + req_.memtype + "] [0x" + req_.address.ToString("X") + "]");
             send_queue[pid].Dequeue();
             return true;
         }
@@ -145,7 +145,7 @@ namespace SimplePIM.Procs
             if (Config.DEBUG_MTRL)
             {
                 DEBUG.WriteLine();
-                DEBUG.WriteLine("---------" + (pim ? "PIM " : "") + " Memory Controller ["+id+"] Update [Cycle " + cycle + "]------------");
+                DEBUG.WriteLine("---------PIM Memory Controller [" + id + "] Update [Cycle " + cycle + "]------------");
             }
             for (int i = 0; i < wait_queue.Count(); i++)
             {
@@ -153,15 +153,12 @@ namespace SimplePIM.Procs
                 if (peek.cycle + (UInt64)Config.mc_latency <= cycle - 1)
                 {
                     if (Config.DEBUG_MTRL)
-                        DEBUG.WriteLine("-- Issue ProcRequest : [" + peek.type + "] [0x"+peek.block_addr.ToString("X")+ "] [0x" + peek.actual_addr.ToString("X") + "]");
+                        DEBUG.WriteLine("-- Issue ProcRequest : [" + peek.type + "] [0x" + peek.block_addr.ToString("X") + "] [0x" + peek.actual_addr.ToString("X") + "]");
                     if (PIMConfigs.Consistency_Model == Consistency.SpinLock)
                     {
                         //if (Config.DEBUG_MTRL)
                         //    DEBUG.WriteLine("-- Use Coherence : [" + Config.pim_config.Consistency_Model.ToString() + "]");
-                        if (!Coherence.spin_lock.get_lock_state(peek.actual_addr))
-                        {
-                            if (pim)
-                            {
+
                                 //Console.WriteLine("SetLock");
                                 Coherence.spin_lock.setlock(peek.actual_addr);
 
@@ -172,22 +169,15 @@ namespace SimplePIM.Procs
                                     DEBUG.WriteLine("-- Waiting Host cores flushing data : [0x" + peek.block_addr.ToString("X") + "] [0x" + peek.actual_addr.ToString("X") + "]");
                                     continue;
                                 }
-                            }
+                            
                             send_queue[MemorySelector.get_id(wait_queue[i].actual_addr)].Enqueue(transfer(wait_queue[i]));
                             wait_queue.RemoveAt(i);
                             i--;
                             if (Config.DEBUG_MTRL)
                                 DEBUG.WriteLine("-- Sent ProcRequest :  [" + peek.type + "] [0x" + peek.block_addr.ToString("X") + "] [0x" + peek.actual_addr.ToString("X") + "]");
 
-                        }
-                        else
-                        {
-                            //current data are unavalible cuz it locked.
-                            //stall req++
-                            stalled_reqs_by_coherence++;
-                            if (Config.DEBUG_MTRL)
-                                DEBUG.WriteLine("-- ProcRequest Stalled by SpinLock : [" + peek.type + "] [0x" + peek.block_addr.ToString("X") + "] [0x" + peek.actual_addr.ToString("X") + "]");
-                        }
+                        
+                       
                     }
 
 
@@ -207,10 +197,11 @@ namespace SimplePIM.Procs
         public static MemRequest transfer(ProcRequest pro_req_)
         {
             MemRequest trans = new MemRequest();
-            trans.address = MemorySelector.resize( pro_req_.actual_addr);
+            trans.address = MemorySelector.resize(pro_req_.actual_addr);
             trans.data = 0;     //actully we need no data here, but we'll take it in the future.
             trans.block_addr = pro_req_.block_addr;
             trans.pid.Add(pro_req_.pid);
+            trans.stage_id = pro_req_.stage_id;
             trans.cycle = pro_req_.cycle;
             switch (pro_req_.type)
             {
@@ -222,6 +213,12 @@ namespace SimplePIM.Procs
                     break;
                 case RequestType.FLUSH:
                     trans.memtype = MemReqType.FLUSH;
+                    break;
+                case RequestType.LOAD:
+                    trans.memtype = MemReqType.LOAD;
+                    break;
+                case RequestType.STORE:
+                    trans.memtype = MemReqType.STORE;
                     break;
                 default:
                     trans.memtype = MemReqType.RETURN_DATA;
@@ -235,7 +232,7 @@ namespace SimplePIM.Procs
         /// </summary>
         public static void PrintStatus()
         {
-            DEBUG.WriteLine("---------------  MTRL ["+id+"] Statistics  -----------");
+            DEBUG.WriteLine("---------------  MTRL [" + id + "] Statistics  -----------");
             DEBUG.WriteLine("    Total reqs added : " + total_add);
             DEBUG.WriteLine("    Total regs stalled : " + add_failed);
             DEBUG.WriteLine(" Total Stalled by Coherence :" + stalled_reqs_by_coherence);

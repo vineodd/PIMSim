@@ -24,6 +24,7 @@ namespace SimplePIM
                 Config.fs.Close();
                 Config.sw.Close();
             }
+            Console.ReadKey();
         }
         public static PIMSimulator pimsim;
         static void Main(string[] args)

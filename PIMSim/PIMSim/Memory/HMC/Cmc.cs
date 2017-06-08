@@ -197,7 +197,7 @@ namespace SimplePIM.Memory.HMC
         CMC124,                         /*! HMC-SIM: HMC_RQST_T: CMC CMD=124 */
         CMC125,                         /*! HMC-SIM: HMC_RQST_T: CMC CMD=125 */
         CMC126,                         /*! HMC-SIM: HMC_RQST_T: CMC CMD=126 */
-        CMC127                          /*! HMC-SIM: HMC_RQST_T: CMC CMD=127 */
+        CMC127,                          /*! HMC-SIM: HMC_RQST_T: CMC CMD=127 */
     }
     public enum hmc_response
     {

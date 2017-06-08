@@ -28,25 +28,25 @@ namespace SimplePIM.Procs
         /// </summary>
         public UInt64 block_addr;
 
-        /// <summary>
-        /// returned cycle
-        /// </summary>
-        public UInt64 done_cycle;
 
         /// <summary>
         /// pim operations
         /// </summary>
         public bool pim;
 
-        /// <summary>
-        /// used data
-        /// </summary>
-        public UInt64 data;
 
         /// <summary>
         /// target pid
         /// </summary>
         public List<int> pid = new List<int>();
+
+        public bool flush = false;
+
+        public bool load = false;
+
+        public bool store = false;
+
+        public List<int> stage_id = new List<int>();
 
         #endregion
 
@@ -57,24 +57,17 @@ namespace SimplePIM.Procs
         /// </summary>
         /// <param name="addr"></param>
         /// <param name="blockaddr"></param>
-        /// <param name="addcycle"></param>
         /// <param name="p"></param>
         /// <param name="pid_"></param>
-        public CallBackInfo(UInt64 addr,UInt64 blockaddr,UInt64 addcycle,bool p,List<int> pid_)
+        public CallBackInfo(UInt64 addr,UInt64 blockaddr,bool p,List<int> pid_)
         {
             address = addr;
             block_addr = blockaddr;
-            done_cycle = addcycle;
+
             pim = p;
             pid = pid_;
         }
-        public CallBackInfo(UInt64 addr, UInt64 blockaddr,  bool p, List<int> pid_)
-        {
-            address = addr;
-            block_addr = blockaddr;
-            pim = p;
-            pid = pid_;
-        }
+
         public CallBackInfo()
         {
 

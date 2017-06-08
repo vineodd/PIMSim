@@ -231,6 +231,7 @@ namespace SimplePIM.Configs
 
         public static UInt64 sim_cycle = 10000;
         public static SIM_TYPE sim_type = SIM_TYPE.file;
+        public static bool use_pim = true;
 
         #endregion
 

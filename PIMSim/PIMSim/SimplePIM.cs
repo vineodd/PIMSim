@@ -37,7 +37,6 @@ namespace SimplePIM.General
 
 
         public TraceFetcher trace;
-        public Mctrl[] mctrl;
         public PageConverter pg;
         public Shared_Cache shared_cache;
         public PIM.PIM pim;
@@ -47,7 +46,6 @@ namespace SimplePIM.General
         {
 
             initAllconfigs(args);
-            mctrl = new Mctrl[2];
             trace = new TraceFetcher();
             trace.SET_trace_path(Config.trace_path);
 
@@ -59,13 +57,12 @@ namespace SimplePIM.General
             if (Config.shared_cache)
                 shared_cache = new Shared_Cache();
             proc = new List<Proc>();
-            mctrl[0] = new Mctrl(0);
+
             for (int i = 0; i < Config.N; i++)
             {
                 Proc to_add = new Proc(ref ins_p, i);
                 if (Config.shared_cache)
                     to_add.attach_shared_cache(ref shared_cache);
-                to_add.attach_memctrl(ref mctrl[0]);
                 to_add.attach_tlb(ref pg);
                 proc.Add(to_add);
             }
@@ -95,17 +92,12 @@ namespace SimplePIM.General
                 }
             }
             
-            mctrl[0].init_queue();
-            mctrl[1] = new Mctrl(1, true);
-            mctrl[1].init_queue();
-            foreach (var memoryobj in MemorySelector.MemoryInfo)
-            {
-                memoryobj.Item3.attach_mctrl(ref mctrl[0]);
-                memoryobj.Item3.attach_mctrl(ref mctrl[1]);
-            }
-           
+            Mctrl.init_queue();
+
+            PIMMctrl.init_queue();
+ 
          
-            pim = new PIM.PIM(ref ins_p, ref mctrl[1]);
+            pim = new PIM.PIM(ref ins_p);
             Coherence.init();
             Coherence.linkproc(proc);
             OverallClock.InitClock();
@@ -121,8 +113,8 @@ namespace SimplePIM.General
                     if (OverallClock.ifProcStep(j))
                         proc[j].Step();
                 }
-                foreach (var m in mctrl)
-                    m.Step();
+                Mctrl.Step();
+                PIMMctrl.Step();
                 foreach (var mem in MemorySelector.MemoryInfo)
                 {
                     if (OverallClock.ifMemoryStep(0))
@@ -227,11 +219,11 @@ namespace SimplePIM.General
                 item.PrintStatus();
                 
             }
-            foreach (var item in mctrl)
-            {
-                item.PrintStatus();
+            Mctrl.PrintStatus();
+            if (Config.use_pim)
+                PIMMctrl.PrintStatus();
                 
-            }
+            
             ins_p.PrintStatus();
             
             foreach (var item in pim.unit)

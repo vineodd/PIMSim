@@ -87,7 +87,7 @@ namespace SimplePIM.Configs
         /// Bypass : addictional circuits added to suport none-conventional fast data storing and loading operations. 
         /// Conventional : add to MTRL
         /// </summary>
-        public static PIM_Load_Method memory_method = PIM_Load_Method.Bypass;
+        public static PIM_Load_Method memory_method = PIM_Load_Method.Conventional;
 
         //cache
         public static int max_l1cache_bit = 16;

@@ -5,6 +5,7 @@ using SimplePIM.Configs;
 using SimplePIM.General;
 using SimplePIM.Statistics;
 using SimplePIM.PIM;
+using mctrl = SimplePIM.Procs.Mctrl;
 #endregion
 
 namespace SimplePIM.Procs
@@ -39,6 +40,9 @@ namespace SimplePIM.Procs
         private List<ProcRequest> writeback_req;
 
 
+
+
+
         /// <summary>
         /// [Instrcution Partitioner]
         /// Distrubute all the inputs to hosts or memorys.
@@ -68,10 +72,7 @@ namespace SimplePIM.Procs
         /// </summary>
         private int IPC;
 
-        /// <summary>
-        /// [Memory Controller]
-        /// </summary>
-        private Mctrl mctrl;
+
 
         /// <summary>
         /// [Arithmetic Logic Unit]
@@ -140,6 +141,7 @@ namespace SimplePIM.Procs
         private UInt64 scache_miss => shared_cache.miss;
         private UInt64 scache_loaded => scache_hit + scache_miss;
 
+        private UInt64 total_flushed = 0;
         #endregion
 
         #region Public Variables
@@ -184,15 +186,6 @@ namespace SimplePIM.Procs
             this.tlb = tlb_;
         }
 
-        /// <summary>
-        /// Attach Memory Controller.
-        /// Used when Shared Memory Controller.
-        /// </summary>
-        /// <param name="ctrl_">Linked Memory Controller</param>
-        public void attach_memctrl(ref Mctrl ctrl_)
-        {
-            mctrl = ctrl_;
-        }
 
         /// <summary>
         /// Add a Processor Request to Memory Controller.
@@ -239,6 +232,8 @@ namespace SimplePIM.Procs
             //init callback
             read_callback = new ReadCallBack(handle_read_callback);
             write_callback = new WriteCallBack(handle_write_callback);
+
+
         }
 
         /// <summary>
@@ -389,8 +384,10 @@ namespace SimplePIM.Procs
         /// </summary>
         /// <param name="block_addr">Block address</param>
         /// <param name="addr_">Actual address</param>
-        public void handle_read_callback(UInt64 block_addr, UInt64 addr_)
+        public void handle_read_callback(CallBackInfo callback)
         {
+            var block_addr = callback.block_addr;
+            var addr_ = callback.address;
             ins_w.set_ready(block_addr, this.cycle);
             MSHR.RemoveAll(x => x.block_addr == block_addr);
 
@@ -425,8 +422,10 @@ namespace SimplePIM.Procs
         /// Write Complete Callback
         /// </summary>
         /// <param name="block_addr">Block address</param>
-        public void handle_write_callback(UInt64 block_addr, UInt64 addr_)
+        public void handle_write_callback(CallBackInfo callback)
         {
+            var block_addr = callback.block_addr;
+            var addr_ = callback.address;
             //if (Coherence.consistency == Consistency.SpinLock)
             //    Coherence.spin_lock.relese_lock(addr_);
             ins_w.set_ready(block_addr, this.cycle);
@@ -654,14 +653,43 @@ namespace SimplePIM.Procs
         /// Flush cacheline
         /// </summary>
         /// <param name="addr">Block address</param>
-        public void flush(UInt64 addr)
+        public bool flush(UInt64 addr, bool actual = false)
         {
+            var address = addr;
+            if (actual)
+                address = tlb.scan_page(addr);
             if (!Config.use_cache)
-                return;
-            if (Config.shared_cache)
+                return true;
+            if (Coherence.flush_queue.Contains(addr))
             {
-                shared_cache.remove(addr);
+                return false;
             }
+            if (L1Cache.ifdirty(addr) || (Config.shared_cache ? shared_cache.ifdirty(addr) : false))
+            {
+                ProcRequest item = new ProcRequest();
+                item.block_addr = addr;
+                item.actual_addr = tlb.scan_page(addr);
+                item.cycle = OverallClock.cycle;
+                item.if_mem = true;
+                item.pid = this.pid;
+                item.type = RequestType.FLUSH;
+                item.ready = false;
+                if (Config.writeback)
+                    writeback_req.Add(item);
+                else
+                    add_to_mctrl(item);
+
+                total_flushed++;
+                L1Cache.remove(addr);
+                if (Config.shared_cache)
+                {
+                    shared_cache.remove(addr);
+                }
+                return false;
+            }
+            return true;
+
+
 
         }
 
@@ -825,6 +853,7 @@ namespace SimplePIM.Procs
             DEBUG.WriteLine("        Average Read Latency      : " + avg_read_latency);
             DEBUG.WriteLine("        Average Write Latency     : " + avg_write_latency);
             DEBUG.WriteLine("        Average Memory Latency    : " + avg_latency);
+            DEBUG.WriteLine("         Total Flushed Reqs       : " + total_flushed);
             if (Config.use_cache)
             {
                 DEBUG.WriteLine();

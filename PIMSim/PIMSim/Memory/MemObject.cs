@@ -30,11 +30,6 @@ namespace SimplePIM.Memory
         /// <returns></returns>
         public abstract bool addTransation(MemRequest req);
 
-        /// <summary>
-        /// Attach MTRL to get input requests
-        /// </summary>
-        /// <param name="mctrl_">attached MTRL</param>
-        public abstract void attach_mctrl(ref Mctrl mctrl_);
 
         /// <summary>
         /// function to set lock

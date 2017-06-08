@@ -339,7 +339,7 @@ namespace SimplePIM.Memory.DDR
             channels = new List<MemorySystem>();
             for (uint i = 0; i < Config.dram_config.NUM_CHANS; i++)
             {
-                MemorySystem channel = new MemorySystem(i, megsOfMemory / Config.dram_config.NUM_CHANS, ref dramsim_log, ref proc);
+                MemorySystem channel = new MemorySystem(i, megsOfMemory / Config.dram_config.NUM_CHANS, ref dramsim_log);
                 channels.Add(channel);
             }
         }
@@ -355,10 +355,10 @@ namespace SimplePIM.Memory.DDR
             uint channelNumber = findChannelNumber(trans.address);
             return channels[(int)channelNumber].addTransaction(trans);
         }
-        public bool addTransaction(bool isWrite, UInt64 addr, UInt64 block_addr_, List<int> pid_, bool pim_)
+        public bool addTransaction(bool isWrite, UInt64 addr, CallBackInfo callback)
         {
             uint channelNumber = findChannelNumber(addr);
-            return channels[(int)channelNumber].addTransaction(isWrite, addr, block_addr_, pid_, pim_);
+            return channels[(int)channelNumber].addTransaction(isWrite, addr, callback);
         }
         public bool willAcceptTransaction()
         {

@@ -8,12 +8,12 @@ using SimplePIM.Procs;
 using SimplePIM.Configs;
 using System.IO;
 using SimplePIM.PIM;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.HMC
 {
     public class HMCMem : MemObject
     {
-        public List<Mctrl> mctrl;
 
         public List<MemRequest> TransationQueue;
 
@@ -29,15 +29,12 @@ namespace SimplePIM.Memory.HMC
             return false;
         }
 
-        public override void attach_mctrl(ref Mctrl mctrl_)
-        {
-            mctrl.Add(  mctrl_);
-        }
+
         public HMCMem(int id_)
         {
 
             this.id = id_;
-            mctrl = new List<Mctrl>();
+
             hmc = new HMCSim();
             hmc.hmcsim_init(Config.hmc_config.num_devs, Config.hmc_config.num_links,
                                Config.hmc_config.num_vaults, Config.hmc_config.queue_depth,
@@ -94,13 +91,20 @@ namespace SimplePIM.Memory.HMC
             cycle++;
             current_statue = Macros.HMC_OK;
             MemRequest req_ = new MemRequest();
-            foreach (var m in mctrl)
+
+                while (Mctrl.get_req(this.pid, ref req_))
+                {
+                    TransationQueue.Add(req_);
+                }
+            if (Config.use_pim)
             {
-                while (m.get_req(this.pid, ref req_))
+                while (PIMMctrl.get_req(this.pid, ref req_))
                 {
                     TransationQueue.Add(req_);
                 }
             }
+
+
             bool restart = false;
             while (!restart)
             {
@@ -150,8 +154,17 @@ namespace SimplePIM.Memory.HMC
                     case MemReqType.WRITE:
                         type = hmc_rqst.WR64;
                         break;
-                    case MemReqType.RETURN_DATA:
 
+                    case MemReqType.FLUSH:
+                        type = hmc_rqst.WR64;
+                        break;
+                    case MemReqType.LOAD:
+                        type = hmc_rqst.RD64;
+                        break;
+                    case MemReqType.STORE:
+                        type = hmc_rqst.WR64;
+                        break;
+                    case MemReqType.RETURN_DATA:
 
                     default:
 
@@ -161,6 +174,7 @@ namespace SimplePIM.Memory.HMC
                 }
                 if (current_statue != Macros.HMC_STALL)
                 {
+
                     uint cub = 0;
 
                     uint link = 0;
@@ -204,7 +218,23 @@ namespace SimplePIM.Memory.HMC
                     current_statue = hmc.hmcsim_send(packet);
                     if (current_statue == 0)
                     {
-                        callback.Add(new Tuple<ulong, CallBackInfo>(tag - 1, new CallBackInfo(req.address, req.block_addr, req.pim, req.pid)));
+                        
+                        var newitem = new CallBackInfo(req.address, req.block_addr, req.pim, req.pid);
+                        if(req.memtype== MemReqType.FLUSH)
+                        {
+                            newitem.flush = true;
+                        }
+                        if (req.memtype == MemReqType.LOAD)
+                        {
+                            newitem.load = true;
+                            newitem.stage_id = req.stage_id;
+                        }
+                        if (req.memtype == MemReqType.STORE)
+                        {
+                            newitem.store = true;
+                            newitem.stage_id = req.stage_id;
+                        }
+                        callback.Add(new Tuple<ulong, CallBackInfo>(tag - 1, newitem));
                         TransationQueue.RemoveAt(0);
                         current_statue = Macros.HMC_OK;
                         while (current_statue != Macros.HMC_STALL)
@@ -250,13 +280,21 @@ namespace SimplePIM.Memory.HMC
 
                                     if (d_type == hmc_response.RD_RS)
                                     {
+                                        if (callback[item].Item2.load)
+                                        {
+                                            foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                            {
+                                                pimunit.read_callback(callback[item].Item2);
+                                            }
+                                            goto end;
+                                        }
                                         if (!callback[item].Item2.pim)
                                         {
                                             foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
                                             {
-                                                proc.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                proc.read_callback(callback[item].Item2);
                                             }
-
+                                            
                                         }
                                         else
                                         {
@@ -264,7 +302,7 @@ namespace SimplePIM.Memory.HMC
                                             {
                                                 foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
                                                 {
-                                                    pimproc.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                    pimproc.read_callback(callback[item].Item2);
                                                 }
 
 
@@ -273,7 +311,7 @@ namespace SimplePIM.Memory.HMC
                                             {
                                                 foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
                                                 {
-                                                    pimunit.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                    pimunit.read_callback(callback[item].Item2);
                                                 }
 
                                             }
@@ -283,32 +321,49 @@ namespace SimplePIM.Memory.HMC
                                     {
                                         if (d_type == hmc_response.WR_RS)
                                         {
-                                            if (!callback[item].Item2.pim)
+                                            if (callback[item].Item2.store)
                                             {
-                                                foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
+                                                foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
                                                 {
-                                                    proc.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                                    pimunit.write_callback(callback[item].Item2);
                                                 }
+                                                goto end;
+                                            }
+                                            if (callback[item].Item2.flush)
+                                            {
+                                                Coherence.flush_queue.Remove(callback[item].Item2.block_addr);
+                                                DEBUG.WriteLine("-- Flushed data : [" + callback[item].Item2.block_addr + "] [" + callback[item].Item2.address + "]");
 
                                             }
-                                            else
-                                            {
-                                                if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
-                                                {
-                                                    foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
-                                                    {
-                                                        pimproc.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
-                                                    }
+                                            else {
 
+                                                if (!callback[item].Item2.pim)
+                                                {
+                                                    foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
+                                                    {
+                                                        proc.write_callback(callback[item].Item2);
+                                                    }
 
                                                 }
                                                 else
                                                 {
-                                                    foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                                    if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
                                                     {
-                                                        pimunit.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
-                                                    }
+                                                        foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                                        {
+                                                            pimproc.write_callback(callback[item].Item2);
+                                                        }
 
+
+                                                    }
+                                                    else
+                                                    {
+                                                        foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                                        {
+                                                            pimunit.write_callback(callback[item].Item2);
+                                                        }
+
+                                                    }
                                                 }
                                             }
                                         }
@@ -325,7 +380,7 @@ namespace SimplePIM.Memory.HMC
                                     //        Coherence.spin_lock.relese_lock(callback[item].Item4);
                                     //    }
                                     //}
-
+                                    end:
                                     callback.RemoveAt(item);
                                 }
 
@@ -423,11 +478,19 @@ namespace SimplePIM.Memory.HMC
 
                         if (d_type == hmc_response.RD_RS)
                         {
+                            if (callback[item].Item2.load)
+                            {
+                                foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                {
+                                    pimunit.read_callback(callback[item].Item2);
+                                }
+                                goto endr;
+                            }
                             if (!callback[item].Item2.pim)
                             {
                                 foreach (var procs in (callback[item].Item2.getsource() as List<Proc>))
                                 {
-                                    procs.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                    procs.read_callback(callback[item].Item2);
                                 }
 
                             }
@@ -437,7 +500,7 @@ namespace SimplePIM.Memory.HMC
                                 {
                                     foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
                                     {
-                                        pimproc.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                        pimproc.read_callback(callback[item].Item2);
                                     }
 
 
@@ -446,7 +509,7 @@ namespace SimplePIM.Memory.HMC
                                 {
                                     foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
                                     {
-                                        pimunit.read_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                        pimunit.read_callback(callback[item].Item2);
                                     }
 
                                 }
@@ -456,32 +519,48 @@ namespace SimplePIM.Memory.HMC
                         {
                             if (d_type == hmc_response.WR_RS)
                             {
-                                if (!callback[item].Item2.pim)
+                                if (callback[item].Item2.store)
                                 {
-                                    foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
+                                    foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
                                     {
-                                        proc.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                        pimunit.write_callback(callback[item].Item2);
                                     }
+                                    goto endr;
+                                }
+                                if (callback[item].Item2.flush)
+                                {
+                                    Coherence.flush_queue.Remove(callback[item].Item2.block_addr);
+                                    DEBUG.WriteLine("-- Flushed data : [" + callback[item].Item2.block_addr + "] [" + callback[item].Item2.address + "]");
 
                                 }
-                                else
-                                {
-                                    if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                                else {
+                                    if (!callback[item].Item2.pim)
                                     {
-                                        foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                        foreach (var proc in (callback[item].Item2.getsource() as List<Proc>))
                                         {
-                                            pimproc.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
+                                            proc.write_callback(callback[item].Item2);
                                         }
-
 
                                     }
                                     else
                                     {
-                                        foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                        if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
                                         {
-                                            pimunit.write_callback(callback[item].Item2.block_addr, callback[item].Item2.address);
-                                        }
+                                            foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                            {
+                                                pimproc.write_callback(callback[item].Item2);
+                                            }
 
+
+                                        }
+                                        else
+                                        {
+                                            foreach (var pimunit in (callback[item].Item2.getsource() as List<ComputationalUnit>))
+                                            {
+                                                pimunit.write_callback(callback[item].Item2);
+                                            }
+
+                                        }
                                     }
                                 }
                             }
@@ -498,6 +577,7 @@ namespace SimplePIM.Memory.HMC
                         //        Coherence.spin_lock.relese_lock(callback[item].Item4);
                         //    }
                         //}
+                        endr:
                         callback.RemoveAt(item);
                         // all_recv++;
                     }

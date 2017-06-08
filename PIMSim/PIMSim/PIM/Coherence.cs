@@ -13,6 +13,7 @@ namespace SimplePIM.PIM
         public static SpinLock spin_lock;
         public static Consistency consistency;
         public static List<Proc> proc;
+        public static List<UInt64> flush_queue = new List<ulong>();
         
         public static void init()
         {
@@ -23,10 +24,17 @@ namespace SimplePIM.PIM
                 spin_lock = new SpinLock();
             }
         }
-        public static void flush(UInt64 addr)
+        public static bool flush(UInt64 addr, bool actual = false)
         {
+
+            bool stall = true;
             foreach (var p in proc)
-                p.flush(addr);
+                stall = p.flush(addr, actual);
+            if (stall)
+                return true;
+            else
+                return false;
+
         }
         public static void linkproc(List<Proc> proc_)
         {

@@ -19,7 +19,7 @@ namespace SimplePIM.PIM
     /// Two Load operations can be parallel executed.
     /// This function used bypass data method.
     /// </summary>
-    public class Adder : ComputationalUnit, PIMInterface
+    public class Adder_Conventional : ComputationalUnit, PIMInterface
     {
         /// <summary>
         /// Pipeline
@@ -27,8 +27,6 @@ namespace SimplePIM.PIM
         public Stage[] pipeline = new Stage[4];
 
         public string name = "ADDer";
-        public int latency_load = 1;
-        public int latnecy_store = 1;
         public int latency_op = 1;
         public InsPartition isp;
         public Function curr = null;
@@ -42,7 +40,7 @@ namespace SimplePIM.PIM
 
         #endregion
 
-        public Adder(int id_, ref InsPartition insp_)
+        public Adder_Conventional(int id_, ref InsPartition insp_)
         {
             
             this.id = id_;
@@ -54,7 +52,7 @@ namespace SimplePIM.PIM
             //**           Stage 1-1:   Load Data                   **
             //**                                                    **
             //********************************************************
-            var item_stage1 = new PIMStage_LoadData( this, 0,latency_load);
+            var item_stage1 = new PIMStage_LoadData(this,0);
             pipeline[0] = (item_stage1 as Stage);
             item_stage1 = null;
 
@@ -63,7 +61,7 @@ namespace SimplePIM.PIM
             //**                Stage 1-2:   Load data              **
             //**                                                    **
             //********************************************************
-            var item_stage2 = new PIMStage_LoadData(this,1, latency_load);
+            var item_stage2 = new PIMStage_LoadData(this,1);
             pipeline[1] = item_stage2 as Stage;
             item_stage2 = null;
 
@@ -72,7 +70,7 @@ namespace SimplePIM.PIM
             //**           Stage 3:     Calculation                 **
             //**                                                    **
             //********************************************************
-            var item_stage3 = new PIMStage_Computation(this, 2, latency_op);
+            var item_stage3 = new PIMStage_Computation(this,2, latency_op);
             item_stage3.set_link(ref pipeline[0]);
             item_stage3.set_link(ref pipeline[1]);
             pipeline[2] = item_stage3 as Stage;
@@ -82,7 +80,7 @@ namespace SimplePIM.PIM
             //**       Stage 4:     Write results back              **
             //**                                                    **
             //********************************************************
-            var item_stage4 = new PIMStage_Store(this, latnecy_store);
+            var item_stage4 = new PIMStage_Store(this,3);
             item_stage4.set_link(ref pipeline[2]);
             pipeline[3] = item_stage4 as Stage;
 
@@ -94,11 +92,25 @@ namespace SimplePIM.PIM
 
         private void handle_write_callback(CallBackInfo callback)
         {
+            if (callback != null)
+            {
+                foreach (var id in callback.stage_id)
+                {
+                    pipeline[id].status = Status.Complete;
+                }
+            }
             bandwidth_bit += 64;
         }
 
         private void handle_read_callback(CallBackInfo callback)
         {
+            if (callback != null)
+            {
+                foreach (var id in callback.stage_id)
+                {
+                    pipeline[id].status = Status.Complete;
+                }
+            }
             bandwidth_bit += 64;
         }
 
@@ -118,6 +130,7 @@ namespace SimplePIM.PIM
                     bandwidth_bit += curr.Length();
                     pipeline[0].set_input(curr.input[0]);
                     pipeline[1].set_input(curr.input[1]);
+                    (pipeline[3] as PIMStage_Store).store_addr = curr.output[0];
                 }
 
             }
@@ -138,7 +151,7 @@ namespace SimplePIM.PIM
                     {
                         if (curr != null)
                         {
-                            object addr = NULL;
+
 
                             if (Coherence.consistency == Consistency.SpinLock)
                             {
@@ -147,7 +160,7 @@ namespace SimplePIM.PIM
                                 Coherence.spin_lock.relese_lock(curr.output[0]);
 
                             }
-                            pipeline[i].get_output(ref addr);
+                            pipeline[i].get_output();
 
                             total_latency += OverallClock.cycle - curr.servetime;
 

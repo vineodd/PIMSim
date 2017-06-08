@@ -54,6 +54,8 @@ namespace SimplePIM.General
         /// </summary>
         public UInt64 pc;
 
+
+        public List<int> stage_id = new List<int>();
         #endregion
 
         #region Public Methods
@@ -105,6 +107,9 @@ namespace SimplePIM.General
         READ,
         WRITE,
         NOP,
-        CALCULATION
+        CALCULATION,
+        FLUSH,
+        LOAD,
+        STORE
     }
 }

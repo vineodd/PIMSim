@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using SimplePIM.Procs;
 using SimplePIM.Configs;
 using SimplePIM.PIM;
+using SimplePIM.Statistics;
 
 
 namespace SimplePIM.Memory.DDR
@@ -24,14 +25,15 @@ namespace SimplePIM.Memory.DDR
         
         // friend ostream &operator<<(ostream &os, const Transaction &t);
         //functions
-        public Transaction(TransactionType transType, CallBackInfo call_)// UInt64 addr, UInt64 dat, UInt64 block, int pid_,bool pim_)
+        public Transaction(TransactionType transType,UInt64 addr, UInt64 dat,CallBackInfo call_)// UInt64 addr, UInt64 dat, UInt64 block, int pid_,bool pim_)
         {
             callback = call_;
-        //    block_addr = block;
+            data = dat;
+           // block_addr = block;
             transactionType = transType;
             address = call_.address;
-            //address = addr;
-            data = call_.data;
+            address = addr;
+
             //pid = pid_;
             //pim = pim_;
         }
@@ -96,6 +98,7 @@ namespace SimplePIM.Memory.DDR
         DATA_READ,
         DATA_WRITE,
         RETURN_DATA
+
     }
 
     public class TransactionReceiver
@@ -161,10 +164,10 @@ namespace SimplePIM.Memory.DDR
         }
 
         // public void read_complete(uint id, UInt64 address,UInt64 block_addr, UInt64 done_cycle,bool pim_)
-        public void read_complete(uint id, CallBackInfo callback)
+        public void read_complete(uint id, UInt64 addr, UInt64 done_cycle, CallBackInfo callback)
         {
 
-            int it = find(pendingReadRequests, callback.address);
+            int it = find(pendingReadRequests, addr);
             if (it == pendingReadRequests.Count())
             {
                 Console.WriteLine("ERROR: Cant find a pending read for this one");
@@ -179,41 +182,48 @@ namespace SimplePIM.Memory.DDR
                 }
             }
 
-            UInt64 added_cycle = pendingReadRequests[callback.address].First();
-            UInt64 latency = callback.done_cycle - added_cycle;
+            UInt64 added_cycle = pendingReadRequests[addr].First();
+            UInt64 latency = done_cycle - added_cycle;
 
             //   for (int i = 0; i < proc.Count(); i++)
-            
-                if (!callback.pim)
+            if (callback.load)
+            {
+                foreach (var pimunit in (callback.getsource() as List<ComputationalUnit>))
                 {
-                    foreach(var proc in (callback.getsource() as List<Proc>))
-                    {
-                        proc.read_callback(callback.block_addr, callback.address);
-                    }
-                    
+                    pimunit.read_callback(callback);
                 }
-                else
+                goto endr;
+            }
+            if (!callback.pim)
+            {
+                foreach (var proc in (callback.getsource() as List<Proc>))
                 {
-                    if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                    proc.read_callback(callback);
+                }
+                goto endr;
+            }
+            else
+            {
+                if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                {
+                    foreach (var pimproc in (callback.getsource() as List<PIMProc>))
                     {
-                        foreach (var pimproc in (callback.getsource() as List<PIMProc>))
-                        {
-                            pimproc.read_callback(callback.block_addr, callback.address);
-                        }
+                        pimproc.read_callback(callback);
+                    }
+                    goto endr;
 
-                      
-                    }
-                    else
-                    {
-                        foreach (var pimunit in (callback.getsource() as List<ComputationalUnit>))
-                        {
-                            pimunit.read_callback(callback.block_addr, callback.address);
-                        }
-                       
-                    }
                 }
-            
-            
+
+                ///CU
+                foreach (var pimunit in (callback.getsource() as List<ComputationalUnit>))
+                {
+                    pimunit.read_callback(callback);
+                }
+            }
+
+
+
+            endr:
 
             //if (Coherence.consistency == Consistency.SpinLock)
             //{
@@ -223,17 +233,17 @@ namespace SimplePIM.Memory.DDR
             //    }
             //}
 
-            pendingReadRequests[callback.address].RemoveAt(0);
-            if (pendingReadRequests[callback.address].Count() == 0)
-                pendingReadRequests.Remove(callback.address);
-            Console.WriteLine("Read Callback:  0x" + callback.address.ToString("X") + "Block_addr=0x"+ callback.block_addr +"  latency=" + latency + "cycles (" + callback.done_cycle + "->" + added_cycle + ")");
+            pendingReadRequests[addr].RemoveAt(0);
+            if (pendingReadRequests[addr].Count() == 0)
+                pendingReadRequests.Remove(addr);
+            Console.WriteLine("Read Callback:  0x" + addr.ToString("X") + "Block_addr=0x" + callback.block_addr + "  latency=" + latency + "cycles (" + done_cycle + "->" + added_cycle + ")");
 
-            
+
         }
-       public void write_complete(uint id, CallBackInfo callback)//UInt64 address, UInt64 block_addr, UInt64 done_cycle,bool pim_)
+       public void write_complete(uint id, UInt64 addr, UInt64 done_cycle, CallBackInfo callback)//UInt64 address, UInt64 block_addr, UInt64 done_cycle,bool pim_)
         {
 
-            int it = find(pendingWriteRequests, callback.address);
+            int it = find(pendingWriteRequests, addr);
             if (it == pendingWriteRequests.Count())
             {
                 Console.WriteLine("ERROR  : Cant find a pending read for this one");
@@ -248,38 +258,55 @@ namespace SimplePIM.Memory.DDR
                 }
             }
 
-            UInt64 added_cycle = pendingWriteRequests[callback.address].First();
-            UInt64 latency = callback.done_cycle - added_cycle;
+            UInt64 added_cycle = pendingWriteRequests[addr].First();
+            UInt64 latency = done_cycle - added_cycle;
 
             //   for (int i = 0; i < proc.Count(); i++)
 
-            // proc[(int)id].write_callback(callback.block_addr, callback.address);
-            if (!callback.pim)
+            if (callback.store)
             {
-                foreach (var proc in (callback.getsource() as List<Proc>))
+                foreach (var pimunit in (callback.getsource() as List<ComputationalUnit>))
                 {
-                    proc.write_callback(callback.block_addr, callback.address);
+                    pimunit.write_callback(callback);
                 }
-
+                goto endw;
+            }
+            // proc[(int)id].write_callback(callback.block_addr, callback.address);
+            if (callback.flush)
+            {
+                Coherence.flush_queue.Remove(callback.block_addr);
+                DEBUG.WriteLine("-- Flushed data : [" + callback.block_addr + "] [" + callback.address + "]");
+                goto endw;
             }
             else
             {
-                if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
+                if (!callback.pim)
                 {
-                    foreach (var pimproc in (callback.getsource() as List<PIMProc>))
+                    foreach (var proc in (callback.getsource() as List<Proc>))
                     {
-                        pimproc.write_callback(callback.block_addr, callback.address);
+                        proc.write_callback(callback);
                     }
-
-
+                    goto endw;
                 }
                 else
                 {
-                    foreach (var pimunit in (callback.getsource() as List<ComputationalUnit>))
+                    if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
                     {
-                        pimunit.write_callback(callback.block_addr, callback.address);
-                    }
+                        foreach (var pimproc in (callback.getsource() as List<PIMProc>))
+                        {
+                            pimproc.write_callback(callback);
+                        }
 
+                        goto endw;
+                    }
+                    else
+                    {
+                        foreach (var pimunit in (callback.getsource() as List<ComputationalUnit>))
+                        {
+                            pimunit.write_callback(callback);
+                        }
+
+                    }
                 }
             }
 
@@ -291,11 +318,11 @@ namespace SimplePIM.Memory.DDR
             //     }
             // }
 
-
-            pendingWriteRequests[callback.address].RemoveAt(0);
-            if (pendingWriteRequests[callback.address].Count() == 0)
-                pendingWriteRequests.Remove(callback.address);
-            Console.WriteLine("Write Callback: 0x" + callback.address.ToString("X") + " latency=" + latency + "cycles (" + callback.done_cycle + "->" + added_cycle + ")");
+            endw:
+            pendingWriteRequests[addr].RemoveAt(0);
+            if (pendingWriteRequests[addr].Count() == 0)
+                pendingWriteRequests.Remove(addr);
+            Console.WriteLine("Write Callback: 0x" + addr.ToString("X") + " latency=" + latency + "cycles (" + done_cycle + "->" + added_cycle + ")");
         }
     }
 }

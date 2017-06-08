@@ -39,6 +39,9 @@ namespace SimplePIM.General
 
 
         public bool stall = false;
+
+
+        public Status status = Status.NoOP;
         /// <summary>
         /// Linked last pipeline stage.
         /// </summary>
@@ -51,6 +54,7 @@ namespace SimplePIM.General
 
         public object Parent;
 
+        public int id = 0;
 
         #endregion
 
@@ -80,6 +84,7 @@ namespace SimplePIM.General
             }
 
         }
+
         public bool get_output(ref object out_)
         {
             if (output_ready)
@@ -94,7 +99,19 @@ namespace SimplePIM.General
                 return false;
             }
         }
-
+        public bool get_output()
+        {
+            if (output_ready)
+            {
+                output_ready = false;
+                output = null;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         /// <summary>
         /// Set linked last pipeline stage.
         /// </summary>
@@ -109,6 +126,11 @@ namespace SimplePIM.General
     }
 
 
-
+    public enum Status
+    {
+        NoOP,    //no load operations
+        Outstanding,    //sent load operations
+        Complete
+    }
 
 }
