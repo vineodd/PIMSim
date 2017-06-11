@@ -40,7 +40,7 @@ namespace SimplePIM.Procs
         private List<ProcRequest> writeback_req;
 
 
-
+        private List<Register> registers = new List<Register>();
 
 
         /// <summary>
@@ -236,6 +236,18 @@ namespace SimplePIM.Procs
 
         }
 
+
+        public void HandleNewRequest()
+        {
+            curr_ins = null;
+            curr_ins = get_ins_from_insp();
+            curr_req = null;
+            curr_req = new ProcRequest();
+            curr_req.parse_ins(curr_ins);
+        }
+
+
+
         /// <summary>
         /// Get instruction from instruction partitioner.
         /// We assume that host core can only process intructions(Not Functions and InstrcutionBlocks).
@@ -394,26 +406,37 @@ namespace SimplePIM.Procs
             //update cache
             if (Config.use_cache)
             {
-                UInt64 addr = NULL;
-                if (!shared_cache.search_block(block_addr, General.RequestType.READ))
+                if (Config.shared_cache)
                 {
-                    addr = shared_cache.add(block_addr, General.RequestType.READ, this.pid);
+                    UInt64 addr = NULL;
+                    if (!shared_cache.search_block(block_addr, General.RequestType.READ))
+                    {
+                        addr = shared_cache.add(block_addr, General.RequestType.READ, this.pid);
+                        if (!L1Cache.search_block(block_addr, General.RequestType.READ))
+                        {
+                            L1Cache.add(block_addr, General.RequestType.READ, this.pid);
+                        }
+                        L1Cache.remove(addr);
+                    }
+
+                    if (addr != NULL)
+                    {
+                        var item = new General.ProcRequest();
+                        item.block_addr = addr;
+                        item.type = General.RequestType.WRITE;
+                        item.pid = pid;
+                        bool wb_merge = writeback_req.Exists(x => x.block_addr == item.block_addr);
+                        if (!wb_merge)
+                            writeback_req.Add(item);
+                    }
+                }
+                else
+                {
+                    //only l1cache
                     if (!L1Cache.search_block(block_addr, General.RequestType.READ))
                     {
                         L1Cache.add(block_addr, General.RequestType.READ, this.pid);
                     }
-                    L1Cache.remove(addr);
-                }
-
-                if (addr != NULL)
-                {
-                    var item = new General.ProcRequest();
-                    item.block_addr = addr;
-                    item.type = General.RequestType.WRITE;
-                    item.pid = pid;
-                    bool wb_merge = writeback_req.Exists(x => x.block_addr == item.block_addr);
-                    if (!wb_merge)
-                        writeback_req.Add(item);
                 }
             }
         }
@@ -433,26 +456,36 @@ namespace SimplePIM.Procs
             //update cache
             if (Config.use_cache)
             {
-                UInt64 addr = NULL;
-                if (!shared_cache.search_block(block_addr, General.RequestType.READ))
+                if (Config.shared_cache)
                 {
-                    addr = shared_cache.add(block_addr, General.RequestType.WRITE, this.pid);
+                    UInt64 addr = NULL;
+                    if (!shared_cache.search_block(block_addr, General.RequestType.READ))
+                    {
+                        addr = shared_cache.add(block_addr, General.RequestType.WRITE, this.pid);
+                        if (!L1Cache.search_block(block_addr, General.RequestType.READ))
+                        {
+                            L1Cache.add(block_addr, General.RequestType.WRITE, this.pid);
+                        }
+                        L1Cache.remove(addr);
+                    }
+
+                    if (addr != NULL)
+                    {
+                        var item = new General.ProcRequest();
+                        item.block_addr = addr;
+                        item.type = General.RequestType.WRITE;
+                        item.pid = pid;
+                        bool wb_merge = writeback_req.Exists(x => x.block_addr == item.block_addr);
+                        if (!wb_merge)
+                            writeback_req.Add(item);
+                    }
+                }
+                else
+                {
                     if (!L1Cache.search_block(block_addr, General.RequestType.READ))
                     {
                         L1Cache.add(block_addr, General.RequestType.WRITE, this.pid);
                     }
-                    L1Cache.remove(addr);
-                }
-
-                if (addr != NULL)
-                {
-                    var item = new General.ProcRequest();
-                    item.block_addr = addr;
-                    item.type = General.RequestType.WRITE;
-                    item.pid = pid;
-                    bool wb_merge = writeback_req.Exists(x => x.block_addr == item.block_addr);
-                    if (!wb_merge)
-                        writeback_req.Add(item);
                 }
             }
         }
@@ -576,11 +609,7 @@ namespace SimplePIM.Procs
 
                     ins_w.add_ins(curr_ins, this.cycle);
                     ins_w.setLast(ready);
-                    curr_ins = null;
-                    curr_ins = get_ins_from_insp();
-                    curr_req = null;
-                    curr_req = new ProcRequest();
-                    curr_req.parse_ins(curr_ins);
+                    HandleNewRequest();
                     continue;
                 }
                 if (Config.use_cache)
@@ -593,11 +622,7 @@ namespace SimplePIM.Procs
                         curr_ins.is_mem = true;
                         curr_ins.ready = true;
                         ins_w.add_ins(curr_ins, this.cycle);
-                        curr_ins = null;
-                        curr_ins = get_ins_from_insp();
-                        curr_req = null;
-                        curr_req = new ProcRequest();
-                        curr_req.parse_ins(curr_ins);
+                        HandleNewRequest();
                         continue;
                     }
 
@@ -617,11 +642,7 @@ namespace SimplePIM.Procs
                             //shared_hit
 
                             add_to_cache(curr_req);
-                            curr_ins = null;
-                            curr_ins = get_ins_from_insp();
-                            curr_req = null;
-                            curr_req = new ProcRequest();
-                            curr_req.parse_ins(curr_ins);
+                            HandleNewRequest();
                             continue;
                         }
                     }
@@ -638,13 +659,7 @@ namespace SimplePIM.Procs
                     return;
                 }
 
-                curr_ins = null;
-                curr_ins = get_ins_from_insp();
-
-
-                curr_req = null;
-                curr_req = new ProcRequest();
-                curr_req.parse_ins(curr_ins);
+                HandleNewRequest();
 
             }
         }

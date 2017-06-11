@@ -18,6 +18,10 @@ namespace SimplePIM.General
     /// </summary>
     public class Instruction :InputType
     {
+
+        #region Static Variables
+        private static readonly string NULL = "null";
+        #endregion
         #region Public Varibles
 
         /// <summary>
@@ -44,10 +48,10 @@ namespace SimplePIM.General
 
 
         //Operation and Operands
-        public string Operation = "";
-        public string Operand1 = "";
-        public string Operand2 = "";
-        public string Operand3 = "";
+        public string Operation = NULL;
+        public string Operand1 = NULL;
+        public string Operand2 = NULL;
+        public string Operand3 = NULL;
 
         /// <summary>
         /// PC
@@ -87,6 +91,49 @@ namespace SimplePIM.General
         #endregion
 
         #region Public Method
+
+        public int OperandCount()
+        {
+            if (Operand1 == NULL)
+                return 1;
+            if (Operand2 == NULL)
+                return 2;
+            if (Operand3 == NULL)
+                return 3;
+            return 0;
+        }
+
+        public List<Register> relatedRegs()
+        {
+            List<Register> reg = new List<Register>();
+            if (is_mem)
+            {
+                if (LoadInstruction() || StoreInstruction())
+                {
+                    for (int i = 0; i < OperandCount() - 1; i++)
+                    {
+                        var oprand = (string)(this.GetType().GetField("Operand" + i).GetValue("Operand" + i));
+                        if ( !oprand.Contains("0x")&& !oprand.Contains("[")&& !oprand.Contains(":") && (!oprand.Contains("+")))
+                        {
+                            reg.Add(new Register(oprand, 0, address));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < OperandCount(); i++)
+                {
+                    var oprand = (string)(this.GetType().GetField("Operand" + i).GetValue("Operand" + i));
+                    if (!oprand.Contains("0x") && !oprand.Contains("[") && !oprand.Contains(":") && (!oprand.Contains("+")))
+                    {
+                        reg.Add(new Register(oprand, 0, address));
+                    }
+                }
+            }
+            return reg;
+        }
+
         /// <summary>
         /// Construction Function
         /// </summary>
@@ -94,7 +141,7 @@ namespace SimplePIM.General
         /// <param name="pc_">PC</param>
         public Instruction(string ins, UInt64 pc_ = 0)
         {
-            Operation = ins.Substring(0, ins.IndexOf(" ") + 1).Trim();
+            Operation = ins.Substring(0, ins.IndexOf(" ") + 1).Trim().Replace(" ", "");
             string inst = ins.Substring(ins.IndexOf(" ")).Trim();
             string[] split = inst.Split(',');
             for (int i = 1; i <= split.Length; i++)
@@ -104,6 +151,27 @@ namespace SimplePIM.General
             }
             is_mem = false;
 
+        }
+
+
+        public bool LoadInstruction()
+        {
+            if (Operation.Equals("ld"))
+            {
+                return true;
+            }
+            return false;
+        }
+
+
+
+        public bool StoreInstruction()
+        {
+            if (Operation.Equals("st"))
+            {
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
