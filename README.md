@@ -12,6 +12,7 @@ PIMSim provides simulation of Process-In-Memory(PIM) and applies to the followin
       + Programmers who want to discover the potential of PIM architecture.
 
 PIMSim can provide following experimental statistics information:
+
       + PIM
             --Speed up while applying new PIM design
             --Off-Chip Bandwidth
@@ -27,6 +28,7 @@ PIMSim can provide following experimental statistics information:
             --MSHR simulation details
             --ALU simulation details
             --Hybrid memory simulation details
+            
 
 To take a deep understanding of PIMSim, we’ll show some cases to take advantage of PIMSim:
 
