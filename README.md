@@ -7,27 +7,28 @@ PIMSim is a trace-based simulator of PIM architecture, which provides both host-
 2.  What can PIMSim do?
 
 PIMSim provides simulation of Process-In-Memory(PIM) and applies to the following groups:
-      + People who want to get insight of PIM architecture.
-      + Researchers to build new PIM designs.
-      + Programmers who want to discover the potential of PIM architecture.
+
+    + People who want to get insight of PIM architecture.
+    + Researchers to build new PIM designs.
+    + Programmers who want to discover the potential of PIM architecture.
 
 PIMSim can provide following experimental statistics information:
 
-      + PIM
-            --Speed up while applying new PIM design
-            --Off-Chip Bandwidth
-            --Message statistics
-            --Internal bandwidth
-            --Energy (under development)
-            --PIMProcessor simulation details
-            --Pipeline simulation details
-            --Data Coherence of PIM architecture
-            --Program partitions details
-      + Processor
-            --Cache simulation details
-            --MSHR simulation details
-            --ALU simulation details
-            --Hybrid memory simulation details
+    + PIM
+     --Speed up while applying new PIM design
+     --Off-Chip Bandwidth
+     --Message statistics
+     --Internal bandwidth
+     --Energy (under development)
+     --PIMProcessor simulation details
+     --Pipeline simulation details
+     --Data Coherence of PIM architecture
+     --Program partitions details
+    + Processor
+     --Cache simulation details
+     --MSHR simulation details
+     --ALU simulation details
+     --Hybrid memory simulation details
             
 
 To take a deep understanding of PIMSim, we’ll show some cases to take advantage of PIMSim:
