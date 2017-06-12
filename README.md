@@ -9,7 +9,7 @@ PIMSim is a trace-based simulator of PIM architecture, which provides both host-
 PIMSim provides simulation of Process-In-Memory(PIM) and applies to the following groups:
 
     + People who want to get insight of PIM architecture.
-    + Researchers to build new PIM designs.
+    + Researchers who want to build new PIM designs.
     + Programmers who want to discover the potential of PIM architecture.
 
 PIMSim can provide following experimental statistics information:
