@@ -15,7 +15,7 @@ PIMSim provides simulation of Process-In-Memory(PIM) and applies to the followin
 PIMSim can provide following experimental statistics information:
 
     + PIM
-     --Speed up while applying new PIM design
+     --Speed up while applying new PIM designs
      --Off-Chip Bandwidth
      --Message statistics
      --Internal bandwidth
