@@ -59,8 +59,7 @@ Input trace format：
       7|st rax, SS:[rsp + 0xffdfff8]|W|D=0x0000000000000000 A=0x04fee18
 
 There are four input labels are applied to indicate target operation is executed at memory-side:
-                        
-                        
+
 a.    You can use “PIM_Operation” to indicate that this instruction should be executed in memory-side units, like this :
 
       26|PIM_st r14, SS:[rsp + 0xffffff8]|W|D=0x0000000000000000 A=0x163df5
@@ -86,7 +85,7 @@ c.    If you don’t know the actual instructions executed but know the memory a
                        
 This input indicates an function named 'Add', which has two inputs and one output. The operation duration lasts 2 cycles.
 
-d.	You can customize your own policy by modifying PIMConfigs.cs. For example, you can specify a certain kind of instruction to be executed at memory-side by modifying PIMConfig\PIM_Ins_List.
+d.	You can customize your own PIM operation policy by modifying PIMConfigs.cs. For example, you can specify a certain kind of instruction to be executed at memory-side by modifying PIMConfig\PIM_Ins_List.
 
 
 3.2   Prepare the configuration files
