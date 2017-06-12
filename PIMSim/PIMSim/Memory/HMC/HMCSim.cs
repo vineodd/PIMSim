@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using SimplePIM.Statistics;
+using SimplePIM.Configs;
 
 namespace SimplePIM.Memory.HMC
 {
@@ -143,7 +145,7 @@ namespace SimplePIM.Memory.HMC
             }
 
             if (HMC_DEBUG)
-                Console.WriteLine("PASSED LEVEL1 INIT SANITY CHECK");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("PASSED LEVEL1 INIT SANITY CHECK");
 
 
             /*
@@ -170,7 +172,7 @@ namespace SimplePIM.Memory.HMC
             }
 
             if (HMC_DEBUG)
-                Console.WriteLine("PASSED LEVEL2 INIT SANITY CHECK");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("PASSED LEVEL2 INIT SANITY CHECK");
 
 
             /*
@@ -191,7 +193,7 @@ namespace SimplePIM.Memory.HMC
             }
 
             if (HMC_DEBUG)
-                Console.WriteLine("PASSED LEVEL3 INIT SANITY CHECK");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("PASSED LEVEL3 INIT SANITY CHECK");
 
 
             /*
@@ -251,7 +253,7 @@ namespace SimplePIM.Memory.HMC
                  *
                  */
                 if (HMC_DEBUG)
-                    Console.WriteLine("FAILED TO ALLOCATE INTERNAL MEMORY");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("FAILED TO ALLOCATE INTERNAL MEMORY");
 
 
                 return -1;
@@ -265,7 +267,7 @@ namespace SimplePIM.Memory.HMC
             if (hmcsim_config_devices() != 0)
             {
                 if (HMC_DEBUG)
-                    Console.WriteLine("FAILED TO CONFIGURE THE INTERNAL DEVICE STRUCTURE");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("FAILED TO CONFIGURE THE INTERNAL DEVICE STRUCTURE");
 
 
                 hmcsim_free_memory();
@@ -490,7 +492,7 @@ namespace SimplePIM.Memory.HMC
                         this.devs[i].xbar[j].xbar_rsp.Add(__ptr_xbar_rsp[cur_xbar + tp]);
                     if (false)
                     {
-                        //Console.WriteLine("this.devs[].xbar[].xbar_rsp  = 0x%016llx",
+                        //if(Config.DEBUG_MEMORY)DEBUG.WriteLine("this.devs[].xbar[].xbar_rsp  = 0x%016llx",
                         //                (UInt64) & (this.__ptr_xbar_rsp[cur_xbar]));
                     }
 
@@ -1614,7 +1616,7 @@ namespace SimplePIM.Memory.HMC
 
 
                     if (HMC_DEBUG)
-                        Console.WriteLine("HMCSIM_BUILD_MEMREQUEST : CMC PACKET TYPE = %d", type);
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("HMCSIM_BUILD_MEMREQUEST : CMC PACKET TYPE ="+ type);
 
                     /* check for an active cmc op */
                     if (hmcsim_query_cmc(type, ref flits, ref cmd) != 0)
@@ -1628,7 +1630,7 @@ namespace SimplePIM.Memory.HMC
                      * flits and cmd are initialized
                      */
                     if (HMC_DEBUG)
-                        Console.WriteLine("HMCSIM_BUILD_MEMREQUEST : CMC PACKET COMMAND = %d", cmd);
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("HMCSIM_BUILD_MEMREQUEST : CMC PACKET COMMAND = "+ cmd);
 
                     break;
                 default:
@@ -1728,7 +1730,7 @@ namespace SimplePIM.Memory.HMC
             idx = hmcsim_cmc_cmdtoidx(type);
 
             if (HMC_DEBUG)
-                Console.WriteLine("HMCSIM_QUERY_CMC: RQST_TYPE = %d; IDX = %d", type, idx);
+                if (Config.DEBUG_MEMORY) DEBUG.WriteLine("HMCSIM_QUERY_CMC: RQST_TYPE = " + type + "; IDX = " + idx);
 
 
             if (idx == Macros.HMC_MAX_CMC)
@@ -1738,7 +1740,7 @@ namespace SimplePIM.Memory.HMC
             else if (this.cmcs[(int)idx].active == 0)
             {
                 if (HMC_DEBUG)
-                    Console.WriteLine("ERROR : HMCSIM_QUERY_CMC: CMC OP AT IDX=%d IS INACTIVE", idx);
+                    if (Config.DEBUG_MEMORY) DEBUG.WriteLine("ERROR : HMCSIM_QUERY_CMC: CMC OP AT IDX=" + idx + " IS INACTIVE");
 
                 return -1;
             }
@@ -1822,7 +1824,7 @@ namespace SimplePIM.Memory.HMC
                     /* ASSUME THE RESPONSE IS A CMC */
                     type = hmc_response.RSP_CMC;
 
-                    Console.WriteLine("response type failure");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("response type failure");
                     break;
             }
 

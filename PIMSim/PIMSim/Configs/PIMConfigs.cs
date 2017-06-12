@@ -125,7 +125,7 @@ namespace SimplePIM.Configs
                 if (split.Count() != 2)
                 {
                     //error
-                    Console.WriteLine("Error in parsing line.");
+                    DEBUG.WriteLine("Error in parsing line.");
                     continue;
                 }
                 if (split[0] == "PIM_Unit_Type")
@@ -226,7 +226,7 @@ namespace SimplePIM.Configs
             }
             catch 
             {
-                Console.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
+                DEBUG.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
                 return false;
             }
             return true;

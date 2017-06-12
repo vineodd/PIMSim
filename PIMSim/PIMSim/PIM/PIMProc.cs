@@ -262,7 +262,7 @@ namespace SimplePIM.PIM
             //  Shared_Cache = new Cache(config, true);
             ins_w = new InstructionWindow(Config.ins_w_size, pid);
 
-            IPC = Config.IPC;
+            IPC = PIMConfigs.IPC;
             if(PIMConfigs.use_l1_cache)
                 cache_req_queue = new Queue<ProcRequest>();
             MSHR = new List<ProcRequest>(Config.mshr_size);

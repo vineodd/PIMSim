@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
 using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.DDR
 {
@@ -46,7 +47,7 @@ namespace SimplePIM.Memory.DDR
 
             if (busPacket.column >= Config.dram_config.NUM_COLS)
             {
-                Console.WriteLine("== Error - Bus Packet column " + busPacket.column + " out of bounds");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Bus Packet column " + busPacket.column + " out of bounds");
                 Environment.Exit(-1);
             }
             // head of the list we need to search
@@ -71,9 +72,9 @@ namespace SimplePIM.Memory.DDR
                 foundNode.data = busPacket.data;
                 if (Config.dram_config.DEBUG_BANKS)
                 {
-                    Console.WriteLine(" -- Bank " + busPacket.bank + " writing to physical address 0x" + busPacket.physicalAddress.ToString("x") + ":");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine(" -- Bank " + busPacket.bank + " writing to physical address 0x" + busPacket.physicalAddress.ToString("x") + ":");
                     busPacket.printData();
-                    Console.WriteLine("");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("");
                 }
             }
         }

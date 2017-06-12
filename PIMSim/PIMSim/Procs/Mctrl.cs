@@ -162,7 +162,7 @@ namespace SimplePIM.Procs
                         {
                             if (pim)
                             {
-                                //Console.WriteLine("SetLock");
+                          
                                 Coherence.spin_lock.setlock(peek.actual_addr);
 
                                 //when pim units start to perform, flush all relative data in the host core

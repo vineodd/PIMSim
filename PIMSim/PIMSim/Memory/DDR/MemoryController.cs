@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.IO;
 using SimplePIM.Procs;
 using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.DDR
 {
@@ -30,7 +31,8 @@ namespace SimplePIM.Memory.DDR
 
             if ((physicalAddress & transactionMask) != 0)
             {
-                Console.WriteLine("WARNING: address 0x"  + physicalAddress.ToString("X") + " is not aligned to the request size of " + transactionSize);
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("WARNING: address 0x"  + physicalAddress.ToString("X") + " is not aligned to the request size of " + transactionSize);
             }
 
             // each burst will contain JEDEC_DATA_BUS_BITS/8 bytes of data, so the bottom bits (3 bits for a single channel DDR system) are
@@ -60,7 +62,8 @@ namespace SimplePIM.Memory.DDR
             int colHighBitWidth = colBitWidth - colLowBitWidth;
             if (Config.dram_config.DEBUG_ADDR_MAP)
             {
-                Console.WriteLine("Bit widths: ch:" + channelBitWidth + " r:" + rankBitWidth + " b:" + bankBitWidth
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("Bit widths: ch:" + channelBitWidth + " r:" + rankBitWidth + " b:" + bankBitWidth
                         + " row:" + rowBitWidth + " colLow:" + colLowBitWidth
                         + " colHigh:" + colHighBitWidth + " off:" + byteOffsetWidth
                         + " Total:" + (channelBitWidth + rankBitWidth + bankBitWidth + rowBitWidth + colLowBitWidth + colHighBitWidth + byteOffsetWidth));
@@ -278,12 +281,14 @@ namespace SimplePIM.Memory.DDR
 
             else
             {
-                Console.WriteLine("== Error - Unknown Address Mapping Scheme");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("== Error - Unknown Address Mapping Scheme");
                 Environment.Exit(-1);
             }
             if (Config.dram_config.DEBUG_ADDR_MAP)
             {
-                Console.WriteLine("Mapped Ch=" + newTransactionChan + " Rank=" + newTransactionRank
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("Mapped Ch=" + newTransactionChan + " Rank=" + newTransactionRank
                         + " Bank=" + newTransactionBank + " Row=" + newTransactionRow
                         + " Col=" + newTransactionColumn + "\n");
             }
@@ -430,14 +435,16 @@ namespace SimplePIM.Memory.DDR
         {
             if (bpacket.busPacketType !=BusPacketType. DATA)
             {
-                Console.WriteLine("== Error - Memory Controller received a non-DATA bus packet from rank");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("== Error - Memory Controller received a non-DATA bus packet from rank");
                 bpacket.print();
                 Environment.Exit(1);
             }
 
             if (Config.dram_config.DEBUG_BUS)
             {
-                Console.WriteLine(" -- MC Receiving From Data Bus : ");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine(" -- MC Receiving From Data Bus : ");
                 bpacket.print();
             }
 
@@ -538,14 +545,16 @@ namespace SimplePIM.Memory.DDR
                     //send to bus and print debug stuff
                     if (Config. dram_config.DEBUG_BUS)
                     {
-                        Console.WriteLine(" -- MC Issuing On Data Bus    : ");
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine(" -- MC Issuing On Data Bus    : ");
                         writeDataToSend[0].print();
                     }
 
                     // queue up the packet to be sent
                     if (outgoingDataPacket != null)
                     {
-                        Console.WriteLine("== Error - Data Bus Collision");
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("== Error - Data Bus Collision");
                         Environment.Exit(1);
                     }
 
@@ -608,7 +617,8 @@ namespace SimplePIM.Memory.DDR
                         //add energy to account for total
                         if (Config. dram_config.DEBUG_POWER)
                         {
-                            Console.WriteLine(" ++ Adding Read energy to total energy");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine(" ++ Adding Read energy to total energy");
                         }
                         burstEnergy[rank] += (Config.dram_config.IDD4R - Config.dram_config.IDD3N) * Config.dram_config.BL / 2 * Config.dram_config.NUM_DEVICES;
                         if (poppedBusPacket.busPacketType ==BusPacketType. READ_P)
@@ -681,7 +691,8 @@ namespace SimplePIM.Memory.DDR
                         //add energy to account for total
                         if (Config.dram_config.DEBUG_POWER)
                         {
-                            Console.WriteLine(" ++ Adding Write energy to total energy");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine(" ++ Adding Write energy to total energy");
                         }
                         burstEnergy[rank] += (Config.dram_config.IDD4W - Config.dram_config.IDD3N) * Config.dram_config.BL / 2 * Config.dram_config.NUM_DEVICES;
 
@@ -721,7 +732,8 @@ namespace SimplePIM.Memory.DDR
                         //add energy to account for total
                         if (Config.dram_config.DEBUG_POWER)
                         {
-                            Console.WriteLine(" ++ Adding Activate and Precharge energy to total energy");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine(" ++ Adding Activate and Precharge energy to total energy");
                         }
                         actpreEnergy[rank] += ((Config.dram_config.IDD0 * Config.dram_config.tRC) - ((Config.dram_config.IDD3N * Config.dram_config.tRAS) + (Config.dram_config.IDD2N * (Config.dram_config.tRC - Config.dram_config.tRAS)))) * Config.dram_config.NUM_DEVICES;
 
@@ -756,7 +768,8 @@ namespace SimplePIM.Memory.DDR
                         //add energy to account for total
                         if (Config.dram_config.DEBUG_POWER)
                         {
-                            Console.WriteLine(" ++ Adding Refresh energy to total energy");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine(" ++ Adding Refresh energy to total energy");
                         }
                         refreshEnergy[rank] += (Config.dram_config.IDD5 - Config.dram_config.IDD3N) * Config.dram_config.tRFC * Config.dram_config.NUM_DEVICES;
 
@@ -770,7 +783,8 @@ namespace SimplePIM.Memory.DDR
 
                         break;
                     default:
-                        Console.WriteLine("ERROR == Error - Popped a command we shouldn't have of type : " + poppedBusPacket.busPacketType);
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("ERROR == Error - Popped a command we shouldn't have of type : " + poppedBusPacket.busPacketType);
                         Environment.Exit(1);
                         break;
                 }
@@ -778,14 +792,16 @@ namespace SimplePIM.Memory.DDR
                 //issue on bus and print debug
                 if (Config.dram_config.DEBUG_BUS)
                 {
-                    Console.WriteLine(" -- MC Issuing On Command Bus : ");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine(" -- MC Issuing On Command Bus : ");
                     poppedBusPacket.print();
                 }
 
                 //check for collision on bus
                 if (outgoingCmdPacket != null)
                 {
-                    Console.WriteLine("ERROR == Error - Command Bus Collision");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("ERROR == Error - Command Bus Collision");
                     Environment.Exit(1);
                 }
                 outgoingCmdPacket = poppedBusPacket;
@@ -813,19 +829,26 @@ namespace SimplePIM.Memory.DDR
                 {
                     if (Config.dram_config.DEBUG_ADDR_MAP)
                     {
-                        Console.WriteLine("== New Transaction - Mapping Address [0x"  + transaction.address.ToString("X")  + "]");
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("== New Transaction - Mapping Address [0x"  + transaction.address.ToString("X")  + "]");
                         if (transaction.transactionType == TransactionType. DATA_READ)
                         {
-                            Console.WriteLine(" (Read)");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine(" (Read)");
                         }
                         else
                         {
-                            Console.WriteLine(" (Write)");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine(" (Write)");
                         }
-                        Console.WriteLine("  Rank : " + newTransactionRank);
-                        Console.WriteLine("  Bank : " + newTransactionBank);
-                        Console.WriteLine("  Row  : " + newTransactionRow);
-                        Console.WriteLine("  Col  : " + newTransactionColumn);
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("  Rank : " + newTransactionRank);
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("  Bank : " + newTransactionBank);
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("  Row  : " + newTransactionRow);
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("  Col  : " + newTransactionColumn);
                     }
 
 
@@ -937,7 +960,8 @@ namespace SimplePIM.Memory.DDR
                 {
                     if (Config.dram_config.DEBUG_POWER)
                     {
-                        Console.WriteLine(" ++ Adding IDD3N to total energy [from rank " + i + "]");
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine(" ++ Adding IDD3N to total energy [from rank " + i + "]");
                     }
                     backgroundEnergy[i] += Config.dram_config.IDD3N * Config.dram_config.NUM_DEVICES;
                 }
@@ -948,7 +972,8 @@ namespace SimplePIM.Memory.DDR
                     {
                         if (Config.dram_config.DEBUG_POWER)
                         {
-                            Console.WriteLine(" ++ Adding dram_config.IDD2P to total energy [from rank " + i + "]");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine(" ++ Adding dram_config.IDD2P to total energy [from rank " + i + "]");
                         }
                         backgroundEnergy[i] += Config.dram_config.IDD2P * Config.dram_config.NUM_DEVICES;
                     }
@@ -956,7 +981,8 @@ namespace SimplePIM.Memory.DDR
                     {
                         if (Config.dram_config.DEBUG_POWER)
                         {
-                            Console.WriteLine(" ++ Adding dram_config.IDD2N to total energy [from rank " + i + "]");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine(" ++ Adding dram_config.IDD2N to total energy [from rank " + i + "]");
                         }
                         backgroundEnergy[i] += Config.dram_config.IDD2N * Config.dram_config.NUM_DEVICES;
                     }
@@ -968,7 +994,8 @@ namespace SimplePIM.Memory.DDR
             {
                 if (Config.dram_config.DEBUG_BUS)
                 {
-                    Console.WriteLine(" -- MC Issuing to CPU bus : " + returnTransaction[0]);
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine(" -- MC Issuing to CPU bus : " + returnTransaction[0]);
                 }
                 totalTransactions++;
 
@@ -999,7 +1026,8 @@ namespace SimplePIM.Memory.DDR
                 }
                 if (!foundMatch)
                 {
-                    Console.WriteLine("ERROR Can't find a matching transaction for 0x" + returnTransaction[0].address.ToString("X"));
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("ERROR Can't find a matching transaction for 0x" + returnTransaction[0].address.ToString("X"));
                     Environment.Exit(0);
                 }
                 //* delete returnTransaction[0];
@@ -1018,43 +1046,52 @@ namespace SimplePIM.Memory.DDR
             //
             if (Config.dram_config.DEBUG_TRANS_Q)
             {
-                Console.WriteLine("== Printing transaction queue");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("== Printing transaction queue");
                 for (int i = 0; i < transactionQueue.Count(); i++)
                 {
-                    Console.WriteLine("  " + i + "] " + transactionQueue[i]);
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("  " + i + "] " + transactionQueue[i]);
                 }
             }
 
             if (Config.dram_config.DEBUG_BANKSTATE)
             {
                 //TODO: move this to BankState.cpp
-                Console.WriteLine("== Printing bank states (According to MC)");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("== Printing bank states (According to MC)");
                 for (int i = 0; i < Config.dram_config.NUM_RANKS; i++)
                 {
                     for (int j = 0; j < Config.dram_config.NUM_BANKS; j++)
                     {
                         if (bankStates[i][j].currentBankState == CurrentBankState. RowActive)
                         {
-                            Console.WriteLine("[" + bankStates[i][j].openRowAddress + "] ");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("[" + bankStates[i][j].openRowAddress + "] ");
                         }
                         else if (bankStates[i][j].currentBankState == CurrentBankState.Idle)
                         {
-                            Console.WriteLine("[idle] ");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("[idle] ");
                         }
                         else if (bankStates[i][j].currentBankState == CurrentBankState.Precharging)
                         {
-                            Console.WriteLine("[pre] ");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("[pre] ");
                         }
                         else if (bankStates[i][j].currentBankState == CurrentBankState.Refreshing)
                         {
-                            Console.WriteLine("[ref] ");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("[ref] ");
                         }
                         else if (bankStates[i][j].currentBankState == CurrentBankState.PowerDown)
                         {
-                            Console.WriteLine("[lowp] ");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("[lowp] ");
                         }
                     }
-                    Console.WriteLine(""); // effectively just cout<<endl;
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine(""); // effectively just cout<<endl;
                 }
             }
 
@@ -1117,32 +1154,37 @@ namespace SimplePIM.Memory.DDR
                     totalWritesPerRank[i] += totalWritesPerBank[SEQUENTIAL(i, j)];
                 }
             }
-//# ifdef LOG_OUTPUT
-//            dramsim_log.precision(3);
-//            dramsim_log.setf(ios::fixed, ios::floatfield);
-//#else
-//            cout.precision(3);
-//            cout.setf(ios::fixed, ios::floatfield);
-//#endif
+            //# ifdef LOG_OUTPUT
+            //            dramsim_log.precision(3);
+            //            dramsim_log.setf(ios::fixed, ios::floatfield);
+            //#else
+            //            cout.precision(3);
+            //            cout.setf(ios::fixed, ios::floatfield);
+            //#endif
 
-            Console.WriteLine(" =======================================================");
-            Console.WriteLine(" ============== Printing Statistics [id:" + parentMemorySystem.systemID + "]==============");
-            Console.Write("   Total Return Transactions : " + totalTransactions);
-            Console.WriteLine(" (" + totalBytesTransferred + " bytes) aggregate average bandwidth " + totalBandwidth + "GB/s");
-
+            if (Config.DEBUG_MEMORY)
+            {
+                DEBUG.WriteLine(" =======================================================");
+                DEBUG.WriteLine(" ============== Printing Statistics [id:" + parentMemorySystem.systemID + "]==============");
+                DEBUG.Write("   Total Return Transactions : " + totalTransactions);
+                DEBUG.WriteLine(" (" + totalBytesTransferred + " bytes) aggregate average bandwidth " + totalBandwidth + "GB/s");
+            }
             for (int r = 0; r < Config.dram_config.NUM_RANKS; r++)
             {
 
-                Console.WriteLine("      -Rank   " + r + " : ");
-                Console.Write("        -Reads  : " + totalReadsPerRank[r]);
-                Console.WriteLine(" (" + totalReadsPerRank[r] * bytesPerTransaction + " bytes)");
-                Console.Write("        -Writes : " + totalWritesPerRank[r]);
-                Console.WriteLine(" (" + totalWritesPerRank[r] * bytesPerTransaction + " bytes)");
-                for (int j = 0; j < Config.dram_config.NUM_BANKS; j++)
+                if (Config.DEBUG_MEMORY)
                 {
-                    Console.WriteLine("        -Bandwidth / Latency  (Bank " + j + "): " + bandwidth[SEQUENTIAL(r, j)] + " GB/s\t\t" + averageLatency[SEQUENTIAL(r, j)] + " ns");
-                }
+                    DEBUG.WriteLine("      -Rank   " + r + " : ");
+                    DEBUG.Write("        -Reads  : " + totalReadsPerRank[r]);
+                    DEBUG.WriteLine(" (" + totalReadsPerRank[r] * bytesPerTransaction + " bytes)");
+                    DEBUG.Write("        -Writes : " + totalWritesPerRank[r]);
+                    DEBUG.WriteLine(" (" + totalWritesPerRank[r] * bytesPerTransaction + " bytes)");
+                    for (int j = 0; j < Config.dram_config.NUM_BANKS; j++)
+                    {
+                        DEBUG.WriteLine("        -Bandwidth / Latency  (Bank " + j + "): " + bandwidth[SEQUENTIAL(r, j)] + " GB/s\t\t" + averageLatency[SEQUENTIAL(r, j)] + " ns");
+                    }
 
+                }
                 // factor of 1000 at the end is to account for the fact that totalEnergy is accumulated in mJ since IDD values are given in mA
                 backgroundPower[r] = ((double)backgroundEnergy[r] / (double)(cyclesElapsed)) * Config.dram_config.Vdd / 1000.0;
                 burstPower[r] = ((double)burstEnergy[r] / (double)(cyclesElapsed)) * Config.dram_config.Vdd / 1000.0;
@@ -1155,37 +1197,45 @@ namespace SimplePIM.Memory.DDR
                     parentMemorySystem.ReportPower(backgroundPower[r], burstPower[r], refreshPower[r], actprePower[r]);
                 }
 
-                Console.WriteLine(" == Power Data for Rank        " + r);
-                Console.WriteLine("   Average Power (watts)     : " + averagePower[r]);
-                Console.WriteLine("     -Background (watts)     : " + backgroundPower[r]);
-                Console.WriteLine("     -Act/Pre    (watts)     : " + actprePower[r]);
-                Console.WriteLine("     -Burst      (watts)     : " + burstPower[r]);
-                Console.WriteLine("     -Refresh    (watts)     : " + refreshPower[r]);
+                if (Config.DEBUG_MEMORY)
+                {
+                    DEBUG.WriteLine(" == Power Data for Rank        " + r);
+                    DEBUG.WriteLine("   Average Power (watts)     : " + averagePower[r]);
+                    DEBUG.WriteLine("     -Background (watts)     : " + backgroundPower[r]);
+                    DEBUG.WriteLine("     -Act/Pre    (watts)     : " + actprePower[r]);
+                    DEBUG.WriteLine("     -Burst      (watts)     : " + burstPower[r]);
+                    DEBUG.WriteLine("     -Refresh    (watts)     : " + refreshPower[r]);
 
-               
+                }
             }
            
 
             // only print the latency histogram at the end of the simulation since it clogs the output too much to print every epoch
             if (finalStats)
             {
-                Console.WriteLine(" ---  Latency list (" + latencies.Count() + ")");
-                Console.WriteLine("       [lat] : #");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine(" ---  Latency list (" + latencies.Count() + ")");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("       [lat] : #");
 
                 latencies = latencies.OrderBy(o => o.Key).ToDictionary(o => o.Key, p => p.Value);
                 foreach(var it in latencies) {
-                    Console.WriteLine("       [" + it.Key + "-" + (it.Key + (DRAMConfig. HISTOGRAM_BIN_SIZE - 1)) + "] : " + it.Value);
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("       [" + it.Key + "-" + (it.Key + (DRAMConfig. HISTOGRAM_BIN_SIZE - 1)) + "] : " + it.Value);
                     
                 }
                 if (currentClockCycle % Config. dram_config.EPOCH_LENGTH == 0)
                 {
-                    Console.WriteLine(" --- Grand Total Bank usage list");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine(" --- Grand Total Bank usage list");
                     for (int i = 0; i < Config.dram_config.NUM_RANKS; i++)
                     {
-                        Console.WriteLine("Rank " + i + ":");
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("Rank " + i + ":");
                         for (int j = 0; j < Config.dram_config.NUM_BANKS; j++)
                         {
-                            Console.WriteLine("  b" + j + ": " + grandTotalBankAccesses[SEQUENTIAL(i, j)]);
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("  b" + j + ": " + grandTotalBankAccesses[SEQUENTIAL(i, j)]);
                         }
                     }
                 }
@@ -1193,8 +1243,10 @@ namespace SimplePIM.Memory.DDR
             }
 
 
-            Console.WriteLine();
-            Console.WriteLine(" == Pending Transactions : " + pendingReadTransactions.Count() + " (" + currentClockCycle + ")==");
+            if (Config.DEBUG_MEMORY)
+                DEBUG.WriteLine();
+            if (Config.DEBUG_MEMORY)
+                DEBUG.WriteLine(" == Pending Transactions : " + pendingReadTransactions.Count() + " (" + currentClockCycle + ")==");
             /*
             for(size_t i=0;i<pendingReadTransactions.size();i++)
                 {

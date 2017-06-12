@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.IO;
 using SimplePIM.Procs;
 using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.DDR
 {
@@ -29,7 +30,8 @@ namespace SimplePIM.Memory.DDR
 
             if ((physicalAddress & transactionMask) != 0)
             {
-                Console.WriteLine("WARNING: address 0x" + physicalAddress.ToString("X") + " is not aligned to the request size of " + transactionSize);
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("WARNING: address 0x" + physicalAddress.ToString("X") + " is not aligned to the request size of " + transactionSize);
             }
 
             // each burst will contain JEDEC_DATA_BUS_BITS/8 bytes of data, so the bottom bits (3 bits for a single channel DDR system) are
@@ -59,7 +61,8 @@ namespace SimplePIM.Memory.DDR
             int colHighBitWidth = colBitWidth - colLowBitWidth;
             if (Config.dram_config.DEBUG_ADDR_MAP)
             {
-                Console.WriteLine("Bit widths: ch:" + channelBitWidth + " r:" + rankBitWidth + " b:" + bankBitWidth
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("Bit widths: ch:" + channelBitWidth + " r:" + rankBitWidth + " b:" + bankBitWidth
                         + " row:" + rowBitWidth + " colLow:" + colLowBitWidth
                         + " colHigh:" + colHighBitWidth + " off:" + byteOffsetWidth
                         + " Total:" + (channelBitWidth + rankBitWidth + bankBitWidth + rowBitWidth + colLowBitWidth + colHighBitWidth + byteOffsetWidth));
@@ -277,12 +280,14 @@ namespace SimplePIM.Memory.DDR
 
             else
             {
-                Console.WriteLine("== Error - Unknown Address Mapping Scheme");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("== Error - Unknown Address Mapping Scheme");
                 Environment.Exit(-1);
             }
             if (Config.dram_config.DEBUG_ADDR_MAP)
             {
-                Console.WriteLine("Mapped Ch=" + newTransactionChan + " Rank=" + newTransactionRank
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("Mapped Ch=" + newTransactionChan + " Rank=" + newTransactionRank
                         + " Bank=" + newTransactionBank + " Row=" + newTransactionRow
                         + " Col=" + newTransactionColumn + "\n");
             }
@@ -306,14 +311,14 @@ namespace SimplePIM.Memory.DDR
         {
             return (1UL << (int)dramsim_log2(x)) == x;
         }
-        public MultiChannelMemorySystem(string systemIniFilename_, string pwd_, uint megsOfMemory_)
+        public MultiChannelMemorySystem(string systemIniFilename_,  uint megsOfMemory_)
         {
 
 
             megsOfMemory = megsOfMemory_;
 
             systemIniFilename = systemIniFilename_;
-            pwd = pwd_;
+
 
             //  clockDomainCrosser = (new ClockDomain::Callback<MultiChannelMemorySystem, void>(this, &MultiChannelMemorySystem::actual_update));
             clockDomainCrosser = new ClockDomainCrosser(new ClockUpdateCB(this.actual_update));
@@ -322,20 +327,12 @@ namespace SimplePIM.Memory.DDR
 
             if (!isPowerOfTwo(megsOfMemory))
             {
-                Console.WriteLine("ERROR:  Please specify a power of 2 memory size");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("ERROR:  Please specify a power of 2 memory size");
                 Environment.Exit(1);
             }
-            if (pwd.Length > 0)
-            {
-                //ignore the pwd argument if the argument is an absolute path
-
-                if (systemIniFilename[0] != '/')
-                {
-                    systemIniFilename = pwd + "/" + systemIniFilename;
-                }
-            }
-
-            Console.WriteLine("DEBUG: == Loading system model file '" + systemIniFilename + "' == ");
+            if(Config.DEBUG_MEMORY)
+                DEBUG.WriteLine("DEBUG: == Loading system model file '" + systemIniFilename + "' == ");
             channels = new List<MemorySystem>();
             for (uint i = 0; i < Config.dram_config.NUM_CHANS; i++)
             {
@@ -385,9 +382,11 @@ namespace SimplePIM.Memory.DDR
         {
             for (int i = 0; i < Config.dram_config.NUM_CHANS; i++)
             {
-                Console.WriteLine("==== Channel [" + i + "] ====");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("==== Channel [" + i + "] ====");
                 channels[i].printStats(finalStats);
-                Console.WriteLine("//// Channel [" + i + "] ////");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("//// Channel [" + i + "] ////");
             }
         }
         public FileStream getLogFile()
@@ -483,7 +482,8 @@ namespace SimplePIM.Memory.DDR
 
             if (!isPowerOfTwo(Config.dram_config.NUM_CHANS))
             {
-                Console.WriteLine("ERROR  We can only support power of two # of channels.\n" +
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("ERROR  We can only support power of two # of channels.\n" +
                         "I don't know what Intel was thinking, but trying to address map half a bit is a neat trick that we're not sure how to do");
                 Environment.Exit(1);
             }
@@ -493,7 +493,8 @@ namespace SimplePIM.Memory.DDR
             addressMapping(addr, ref channelNumber, ref rank, ref bank, ref row, ref col);
             if (channelNumber >= Config.dram_config.NUM_CHANS)
             {
-                Console.WriteLine("ERROR Got channel index " + channelNumber + " but only " + Config.dram_config.NUM_CHANS + " exist");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("ERROR Got channel index " + channelNumber + " but only " + Config.dram_config.NUM_CHANS + " exist");
                 Environment.Exit(1);
             }
             //DEBUG("Channel idx = "<<channelNumber<<" totalbits="<<totalBits<<" channelbits="<<channelBits); 
@@ -505,7 +506,8 @@ namespace SimplePIM.Memory.DDR
             if (currentClockCycle == 0)
             {
                 InitOutputFiles(traceFilename);
-                Console.WriteLine("DEBUG :  DRAMSim2 Clock Frequency =" + clockDomainCrosser.clock1 + "Hz, CPU Clock Frequency=" + clockDomainCrosser.clock2 + "Hz");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("DEBUG :  DRAMSim2 Clock Frequency =" + clockDomainCrosser.clock1 + "Hz, CPU Clock Frequency=" + clockDomainCrosser.clock2 + "Hz");
             }
 
             if (currentClockCycle % Config.dram_config.EPOCH_LENGTH == 0)
@@ -530,8 +532,6 @@ namespace SimplePIM.Memory.DDR
         public uint megsOfMemory;
         public string systemIniFilename;
         public string traceFilename;
-        public string pwd;
-        public string visFilename;
         public ClockDomainCrosser clockDomainCrosser;
         public void mkdirIfNotExist(string path)
         {
@@ -573,7 +573,8 @@ namespace SimplePIM.Memory.DDR
                 }
             }
             // if we can't find one, just give up and return whatever is the current filename
-            Console.WriteLine("ERROR  Warning: Couldn't find a suitable suffix for " + filename);
+            if (Config.DEBUG_MEMORY)
+                DEBUG.WriteLine("ERROR  Warning: Couldn't find a suitable suffix for " + filename);
             return currentFilename;
         }
     }

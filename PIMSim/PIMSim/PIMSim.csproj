@@ -141,7 +141,16 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Docs\document.docx" />
+    <None Include="examples\1cpu1pu_function\config.ini" />
+    <None Include="examples\1cpu1pu_function\CPU0.trace" />
+    <None Include="examples\1cpu1pu_function\DRAM.ini" />
+    <None Include="examples\1cpu1pu_function\hmc_config.ini" />
+    <None Include="examples\1cpu1pu_function\PIM_Settings.ini" />
     <None Include="Makefile" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Docs\ClassDiagram.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

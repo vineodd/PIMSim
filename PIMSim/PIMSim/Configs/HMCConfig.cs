@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-
+using SimplePIM.Statistics;
 #endregion
 
 namespace SimplePIM.Configs
@@ -52,7 +52,7 @@ namespace SimplePIM.Configs
             }
             catch 
             {
-                Console.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
 
                 return false;
             }

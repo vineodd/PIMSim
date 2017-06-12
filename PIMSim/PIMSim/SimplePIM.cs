@@ -209,11 +209,7 @@ namespace SimplePIM.General
                         }
                     }
                 }
-                //bool add_res = setValue(command, args[i + 1]);
-                //if(!add_res)
-                //{
-                //    Console.WriteLine("WARNING : setValue failed --- Command : -" + command + "   Value = " + args[i + 1]);
-                //}
+              
             }
             return true;
 

@@ -65,7 +65,7 @@ namespace SimplePIM.Memory.DDR
                     }
                     else
                     {
-                        Console.WriteLine("ERROR: Unknown row buffer policy");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR: Unknown row buffer policy");
                         Environment.Exit(1);
                     }
                     break;
@@ -80,12 +80,12 @@ namespace SimplePIM.Memory.DDR
                     }
                     else
                     {
-                        Console.WriteLine("ERROR: Unknown row buffer policy");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR: Unknown row buffer policy");
                         Environment.Exit(1);
                     }
                     break;
                 default:
-                    Console.WriteLine("ERROR: This transaction type doesn't have a corresponding bus packet type");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR: This transaction type doesn't have a corresponding bus packet type");
                     Environment.Exit(1);
                     break;
             }
@@ -144,7 +144,7 @@ namespace SimplePIM.Memory.DDR
             else
             {
 
-                Console.WriteLine("ERROR  This should never happen");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR  This should never happen");
 
                 Environment.Exit(1);
             }
@@ -170,14 +170,14 @@ namespace SimplePIM.Memory.DDR
             int it = find(pendingReadRequests, addr);
             if (it == pendingReadRequests.Count())
             {
-                Console.WriteLine("ERROR: Cant find a pending read for this one");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR: Cant find a pending read for this one");
                 Environment.Exit(1);
             }
             else
             {
                 if (pendingReadRequests.ElementAt(it).Value.Count() == 0)
                 {
-                    Console.WriteLine("ERROR:Nothing here, either");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR:Nothing here, either");
                     Environment.Exit(1);
                 }
             }
@@ -236,7 +236,7 @@ namespace SimplePIM.Memory.DDR
             pendingReadRequests[addr].RemoveAt(0);
             if (pendingReadRequests[addr].Count() == 0)
                 pendingReadRequests.Remove(addr);
-            Console.WriteLine("Read Callback:  0x" + addr.ToString("X") + "Block_addr=0x" + callback.block_addr + "  latency=" + latency + "cycles (" + done_cycle + "->" + added_cycle + ")");
+            if(Config.DEBUG_MEMORY)DEBUG.WriteLine("Read Callback:  0x" + addr.ToString("X") + "Block_addr=0x" + callback.block_addr + "  latency=" + latency + "cycles (" + done_cycle + "->" + added_cycle + ")");
 
 
         }
@@ -246,14 +246,14 @@ namespace SimplePIM.Memory.DDR
             int it = find(pendingWriteRequests, addr);
             if (it == pendingWriteRequests.Count())
             {
-                Console.WriteLine("ERROR  : Cant find a pending read for this one");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR  : Cant find a pending read for this one");
                 Environment.Exit(1);
             }
             else
             {
                 if (pendingWriteRequests.ElementAt(it).Value.Count() == 0)
                 {
-                    Console.WriteLine("ERROR  : Nothing here, either");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR  : Nothing here, either");
                     Environment.Exit(1);
                 }
             }
@@ -322,7 +322,7 @@ namespace SimplePIM.Memory.DDR
             pendingWriteRequests[addr].RemoveAt(0);
             if (pendingWriteRequests[addr].Count() == 0)
                 pendingWriteRequests.Remove(addr);
-            Console.WriteLine("Write Callback: 0x" + addr.ToString("X") + " latency=" + latency + "cycles (" + done_cycle + "->" + added_cycle + ")");
+            if(Config.DEBUG_MEMORY)DEBUG.WriteLine("Write Callback: 0x" + addr.ToString("X") + " latency=" + latency + "cycles (" + done_cycle + "->" + added_cycle + ")");
         }
     }
 }

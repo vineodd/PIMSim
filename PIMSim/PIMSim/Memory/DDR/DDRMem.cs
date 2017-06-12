@@ -1,4 +1,5 @@
-﻿using System;
+﻿#region Reference
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,25 +10,27 @@ using SimplePIM.Procs;
 using SimplePIM.Configs;
 using SimplePIM.Statistics;
 using SimplePIM.PIM;
+#endregion
 
 namespace SimplePIM.Memory.DDR
 {
     public class DDRMem : MemObject
     {
-        public TransactionReceiver transactionReceiver;
+        #region Private Variables
+
+        #endregion
+        private TransactionReceiver transactionReceiver;
         public string pwdString = "";
-        public uint megsOfMemory = 2048;
-        public bool useClockCycle = true;
-        public UInt64 numCycles = 1000;
-        public MultiChannelMemorySystem memorySystem;
+        private uint megsOfMemory = 2048;
+        private MultiChannelMemorySystem memorySystem;
         public Callback_t read_cb;
         public Callback_t write_cb;
         public List<MemRequest> TransationQueue;
-        public UInt64 clockCycle = 0;
-        TransactionType transType = TransactionType.RETURN_DATA;
-        Transaction trans = null;
-        bool pendingTrans = false;
-        UInt64 addr = 0;
+        private UInt64 clockCycle = 0;
+        private TransactionType transType = TransactionType.RETURN_DATA;
+        private Transaction trans = null;
+        private bool pendingTrans = false;
+
 
         public DDRMem( int pid_)
         {
@@ -35,7 +38,7 @@ namespace SimplePIM.Memory.DDR
 
             transactionReceiver = new TransactionReceiver();
 
-            memorySystem = new MultiChannelMemorySystem(Config.dram_config_file, pwdString, megsOfMemory);
+            memorySystem = new MultiChannelMemorySystem(Config.dram_config_file, megsOfMemory);
             memorySystem.setCPUClockSpeed(0);
             if (Config.dram_config.RETURN_TRANSACTIONS)
             {
@@ -67,9 +70,9 @@ namespace SimplePIM.Memory.DDR
         public override void Step()
         {
             cycle++;
+
+            //get requests
             MemRequest req_ = new MemRequest();
-
-
             while (Mctrl.get_req(this.pid, ref req_))
             {
                 TransationQueue.Add(req_);
@@ -82,6 +85,7 @@ namespace SimplePIM.Memory.DDR
                 }
             }
 
+            //marge same requests
             bool restart = false;
             while (!restart)
             {
@@ -102,6 +106,8 @@ namespace SimplePIM.Memory.DDR
                     }
                 }
             }
+
+            //update memory
             if (!pendingTrans)
             {
                 if (TransationQueue.Count() > 0)
@@ -132,9 +138,7 @@ namespace SimplePIM.Memory.DDR
                             break;
 
                     }
-                    //  addr = req.address;
-                    //   data = req.data;
-                    //   clockCycle = req.cycle;
+
                     TransationQueue.RemoveAt(0);
                     if (transType != TransactionType.DATA_READ && transType != TransactionType.DATA_WRITE)
                         return;
@@ -161,7 +165,8 @@ namespace SimplePIM.Memory.DDR
                         callback.stage_id = req.stage_id;
                     }
                     trans = new Transaction(transType,req.address,req.data, callback);//addr, data, req.block_addr, req.pid, req.pim);
-                    Console.WriteLine("ADD transaction: addr=" + addr.ToString("X"));
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("--DDR[" + this.pid + "] ADD transaction: [" + req.address.ToString("X") + "]");
 
 
                     alignTransactionAddress(ref trans);

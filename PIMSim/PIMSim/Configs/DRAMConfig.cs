@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using SimplePIM.Statistics;
+using SimplePIM.Configs;
 #endregion
 
 namespace SimplePIM.Memory.DDR
@@ -244,7 +246,8 @@ namespace SimplePIM.Memory.DDR
                             }
                             catch 
                             {
-                                Console.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
+                                if (Config.DEBUG_MEMORY)
+                                    DEBUG.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
                             }
                             finally
                             {
@@ -256,7 +259,8 @@ namespace SimplePIM.Memory.DDR
 
                             if (DEBUG_INI_READER)
                             {
-                                Console.WriteLine("      - SETTING " + configMap[i].iniKey + "=" + intValue);
+                                if (Config.DEBUG_MEMORY)
+                                    DEBUG.WriteLine("      - SETTING " + configMap[i].iniKey + "=" + intValue);
                             }
                             break;
                         case varType.UINT64:
@@ -266,7 +270,8 @@ namespace SimplePIM.Memory.DDR
                             }
                             catch 
                             {
-                                Console.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
+                                if (Config.DEBUG_MEMORY)
+                                    DEBUG.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
                             }
                             finally
                             {
@@ -277,7 +282,8 @@ namespace SimplePIM.Memory.DDR
 
                             if (DEBUG_INI_READER)
                             {
-                                Console.WriteLine("      - SETTING " + configMap[i].iniKey + "=" + int64Value);
+                                if (Config.DEBUG_MEMORY)
+                                    DEBUG.WriteLine("      - SETTING " + configMap[i].iniKey + "=" + int64Value);
                             }
                             break;
                         case varType.FLOAT:
@@ -287,7 +293,8 @@ namespace SimplePIM.Memory.DDR
                             }
                             catch 
                             {
-                                Console.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
+                                if (Config.DEBUG_MEMORY)
+                                    DEBUG.WriteLine("could not parse line " + lineNumber + " (non-numeric value '" + valueString + "')?");
                             }
                             finally
                             {
@@ -298,7 +305,8 @@ namespace SimplePIM.Memory.DDR
 
                             if (DEBUG_INI_READER)
                             {
-                                Console.WriteLine("      - SETTING " + configMap[i].iniKey + "=" + floatValue);
+                                if (Config.DEBUG_MEMORY)
+                                    DEBUG.WriteLine("      - SETTING " + configMap[i].iniKey + "=" + floatValue);
                             }
                             break;
                         case varType.STRING:
@@ -307,7 +315,8 @@ namespace SimplePIM.Memory.DDR
                             typeof(DRAMConfig).GetField(configMap[i].iniKey).SetValue(this, valueString);
                             if (DEBUG_INI_READER)
                             {
-                                Console.WriteLine("      - SETTING " + configMap[i].iniKey + "=" + valueString);
+                                if (Config.DEBUG_MEMORY)
+                                    DEBUG.WriteLine("      - SETTING " + configMap[i].iniKey + "=" + valueString);
                             }
 
                             break;
@@ -333,24 +342,9 @@ namespace SimplePIM.Memory.DDR
                 }
             }
 
-          //  if (configMap[i].variablePtr == null)
-          //  {
-            //    Console.WriteLine("WARNING: UNKNOWN KEY '" + key + "' IN INI FILE");
-          //  }
+       
         }
-        public void OverrideKeys(ref Dictionary<string, string> map)
-        {
-            if (map == null)
-                return;
-            Console.WriteLine("Key overrides from command line:");
-            foreach (KeyValuePair<string, string> it in map)
-            {
-                string key = it.Key;
-                string value = it.Value;
-                Console.WriteLine("     '" + key + "'->'" + value + "'");
-                SetKey(key, value);
-            }
-        }
+       
         public void ReadIniFile(string filename)
         {
             string line = "";
@@ -403,7 +397,7 @@ namespace SimplePIM.Memory.DDR
             }
             else
             {
-                Console.WriteLine("ERROR  : Unable to load ini file " + filename);
+                DEBUG.WriteLine("ERROR  : Unable to load ini file " + filename);
                 Environment.Exit(1);
             }
             /* precompute frequently used values */
@@ -423,7 +417,8 @@ namespace SimplePIM.Memory.DDR
                 addressMappingScheme = AddressMappingScheme.Scheme1;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ADDR SCHEME: 1");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ADDR SCHEME: 1");
                 }
             }
             else if (ADDRESS_MAPPING_SCHEME == "scheme2")
@@ -431,7 +426,8 @@ namespace SimplePIM.Memory.DDR
                 addressMappingScheme = AddressMappingScheme.Scheme2;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ADDR SCHEME: 2");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ADDR SCHEME: 2");
                 }
             }
             else if (ADDRESS_MAPPING_SCHEME == "scheme3")
@@ -439,7 +435,8 @@ namespace SimplePIM.Memory.DDR
                 addressMappingScheme = AddressMappingScheme.Scheme3;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ADDR SCHEME: 3");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ADDR SCHEME: 3");
                 }
             }
             else if (ADDRESS_MAPPING_SCHEME == "scheme4")
@@ -447,7 +444,8 @@ namespace SimplePIM.Memory.DDR
                 addressMappingScheme = AddressMappingScheme.Scheme4;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ADDR SCHEME: 4");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ADDR SCHEME: 4");
                 }
             }
             else if (ADDRESS_MAPPING_SCHEME == "scheme5")
@@ -455,7 +453,8 @@ namespace SimplePIM.Memory.DDR
                 addressMappingScheme = AddressMappingScheme.Scheme5;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ADDR SCHEME: 5");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ADDR SCHEME: 5");
                 }
             }
             else if (ADDRESS_MAPPING_SCHEME == "scheme6")
@@ -463,7 +462,8 @@ namespace SimplePIM.Memory.DDR
                 addressMappingScheme = AddressMappingScheme.Scheme6;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ADDR SCHEME: 6");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ADDR SCHEME: 6");
                 }
             }
             else if (ADDRESS_MAPPING_SCHEME == "scheme7")
@@ -471,12 +471,14 @@ namespace SimplePIM.Memory.DDR
                 addressMappingScheme = AddressMappingScheme.Scheme7;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ADDR SCHEME: 7");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ADDR SCHEME: 7");
                 }
             }
             else
             {
-                Console.WriteLine("WARNING: unknown address mapping scheme '" + ADDRESS_MAPPING_SCHEME + "'; valid values are 'scheme1'...'scheme7'. Defaulting to scheme1");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("WARNING: unknown address mapping scheme '" + ADDRESS_MAPPING_SCHEME + "'; valid values are 'scheme1'...'scheme7'. Defaulting to scheme1");
                 addressMappingScheme = AddressMappingScheme.Scheme1;
             }
 
@@ -485,7 +487,8 @@ namespace SimplePIM.Memory.DDR
                 rowBufferPolicy =RowBufferPolicy. OpenPage;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ROW BUFFER: open page");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ROW BUFFER: open page");
                 }
             }
             else if (ROW_BUFFER_POLICY == "close_page")
@@ -493,12 +496,14 @@ namespace SimplePIM.Memory.DDR
                 rowBufferPolicy = RowBufferPolicy.ClosePage;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: ROW BUFFER: close page");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: ROW BUFFER: close page");
                 }
             }
             else
             {
-                Console.WriteLine("WARNING: unknown row buffer policy '" + ROW_BUFFER_POLICY + "'; valid values are 'open_page' or 'close_page', Defaulting to Close Page.");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("WARNING: unknown row buffer policy '" + ROW_BUFFER_POLICY + "'; valid values are 'open_page' or 'close_page', Defaulting to Close Page.");
                 rowBufferPolicy = RowBufferPolicy.ClosePage;
             }
 
@@ -507,7 +512,8 @@ namespace SimplePIM.Memory.DDR
                 queuingStructure =QueuingStructure. PerRankPerBank;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: QUEUING STRUCT: per rank per bank");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: QUEUING STRUCT: per rank per bank");
                 }
             }
             else if (QUEUING_STRUCTURE == "per_rank")
@@ -515,12 +521,14 @@ namespace SimplePIM.Memory.DDR
                 queuingStructure =QueuingStructure. PerRank;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: QUEUING STRUCT: per rank");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: QUEUING STRUCT: per rank");
                 }
             }
             else
             {
-                Console.WriteLine("WARNING: Unknown queueing structure '" + QUEUING_STRUCTURE + "'; valid options are 'per_rank' and 'per_rank_per_bank', defaulting to Per Rank Per Bank");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("WARNING: Unknown queueing structure '" + QUEUING_STRUCTURE + "'; valid options are 'per_rank' and 'per_rank_per_bank', defaulting to Per Rank Per Bank");
                 queuingStructure =QueuingStructure. PerRankPerBank;
             }
 
@@ -529,7 +537,8 @@ namespace SimplePIM.Memory.DDR
                 schedulingPolicy =SchedulingPolicy. RankThenBankRoundRobin;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: SCHEDULING: Rank Then Bank");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: SCHEDULING: Rank Then Bank");
                 }
             }
             else if (SCHEDULING_POLICY == "bank_then_rank_round_robin")
@@ -537,12 +546,14 @@ namespace SimplePIM.Memory.DDR
                 schedulingPolicy = SchedulingPolicy.BankThenRankRoundRobin;
                 if (DEBUG_INI_READER)
                 {
-                    Console.WriteLine("DEBUG: SCHEDULING: Bank Then Rank");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("DEBUG: SCHEDULING: Bank Then Rank");
                 }
             }
             else
             {
-                Console.WriteLine("WARNING: Unknown scheduling policy '" + SCHEDULING_POLICY + "'; valid options are 'rank_then_bank_round_robin' or 'bank_then_rank_round_robin'; defaulting to Bank Then Rank Round Robin");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("WARNING: Unknown scheduling policy '" + SCHEDULING_POLICY + "'; valid options are 'rank_then_bank_round_robin' or 'bank_then_rank_round_robin'; defaulting to Bank Then Rank Round Robin");
                 schedulingPolicy = SchedulingPolicy.BankThenRankRoundRobin;
             }
         }
@@ -552,19 +563,22 @@ namespace SimplePIM.Memory.DDR
             {
                 if (!configMap[i].wasSet)
                 {
-                    Console.WriteLine("WARNING: KEY " + configMap[i].iniKey + " NOT FOUND IN INI FILE.");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("WARNING: KEY " + configMap[i].iniKey + " NOT FOUND IN INI FILE.");
                     switch (configMap[i].variableType)
                     {
                         //the string and bool values can be defaulted, but generally we need all the numeric values to be set to continue
                         case varType.UINT:
                         case varType.UINT64:
                         case varType.FLOAT:
-                            Console.WriteLine("ERROR: Cannot continue without key '" + configMap[i].iniKey + "' set.");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("ERROR: Cannot continue without key '" + configMap[i].iniKey + "' set.");
                             return false;
 
                         case varType.BOOL:
                             configMap[i].variablePtr = false;
-                            Console.WriteLine("DEBUG: \tSetting Default: " + configMap[i].iniKey + "=false");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("DEBUG: \tSetting Default: " + configMap[i].iniKey + "=false");
                             break;
                         case varType.STRING:
                             break;

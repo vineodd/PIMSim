@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.IO;
 using SimplePIM.Procs;
 using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.DDR
 {
@@ -23,7 +24,7 @@ namespace SimplePIM.Memory.DDR
 
             currentClockCycle = 0;
 
-            Console.WriteLine("===== MemorySystem " + systemID + " =====");
+            if(Config.DEBUG_MEMORY)DEBUG.WriteLine("===== MemorySystem " + systemID + " =====");
 
             UInt64 megsOfStoragePerRank = ((((UInt64)Config.dram_config.NUM_ROWS * (Config.dram_config.NUM_COLS * Config.dram_config.DEVICE_WIDTH) * Config.dram_config.NUM_BANKS) * ((UInt64)Config.dram_config.JEDEC_DATA_BUS_BITS / Config.dram_config.DEVICE_WIDTH)) / 8) >> 20;
 
@@ -34,7 +35,7 @@ namespace SimplePIM.Memory.DDR
                 Config.dram_config.NUM_RANKS_LOG = Config.dram_config.log2(Config.dram_config.NUM_RANKS);
                 if (Config.dram_config.NUM_RANKS == 0)
                 {
-                    Console.WriteLine("WARNING: Cannot create memory system with " + megsOfMemory + "MB, defaulting to minimum size of " + megsOfStoragePerRank + "MB");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("WARNING: Cannot create memory system with " + megsOfMemory + "MB, defaulting to minimum size of " + megsOfStoragePerRank + "MB");
                     Config.dram_config.NUM_RANKS = 1;
                 }
             }
@@ -42,7 +43,7 @@ namespace SimplePIM.Memory.DDR
             Config.dram_config.NUM_DEVICES = Config.dram_config.JEDEC_DATA_BUS_BITS / Config.dram_config.DEVICE_WIDTH;
             Config.dram_config.TOTAL_STORAGE = (Config.dram_config.NUM_RANKS * megsOfStoragePerRank);
 
-            Console.WriteLine("CH. " + systemID + " TOTAL_STORAGE : " + Config.dram_config.TOTAL_STORAGE + "MB | " + Config.dram_config.NUM_RANKS + " Ranks | " + Config.dram_config.NUM_DEVICES + " Devices per rank");
+            if(Config.DEBUG_MEMORY)DEBUG.WriteLine("CH. " + systemID + " TOTAL_STORAGE : " + Config.dram_config.TOTAL_STORAGE + "MB | " + Config.dram_config.NUM_RANKS + " Ranks | " + Config.dram_config.NUM_DEVICES + " Devices per rank");
 
 
             memoryController = new MemoryController(this, dramsim_log);

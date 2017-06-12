@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SimplePIM.Statistics;
 #endregion
 
 namespace SimplePIM.Procs
@@ -48,7 +49,7 @@ namespace SimplePIM.Procs
                 return true;
             }
             //found no suitable replacement
-            Console.WriteLine("ERROR : No suitable replacement found.");
+            DEBUG.WriteLine("ERROR : No suitable replacement found.");
             return false;
 
         }

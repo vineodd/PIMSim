@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.DDR
 {
@@ -44,7 +45,8 @@ namespace SimplePIM.Memory.DDR
             }
             else
             {
-                Console.WriteLine("== Error - Unknown queuing structure");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("== Error - Unknown queuing structure");
                 Environment.Exit(1);
             }
 
@@ -100,8 +102,10 @@ namespace SimplePIM.Memory.DDR
                 queues[(int)rank][0].Add(newBusPacket);
                 if (queues[(int)rank][0].Count() >  Config.dram_config.CMD_QUEUE_DEPTH)
                 {
-                    Console.WriteLine("== Error - Enqueued more than allowed in command queue");
-                    Console.WriteLine("						Need to call .hasRoomFor(int numberToEnqueue, unsigned rank, unsigned bank) first");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("== Error - Enqueued more than allowed in command queue");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("						Need to call .hasRoomFor(int numberToEnqueue, unsigned rank, unsigned bank) first");
                     Environment.Exit(1);
                 }
             }
@@ -110,14 +114,17 @@ namespace SimplePIM.Memory.DDR
                 queues[(int)rank][(int)bank].Add(newBusPacket);
                 if (queues[(int)rank][(int)bank].Count() >  Config.dram_config.CMD_QUEUE_DEPTH)
                 {
-                    Console.WriteLine("== Error - Enqueued more than allowed in command queue");
-                    Console.WriteLine("						Need to call .hasRoomFor(int numberToEnqueue, unsigned rank, unsigned bank) first");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("== Error - Enqueued more than allowed in command queue");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("						Need to call .hasRoomFor(int numberToEnqueue, unsigned rank, unsigned bank) first");
                     Environment.Exit(1);
                 }
             }
             else
             {
-                Console.WriteLine("== Error - Unknown queuing structure");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("== Error - Unknown queuing structure");
                 Environment.Exit(1);
             }
         }
@@ -587,7 +594,8 @@ namespace SimplePIM.Memory.DDR
                     }
                     break;
                 default:
-                    Console.WriteLine("ERROT == Error - Trying to issue a crazy bus packet type : ");
+                    if (Config.DEBUG_MEMORY)
+                        DEBUG.WriteLine("ERROT == Error - Trying to issue a crazy bus packet type : ");
                     busPacket.print();
                     Environment.Exit(0);
                     break;
@@ -610,7 +618,8 @@ namespace SimplePIM.Memory.DDR
             }
             else
             {
-                Console.WriteLine("DEBUG: Invalid Queueing Stucture");
+                if (Config.DEBUG_MEMORY)
+                    DEBUG.WriteLine("DEBUG: Invalid Queueing Stucture");
                 Environment.Exit(1);
                 return false;
             }
@@ -640,7 +649,7 @@ namespace SimplePIM.Memory.DDR
             }
             else
             {
-                Console.WriteLine("ERROR : Unknown queue structure");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR : Unknown queue structure");
                 Environment.Exit(1);
                 return null;
             }
@@ -683,7 +692,7 @@ namespace SimplePIM.Memory.DDR
             }
             else
             {
-                Console.WriteLine("== Error - Unknown scheduling policy");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Unknown scheduling policy");
                 Environment.Exit(1);
             }
         }

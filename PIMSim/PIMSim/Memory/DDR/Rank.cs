@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.DDR
 {
@@ -44,7 +45,7 @@ namespace SimplePIM.Memory.DDR
         {
             if (Config.dram_config.DEBUG_BUS)
             {
-                Console.WriteLine(" -- R" + this.id + " Receiving On Bus    : ");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine(" -- R" + this.id + " Receiving On Bus    : ");
                 packet.print();
             }
             if (Config.dram_config.VERIFICATION_OUTPUT)
@@ -61,7 +62,7 @@ namespace SimplePIM.Memory.DDR
                             packet.row != bankStates[(int)packet.bank].openRowAddress)
                     {
                         packet.print();
-                        Console.WriteLine("== Error - Rank " + id + " received a READ when not allowed");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Rank " + id + " received a READ when not allowed");
                         Environment.Exit(1);
                     }
 
@@ -88,7 +89,7 @@ namespace SimplePIM.Memory.DDR
                             currentClockCycle < bankStates[(int)packet.bank].nextRead ||
                             packet.row != bankStates[(int)packet.bank].openRowAddress)
                     {
-                        Console.WriteLine("ERROR == Error - Rank " + id + " received a READ_P when not allowed");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("ERROR == Error - Rank " + id + " received a READ_P when not allowed");
                         Environment.Exit(1);
                     }
 
@@ -118,7 +119,7 @@ namespace SimplePIM.Memory.DDR
                             currentClockCycle < bankStates[(int)packet.bank].nextWrite ||
                             packet.row != bankStates[(int)packet.bank].openRowAddress)
                     {
-                        Console.WriteLine("== Error - Rank " + id + " received a WRITE when not allowed");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Rank " + id + " received a WRITE when not allowed");
                         bankStates[(int)packet.bank].print();
                         Environment.Exit(1);
                     }
@@ -144,7 +145,7 @@ namespace SimplePIM.Memory.DDR
                             currentClockCycle < bankStates[(int)packet.bank].nextWrite ||
                             packet.row != bankStates[(int)packet.bank].openRowAddress)
                     {
-                        Console.WriteLine("== Error - Rank " + id + " received a WRITE_P when not allowed");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Rank " + id + " received a WRITE_P when not allowed");
                         Environment.Exit(1);
                     }
 
@@ -168,7 +169,7 @@ namespace SimplePIM.Memory.DDR
                     if (bankStates[(int)packet.bank].currentBankState != CurrentBankState.Idle ||
                             currentClockCycle < bankStates[(int)packet.bank].nextActivate)
                     {
-                        Console.WriteLine("== Error - Rank " + id + " received an ACT when not allowed");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Rank " + id + " received an ACT when not allowed");
                         packet.print();
                         bankStates[(int)packet.bank].print();
                         Environment.Exit(1);
@@ -205,7 +206,7 @@ namespace SimplePIM.Memory.DDR
                     if (bankStates[(int)packet.bank].currentBankState != CurrentBankState.RowActive ||
                             currentClockCycle < bankStates[(int)packet.bank].nextPrecharge)
                     {
-                        Console.WriteLine("== Error - Rank " + id + " received a PRE when not allowed");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Rank " + id + " received a PRE when not allowed");
                         Environment.Exit(1);
                     }
 
@@ -219,7 +220,7 @@ namespace SimplePIM.Memory.DDR
                     {
                         if (bankStates[i].currentBankState != CurrentBankState.Idle)
                         {
-                            Console.WriteLine("== Error - Rank " + id + " received a REF when not allowed");
+                            if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Rank " + id + " received a REF when not allowed");
                             Environment.Exit(1);
                         }
                         bankStates[i].nextActivate = currentClockCycle + Config.dram_config.tRFC;
@@ -247,7 +248,7 @@ namespace SimplePIM.Memory.DDR
                     //  delete(packet);
                     break;
                 default:
-                    Console.WriteLine("== Error - Unknown BusPacketType trying to be sent to Bank");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Unknown BusPacketType trying to be sent to Bank");
                     Environment.Exit(1);
                     break;
             }
@@ -302,9 +303,9 @@ namespace SimplePIM.Memory.DDR
                 readReturnCountdown.RemoveAt(0);
                 if (Config.dram_config.DEBUG_BUS)
                 {
-                    Console.WriteLine(" -- R" + this.id + " Issuing On Data Bus : ");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine(" -- R" + this.id + " Issuing On Data Bus : ");
                     outgoingDataPacket.print();
-                    Console.WriteLine();
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine();
                 }
 
             }
@@ -313,7 +314,7 @@ namespace SimplePIM.Memory.DDR
         {
             if (!isPowerDown)
             {
-                Console.WriteLine("== Error - Trying to power up rank " + id + " while it is not already powered down");
+                if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Trying to power up rank " + id + " while it is not already powered down");
                 Environment.Exit(1);
             }
 
@@ -323,8 +324,8 @@ namespace SimplePIM.Memory.DDR
             {
                 if (bankStates[i].nextPowerUp > currentClockCycle)
                 {
-                    Console.WriteLine("== Error - Trying to power up rank " + id + " before we're allowed to");
-                    Console.WriteLine(bankStates[i].nextPowerUp + "    " + currentClockCycle);
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Trying to power up rank " + id + " before we're allowed to");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine(bankStates[i].nextPowerUp + "    " + currentClockCycle);
                     Environment.Exit(1);
                 }
                 bankStates[i].nextActivate = currentClockCycle + Config.dram_config.tXP;
@@ -340,7 +341,7 @@ namespace SimplePIM.Memory.DDR
             {
                 if (bankStates[i].currentBankState != CurrentBankState.Idle)
                 {
-                    Console.WriteLine("== Error - Trying to power down rank " + id + " while not all banks are idle");
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("== Error - Trying to power down rank " + id + " while not all banks are idle");
                     Environment.Exit(1);
                 }
 

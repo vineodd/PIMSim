@@ -174,7 +174,7 @@ namespace SimplePIM.Configs
         public static bool DEBUG_ALU_PIPELINE = true;
         public static bool DEBUG_PIM = true;
         public static bool DEBUG_INSP = true;
-        
+        public static bool DEBUG_MEMORY = true;
 
         #endregion
 
@@ -262,7 +262,7 @@ namespace SimplePIM.Configs
             }
             catch
             {
-                Console.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
+                DEBUG.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
                 return false;
             }
             return true;
@@ -313,7 +313,7 @@ namespace SimplePIM.Configs
                 }
                 if (Config.dram_config.NUM_CHANS == 0)
                 {
-                    Console.WriteLine("ERROR:  Zero channels");
+                    DEBUG.WriteLine("ERROR:  Zero channels");
                     Environment.Exit(-1);
                 }
                 if (Config.dram_config.NUM_RANKS == 0)
@@ -350,7 +350,7 @@ namespace SimplePIM.Configs
                         }
                         if (Config.dram_config.NUM_CHANS == 0)
                         {
-                            Console.WriteLine("ERROR:  Zero channels");
+                            DEBUG.WriteLine("ERROR:  Zero channels");
                             Environment.Exit(-1);
                         }
                         if (Config.dram_config.NUM_RANKS == 0)
@@ -384,7 +384,7 @@ namespace SimplePIM.Configs
             }
             catch
             {
-                Console.WriteLine("ERROR : Faield to set $ and block size.");
+                DEBUG.WriteLine("ERROR : Faield to set $ and block size.");
                 Environment.Exit(1);    //exit code 1: config set failed
                 return false;
             }
@@ -471,7 +471,7 @@ namespace SimplePIM.Configs
             }
             catch
             {
-                Console.WriteLine("ERROR : cannot read configs. ");
+                DEBUG.WriteLine("ERROR : cannot read configs. ");
 
             }
         }

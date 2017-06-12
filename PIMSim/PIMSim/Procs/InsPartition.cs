@@ -159,7 +159,8 @@ namespace SimplePIM.Procs
                     else
                     {
                         //if program runs into this part, exit in error
-                        Console.WriteLine("ERROR : ");
+                        if (Config.DEBUG_INSP)
+                            DEBUG.WriteLine("ERROR : ");
                         Environment.Exit(1);
                         return null;
                     }
@@ -191,7 +192,8 @@ namespace SimplePIM.Procs
                     else
                     {
                         //if program runs into this part, exit in error
-                        Console.WriteLine("ERROR : ");
+                        if (Config.DEBUG_INSP)
+                            DEBUG.WriteLine("ERROR : ");
                         Environment.Exit(1);
                         return null;
                     }

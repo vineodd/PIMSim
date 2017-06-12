@@ -64,11 +64,13 @@ namespace SimplePIM.Memory.HMC
 
                     if (current_statue != 0)
                     {
-                        Console.WriteLine("ERROR : ");
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("ERROR : ");
                         Environment.Exit(1);
                     }
                     else {
-                        Console.WriteLine("SUCCESS : INITIALIZED LINK %d\n", i);
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("SUCCESS : INITIALIZED LINK " + i);
                     }
                 }
             }
@@ -251,7 +253,8 @@ namespace SimplePIM.Memory.HMC
                                 }
                                 else {
                                     /* successfully received a packet */
-                                    Console.WriteLine("SUCCESS : RECEIVED A SUCCESSFUL PACKET RESPONSE");
+                                    if (Config.DEBUG_MEMORY)
+                                        DEBUG.WriteLine("SUCCESS : RECEIVED A SUCCESSFUL PACKET RESPONSE");
                                     hmc.hmcsim_decode_memresponse(
                                         packet,
                                         ref d_response_head,
@@ -268,13 +271,15 @@ namespace SimplePIM.Memory.HMC
                                         ref d_errstat,
                                         ref d_rtc,
                                         ref d_crc);
-                                    Console.WriteLine("RECV tag={0}; rtn_tag={1}", d_tag, d_rtn_tag);
+                                    if (Config.DEBUG_MEMORY)
+                                        DEBUG.WriteLine("RECV tag=" + d_tag + "; rtn_tag=" + d_rtn_tag);
                                     // all_recv++;
                                     var item = callback.FindIndex(s => s.Item1 == d_tag);
                                     if (item < 0)
                                     {
                                         //read none
-                                        Console.WriteLine("");
+                                        if (Config.DEBUG_MEMORY)
+                                            DEBUG.WriteLine("");
 
                                     }
 
@@ -399,7 +404,8 @@ namespace SimplePIM.Memory.HMC
                                 *
                                 */
 
-                                Console.WriteLine("STALLED : STALLED IN RECEIVING\n");
+                                if (Config.DEBUG_MEMORY)
+                                    DEBUG.WriteLine("STALLED : STALLED IN RECEIVING");
                                 current_statue = Macros.HMC_STALL;
 
                             }
@@ -447,7 +453,8 @@ namespace SimplePIM.Memory.HMC
                     }
                     else {
                         /* successfully received a packet */
-                        Console.WriteLine("SUCCESS : RECEIVED A SUCCESSFUL PACKET RESPONSE");
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("SUCCESS : RECEIVED A SUCCESSFUL PACKET RESPONSE");
                         hmc.hmcsim_decode_memresponse(
                             packet,
                             ref d_response_head,
@@ -464,7 +471,8 @@ namespace SimplePIM.Memory.HMC
                             ref d_errstat,
                             ref d_rtc,
                             ref d_crc);
-                        Console.WriteLine("RECV tag={0}; rtn_tag={1}", d_tag, d_rtn_tag);
+                        if (Config.DEBUG_MEMORY)
+                            DEBUG.WriteLine("RECV tag=" + d_tag + "; rtn_tag=" + d_rtn_tag);
 
 
 
@@ -472,7 +480,8 @@ namespace SimplePIM.Memory.HMC
                         if (item < 0)
                         {
                             //error
-                            Console.WriteLine("");
+                            if (Config.DEBUG_MEMORY)
+                                DEBUG.WriteLine("");
 
                         }
 

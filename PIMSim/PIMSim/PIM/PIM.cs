@@ -9,6 +9,7 @@ using SimplePIM.Procs;
 using SimplePIM.General;
 using System.IO;
 using SimplePIM.Statistics;
+using System.Reflection;
 #endregion
 
 namespace SimplePIM.PIM
@@ -72,8 +73,21 @@ namespace SimplePIM.PIM
                     {
                         if (PIMConfigs.CU_Name[i] == "Adder")
                         {
-                            unit.Add(new Adder_Conventional(i, ref ins_p) as ComputationalUnit);
+                            unit.Add(new Adder(i, ref ins_p) as ComputationalUnit);
                             return;
+                        }
+                        else
+                        {
+                            if (PIMConfigs.CU_Name[i] == "Adder_Conventional")
+                            {
+                                unit.Add(new Adder_Conventional(i, ref ins_p) as ComputationalUnit);
+                                return;
+                            }
+                            else
+                            {
+                                DEBUG.Error("No PIM Unit templates.");
+                                Environment.Exit(2);
+                            }
                         }
 
                     }

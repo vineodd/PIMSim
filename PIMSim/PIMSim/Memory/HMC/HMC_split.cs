@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using SimplePIM.Statistics;
+using SimplePIM.Configs;
 
 namespace SimplePIM.Memory.HMC
 {
@@ -38,7 +40,7 @@ namespace SimplePIM.Memory.HMC
 
             return 0x01;
         }
-        public UInt32 hmcsim_crc32(UInt64 addr,  UInt64[] payload, UInt32 len)
+        public UInt32 hmcsim_crc32(UInt64 addr, UInt64[] payload, UInt32 len)
         {
             /* vars */
             UInt32 crc = 0x11111111;
@@ -51,15 +53,15 @@ namespace SimplePIM.Memory.HMC
 
         public void HMCSIM_PRINT_ADDR_TRACE(string s, UInt64 a)
         {
-            Console.WriteLine("HCMSIM_TRACE {0}: {1} : {0} : 0x%016llx", s, a);
+            if (Config.DEBUG_MEMORY) DEBUG.WriteLine("HCMSIM_TRACE : " + a + " : 0x" + a.ToString("X"));
         }
         public void HMCSIM_PRINT_INT_TRACE(string s, int d)
         {
-            Console.WriteLine("HCMSIM_TRACE {0} : {1} : {0} : {1}", s, d);
+            if (Config.DEBUG_MEMORY) DEBUG.WriteLine("HCMSIM_TRACE : " + s + " : " + d);
         }
         public void HMCSIM_PRINT_TRACE(string s)
         {
-            Console.WriteLine("HCMSIM_TRACE {0} : {0} : {0}", s);
+            if (Config.DEBUG_MEMORY) DEBUG.WriteLine("HCMSIM_TRACE : " + s);
         }
         public int hmcsim_util_zero_packet(ref hmc_queue queue)
         {
@@ -209,7 +211,7 @@ namespace SimplePIM.Memory.HMC
             return (uint)Macros.HMC_MAX_CMC; /* redundant, but squashes gcc warning */
         }
 
-        public int hmcsim_clock_process_rqst_queue_new(  UInt32 dev,  UInt32 link,  UInt32 i)
+        public int hmcsim_clock_process_rqst_queue_new(UInt32 dev, UInt32 link, UInt32 i)
         {
             /* vars */
             UInt32 j = 0;
@@ -401,7 +403,7 @@ namespace SimplePIM.Memory.HMC
 
 
                         /* STALL */
-                        this.devs[(int)dev].xbar[(int)link].xbar_rqst[(int)i].valid =(uint) Macros.HMC_RQST_STALLED;
+                        this.devs[(int)dev].xbar[(int)link].xbar_rqst[(int)i].valid = (uint)Macros.HMC_RQST_STALLED;
 
                         /*
                          * print a stall trace
@@ -517,7 +519,7 @@ namespace SimplePIM.Memory.HMC
                              * STALL!
                              *
                              */
-                            this.devs[(int)dev].xbar[(int)link].xbar_rqst[(int)i].valid =(uint) Macros.HMC_RQST_STALLED;
+                            this.devs[(int)dev].xbar[(int)link].xbar_rqst[(int)i].valid = (uint)Macros.HMC_RQST_STALLED;
                             /*
                              * print a stall trace
                              *
@@ -641,8 +643,7 @@ namespace SimplePIM.Memory.HMC
             }
 
 
-            Console.WriteLine("XBAR:nvalid:ninvalid:nconflict:nstalled = %d:%d:%d:%d",
-                        nvalid, ninvalid, nconflict, nstalled);
+            if (Config.DEBUG_MEMORY) DEBUG.WriteLine("XBAR:nvalid:ninvalid:nconflict:nstalled = " + nvalid + ":" + ninvalid + ":" + nconflict + ":" + nstalled);
 
             return 0;
         }
@@ -785,7 +786,7 @@ namespace SimplePIM.Memory.HMC
             return 0;
         }
 
-        public int hmcsim_util_decode_vault(  UInt32 dev, UInt32 bsize,  UInt64 addr, ref UInt32 vault)
+        public int hmcsim_util_decode_vault(UInt32 dev, UInt32 bsize, UInt64 addr, ref UInt32 vault)
         {
             /* vars */
             UInt32 num_links = 0x00;
@@ -1084,7 +1085,7 @@ namespace SimplePIM.Memory.HMC
 
             this.power.t_link_remote_route += this.power.link_remote_route;
 
-            hmcsim_trace_power_remote_route( dev, link, slot, quad, vault);
+            hmcsim_trace_power_remote_route(dev, link, slot, quad, vault);
 
             if (this.num_links == 4)
             {
@@ -1140,13 +1141,13 @@ namespace SimplePIM.Memory.HMC
         }
 
 
-        public int hmcsim_power_local_route(  UInt32 dev,  UInt32 link,  UInt32 slot,  UInt32 quad,  UInt32 vault)
+        public int hmcsim_power_local_route(UInt32 dev, UInt32 link, UInt32 slot, UInt32 quad, UInt32 vault)
         {
 
 
             this.power.t_link_local_route += this.power.link_local_route;
 
-            hmcsim_trace_power_local_route( dev, link, slot, quad, vault);
+            hmcsim_trace_power_local_route(dev, link, slot, quad, vault);
 
             if (this.num_links == 4)
             {
@@ -1161,7 +1162,7 @@ namespace SimplePIM.Memory.HMC
             return 0;
         }
 
-        public int hmcsim_trace_power_local_route(  UInt32 dev,  UInt32 link,    UInt32 slot,  UInt32 quad,    UInt32 vault)
+        public int hmcsim_trace_power_local_route(UInt32 dev, UInt32 link, UInt32 slot, UInt32 quad, UInt32 vault)
         {
 
 
@@ -1316,7 +1317,7 @@ namespace SimplePIM.Memory.HMC
 
             this.power.t_xbar_route_extern += this.power.xbar_route_extern;
 
-            hmcsim_trace_power_route_extern( srcdev, srclink, srcslot,
+            hmcsim_trace_power_route_extern(srcdev, srclink, srcslot,
                                              destdev, destlink, destslot);
 
             if (this.num_links == 4)
@@ -1378,7 +1379,7 @@ namespace SimplePIM.Memory.HMC
         }
 
 
-        public int hmcsim_trace_rqst( string rqst, UInt32 dev,   UInt32 quad,   UInt32 vault,   UInt32 bank,  UInt64 addr1,  UInt32 size)
+        public int hmcsim_trace_rqst(string rqst, UInt32 dev, UInt32 quad, UInt32 vault, UInt32 bank, UInt64 addr1, UInt32 size)
         {
             if (this.tfile == null)
             {
@@ -1401,17 +1402,20 @@ namespace SimplePIM.Memory.HMC
         }
 
 
-        public int hmcsim_power_row_access(UInt64 addr, UInt32 mult) {
+        public int hmcsim_power_row_access(UInt64 addr, UInt32 mult)
+        {
 
 
             this.power.t_row_access += (this.power.row_access * (float)(mult));
 
-            hmcsim_trace_power_row_access( addr, mult);
+            hmcsim_trace_power_row_access(addr, mult);
 
-            if (this.num_links == 4) {
+            if (this.num_links == 4)
+            {
                 this.power.H4L.row_access_power += (this.power.row_access * (float)(mult));
                 this.power.H4L.row_access_btu += ((this.power.row_access * (float)(mult)) * Macros.HMC_MILLIWATT_TO_BTU);
-            } else {
+            }
+            else {
                 this.power.H8L.row_access_power += (this.power.row_access * (float)(mult));
                 this.power.H8L.row_access_btu += ((this.power.row_access * (float)(mult)) * Macros.HMC_MILLIWATT_TO_BTU);
             }
@@ -1603,7 +1607,7 @@ namespace SimplePIM.Memory.HMC
 
             this.power.t_vault_rqst_slot += this.power.vault_rqst_slot;
 
-            hmcsim_trace_power_vault_rqst_slot( dev, quad, vault, slot);
+            hmcsim_trace_power_vault_rqst_slot(dev, quad, vault, slot);
 
             if (this.num_links == 4)
             {
@@ -1681,13 +1685,13 @@ namespace SimplePIM.Memory.HMC
             }
 
             /* -- new power measurement items */
-        
+
 
             /* command is active, process it */
             if (HMC_DEBUG)
             {
                 HMCSIM_PRINT_TRACE("PROCESSING CMC PACKET");
-                Console.WriteLine("CMC RAWCMD:IDX = %d:%d", rawcmd, idx);
+                if (Config.DEBUG_MEMORY) DEBUG.WriteLine("CMC RAWCMD:IDX = " + rawcmd + ":" + idx);
             }
             var cmc_execute = cmcs[(int)idx].cmc_execute;
             rtn = cmc_execute(
@@ -2028,13 +2032,11 @@ namespace SimplePIM.Memory.HMC
             if (type == 0)
             {
                 /* request */
-                Console.WriteLine("RQST_VAULT:nvalid:ninvalid:nconflict:nstalled = %d:%d:%d:%d:%d",
-                        vault, nvalid, ninvalid, nconflict, nstalled);
+                if (Config.DEBUG_MEMORY) DEBUG.WriteLine("RQST_VAULT:nvalid:ninvalid:nconflict:nstalled =" + vault + ":" + nvalid + ":" + ninvalid + ":" + nconflict + ":" + nstalled);
             }
             else {
                 /* response */
-                Console.WriteLine("RSP_VAULT:nvalid:ninvalid:nconflict:nstalled = %d:%d:%d:%d:%d",
-            vault, nvalid, ninvalid, nconflict, nstalled);
+                if (Config.DEBUG_MEMORY) DEBUG.WriteLine("RSP_VAULT:nvalid:ninvalid:nconflict:nstalled =" + vault + ":" + nvalid + ":" + ninvalid + ":" + nconflict + ":" + nstalled);
             }
 
             return 0;
@@ -2239,7 +2241,7 @@ namespace SimplePIM.Memory.HMC
             return 0;
         }
 
-        public int hmcsim_clock_reorg_vault_rsp(UInt32 dev,  UInt32 quad,   UInt32 vault)
+        public int hmcsim_clock_reorg_vault_rsp(UInt32 dev, UInt32 quad, UInt32 vault)
         {
             /* vars */
             Int32 i = 0;
@@ -2504,10 +2506,11 @@ namespace SimplePIM.Memory.HMC
                 return -1;
             }
 
-           
+
         }
 
-        public int hmcsim_tecplot8(HMC8LinkTec Tec,  UInt64 clock,  string prefix) {
+        public int hmcsim_tecplot8(HMC8LinkTec Tec, UInt64 clock, string prefix)
+        {
             /* vars */
             string fname_p = "";
             string fname_t = "";
@@ -2540,7 +2543,8 @@ namespace SimplePIM.Memory.HMC
             ofile.Write("\n\n");
 
             /* -- -- link+quad 0,1 */
-            for (i = 0; i < 2; i++) {
+            for (i = 0; i < 2; i++)
+            {
                 /* X Y Z Data */
                 ofile.Write("%s%f%s%f\n",
                          "18 4.5 ", ((float)(i) * (float)(36.0)) + (float)(18.0), " ",
@@ -2559,7 +2563,8 @@ namespace SimplePIM.Memory.HMC
                          Tec.link_remote_route_power[i]);
 
                 /* vault data */
-                for (j = 0; j < 2; j++) {
+                for (j = 0; j < 2; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "4.5 40.5 ",
                              ((float)(i) * (float)(36.0)) + ((float)(j) * (float)(18)) + ((float)(9.0)),
@@ -2574,7 +2579,8 @@ namespace SimplePIM.Memory.HMC
                              " ", Tec.vault_ctrl_power[cur]);
                     cur++;
                 }
-                for (j = 2; j < 4; j++) {
+                for (j = 2; j < 4; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "13.5 40.5 ",
                              ((float)(i) * (float)(36.0)) + ((float)(j - 2) * (float)(18)) + ((float)(9.0)),
@@ -2592,7 +2598,8 @@ namespace SimplePIM.Memory.HMC
             }
 
             /* -- -- link+quad 2,3 */
-            for (i = 2; i < 4; i++) {
+            for (i = 2; i < 4; i++)
+            {
                 ofile.Write("%s%f%s%f\n",
                          "54 4.5 ", ((float)(i - 2) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_phy_power[i]);
@@ -2609,7 +2616,8 @@ namespace SimplePIM.Memory.HMC
                          "54 31.5 ", ((float)(i - 2) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_remote_route_power[i]);
 
-                for (j = 0; j < 2; j++) {
+                for (j = 0; j < 2; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "22.5 40.5 ",
                              ((float)(i - 2) * (float)(36.0)) + ((float)(j) * (float)(18)) + ((float)(9.0)),
@@ -2624,7 +2632,8 @@ namespace SimplePIM.Memory.HMC
                              " ", Tec.vault_ctrl_power[cur]);
                     cur++;
                 }
-                for (j = 2; j < 4; j++) {
+                for (j = 2; j < 4; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "31.5 40.5 ",
                              ((float)(i - 2) * (float)(36.0)) + ((float)(j - 2) * (float)(18)) + ((float)(9.0)),
@@ -2642,7 +2651,8 @@ namespace SimplePIM.Memory.HMC
             }
 
             /* -- -- link+quad 4,5 */
-            for (i = 4; i < 6; i++) {
+            for (i = 4; i < 6; i++)
+            {
                 ofile.Write("%s%f%s%f\n",
                          "90 4.5 ", ((float)(i - 4) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_phy_power[i]);
@@ -2659,7 +2669,8 @@ namespace SimplePIM.Memory.HMC
                          "90 31.5 ", ((float)(i - 4) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_remote_route_power[i]);
 
-                for (j = 0; j < 2; j++) {
+                for (j = 0; j < 2; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "40.5 40.5 ",
                              ((float)(i - 4) * (float)(36.0)) + ((float)(j) * (float)(18)) + ((float)(9.0)),
@@ -2674,7 +2685,8 @@ namespace SimplePIM.Memory.HMC
                              " ", Tec.vault_ctrl_power[cur]);
                     cur++;
                 }
-                for (j = 2; j < 4; j++) {
+                for (j = 2; j < 4; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "49.5 40.5 ",
                              ((float)(i - 4) * (float)(36.0)) + ((float)(j - 2) * (float)(18)) + ((float)(9.0)),
@@ -2692,7 +2704,8 @@ namespace SimplePIM.Memory.HMC
             }
 
             /* -- -- link+quad 6,7 */
-            for (i = 6; i < 8; i++) {
+            for (i = 6; i < 8; i++)
+            {
                 ofile.Write("%s%f%s%f\n",
                          "126 4.5 ", ((float)(i - 6) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_phy_power[i]);
@@ -2709,7 +2722,8 @@ namespace SimplePIM.Memory.HMC
                          "126 31.5 ", ((float)(i - 6) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_remote_route_power[i]);
 
-                for (j = 0; j < 2; j++) {
+                for (j = 0; j < 2; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "58.5 40.5 ",
                              ((float)(i - 6) * (float)(36.0)) + ((float)(j) * (float)(18)) + ((float)(9.0)),
@@ -2724,7 +2738,8 @@ namespace SimplePIM.Memory.HMC
                              " ", Tec.vault_ctrl_power[cur]);
                     cur++;
                 }
-                for (j = 2; j < 4; j++) {
+                for (j = 2; j < 4; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "67.5 40.5 ",
                              ((float)(i - 6) * (float)(36.0)) + ((float)(j - 2) * (float)(18)) + ((float)(9.0)),
@@ -2765,7 +2780,8 @@ namespace SimplePIM.Memory.HMC
             cur = 0;
 
             /* -- -- link+quad 0,1 */
-            for (i = 0; i < 2; i++) {
+            for (i = 0; i < 2; i++)
+            {
                 /* X Y Z Data */
                 ofile.Write("%s%f%s%f\n",
                          "18 4.5 ", ((float)(i) * (float)(36.0)) + (float)(18.0), " ",
@@ -2784,7 +2800,8 @@ namespace SimplePIM.Memory.HMC
                          Tec.link_remote_route_btu[i]);
 
                 /* vault data */
-                for (j = 0; j < 2; j++) {
+                for (j = 0; j < 2; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "4.5 40.5 ",
                              ((float)(i) * (float)(36.0)) + ((float)(j) * (float)(18)) + ((float)(9.0)),
@@ -2799,7 +2816,8 @@ namespace SimplePIM.Memory.HMC
                              " ", Tec.vault_ctrl_btu[cur]);
                     cur++;
                 }
-                for (j = 2; j < 4; j++) {
+                for (j = 2; j < 4; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "13.5 40.5 ",
                              ((float)(i) * (float)(36.0)) + ((float)(j - 2) * (float)(18)) + ((float)(9.0)),
@@ -2817,7 +2835,8 @@ namespace SimplePIM.Memory.HMC
             }
 
             /* -- -- link+quad 2,3 */
-            for (i = 2; i < 4; i++) {
+            for (i = 2; i < 4; i++)
+            {
                 ofile.Write("%s%f%s%f\n",
                          "54 4.5 ", ((float)(i - 2) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_phy_btu[i]);
@@ -2834,7 +2853,8 @@ namespace SimplePIM.Memory.HMC
                          "54 31.5 ", ((float)(i - 2) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_remote_route_btu[i]);
 
-                for (j = 0; j < 2; j++) {
+                for (j = 0; j < 2; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "22.5 40.5 ",
                              ((float)(i - 2) * (float)(36.0)) + ((float)(j) * (float)(18)) + ((float)(9.0)),
@@ -2849,7 +2869,8 @@ namespace SimplePIM.Memory.HMC
                              " ", Tec.vault_ctrl_btu[cur]);
                     cur++;
                 }
-                for (j = 2; j < 4; j++) {
+                for (j = 2; j < 4; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "31.5 40.5 ",
                              ((float)(i - 2) * (float)(36.0)) + ((float)(j - 2) * (float)(18)) + ((float)(9.0)),
@@ -2867,7 +2888,8 @@ namespace SimplePIM.Memory.HMC
             }
 
             /* -- -- link+quad 4,5 */
-            for (i = 4; i < 6; i++) {
+            for (i = 4; i < 6; i++)
+            {
                 ofile.Write("%s%f%s%f\n",
                          "90 4.5 ", ((float)(i - 4) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_phy_btu[i]);
@@ -2884,7 +2906,8 @@ namespace SimplePIM.Memory.HMC
                          "90 31.5 ", ((float)(i - 4) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_remote_route_btu[i]);
 
-                for (j = 0; j < 2; j++) {
+                for (j = 0; j < 2; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "40.5 40.5 ",
                              ((float)(i - 4) * (float)(36.0)) + ((float)(j) * (float)(18)) + ((float)(9.0)),
@@ -2899,7 +2922,8 @@ namespace SimplePIM.Memory.HMC
                              " ", Tec.vault_ctrl_btu[cur]);
                     cur++;
                 }
-                for (j = 2; j < 4; j++) {
+                for (j = 2; j < 4; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "49.5 40.5 ",
                              ((float)(i - 4) * (float)(36.0)) + ((float)(j - 2) * (float)(18)) + ((float)(9.0)),
@@ -2917,7 +2941,8 @@ namespace SimplePIM.Memory.HMC
             }
 
             /* -- -- link+quad 6,7 */
-            for (i = 6; i < 8; i++) {
+            for (i = 6; i < 8; i++)
+            {
                 ofile.Write("%s%f%s%f\n",
                          "126 4.5 ", ((float)(i - 6) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_phy_btu[i]);
@@ -2934,7 +2959,8 @@ namespace SimplePIM.Memory.HMC
                          "126 31.5 ", ((float)(i - 6) * (float)(36.0)) + (float)(18.0), " ",
                          Tec.link_remote_route_btu[i]);
 
-                for (j = 0; j < 2; j++) {
+                for (j = 0; j < 2; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "58.5 40.5 ",
                              ((float)(i - 6) * (float)(36.0)) + ((float)(j) * (float)(18)) + ((float)(9.0)),
@@ -2949,7 +2975,8 @@ namespace SimplePIM.Memory.HMC
                              " ", Tec.vault_ctrl_btu[cur]);
                     cur++;
                 }
-                for (j = 2; j < 4; j++) {
+                for (j = 2; j < 4; j++)
+                {
                     ofile.Write("%s%f%s%f\n",
                              "67.5 40.5 ",
                              ((float)(i - 6) * (float)(36.0)) + ((float)(j - 2) * (float)(18)) + ((float)(9.0)),
@@ -3552,7 +3579,7 @@ namespace SimplePIM.Memory.HMC
             return 0;
         }
 
-        public int hmcsim_util_decode_slid(  List<hmc_queue> queue,   UInt32 slot,    ref UInt32 slid)
+        public int hmcsim_util_decode_slid(List<hmc_queue> queue, UInt32 slot, ref UInt32 slid)
         {
             /* vars */
             UInt64 header = 0x00uL;
@@ -3610,7 +3637,7 @@ namespace SimplePIM.Memory.HMC
             }
 
             /* register the library functions */
-            if (hmcsim_register_functions( cmc_lib) != 0)
+            if (hmcsim_register_functions(cmc_lib) != 0)
             {
                 return -1;
             }
@@ -3660,8 +3687,7 @@ namespace SimplePIM.Memory.HMC
 
             idx = hmcsim_cmc_rawtoidx(cmd);
             if (HMC_DEBUG)
-                Console.WriteLine("HMCSIM_REGISTER_FUNCTIONS: Setting CMC command at IDX=%d to ACTIVE\n",
-                        idx);
+                if (Config.DEBUG_MEMORY) DEBUG.WriteLine("HMCSIM_REGISTER_FUNCTIONS: Setting CMC command at IDX=" + idx + " to ACTIVE");
 
 
             if (this.cmcs[(int)idx].active == 1)
@@ -3714,5 +3740,5 @@ namespace SimplePIM.Memory.HMC
         }
 
 
-}
+    }
 }

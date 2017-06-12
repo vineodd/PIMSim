@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SimplePIM.Configs;
+using SimplePIM.Statistics;
 
 namespace SimplePIM.Memory.HMC
 {
@@ -2153,7 +2155,7 @@ namespace SimplePIM.Memory.HMC
                 case 127:
                     if (HMC_DEBUG)
                     {
-                        Console.WriteLine("HMCSIM_PROCESS_PACKET: PROCESSING CMC PACKET REQUEST");
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("HMCSIM_PROCESS_PACKET: PROCESSING CMC PACKET REQUEST");
                     }
                     /* CMC OPERATIONS */
                     use_cmc = 1;
@@ -2273,13 +2275,13 @@ namespace SimplePIM.Memory.HMC
                 if (HMC_DEBUG)
                 {
                     HMCSIM_PRINT_TRACE("HANDLING OPERATION BANK LATENCY");
-                    Console.WriteLine("DEV:QUAD:VAULT:BANK = %d:%d:%d:%d", dev, quad, vault, bank);
+                    if(Config.DEBUG_MEMORY)DEBUG.WriteLine("DEV:QUAD:VAULT:BANK = "+dev+":"+quad + ":" + vault + ":" + bank);
                 }
                 if (op_latency != 0)
                 { /* Delay, stall the response for op_latency cycles */
                     if (HMC_DEBUG)
                     {
-                        Console.WriteLine("STALLING BANK %d %d CYCLES", bank, op_latency);
+                        if (Config.DEBUG_MEMORY) DEBUG.WriteLine("STALLING BANK " + bank + " " + op_latency + " CYCLES");
                     }
                     this.devs[(int)dev].quads[(int)quad].vaults[(int)vault].banks[(int)bank].valid = Macros.HMC_RQST_VALID;
                     this.devs[(int)dev].quads[(int)quad].vaults[(int)vault].banks[(int)bank].delay = op_latency;
@@ -2295,7 +2297,7 @@ namespace SimplePIM.Memory.HMC
                 else { /* No delay, forward response immediately */
                     if (HMC_DEBUG)
                     {
-                        Console.WriteLine("STALLING BANK %d %d CYCLES", bank, op_latency);
+                        if(Config.DEBUG_MEMORY)DEBUG.WriteLine("STALLING BANK " + bank + " " + op_latency + " CYCLES");
                     }
                     this.devs[(int)dev].quads[(int)quad].vaults[(int)vault].rsp_queue[(int)t_slot].valid = Macros.HMC_RQST_VALID;
                     //for( j=0; j<rsp_len; j++ ){
