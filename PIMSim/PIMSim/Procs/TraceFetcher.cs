@@ -167,15 +167,16 @@ namespace SimplePIM.Procs
             while (true)
             {
                 currentline = sr[pid_].ReadLine();
-                if (currentline.StartsWith("#") || currentline.StartsWith(";"))
-                    continue;
                 if (currentline == null)
                 {
                     Instruction res = new Instruction();
                     res.type = InstructionType.EOF;
                     return res;
-                    
+
                 }
+                if (currentline.StartsWith("#") || currentline.StartsWith(";"))
+                    continue;
+                
                 if (currentline.Contains(";"))
                     currentline = currentline.Substring(0, currentline.IndexOf(";") + 1);
                 if (!currentline.Contains("PIM_") &&! currentline.Contains("START") && !currentline.Contains("END"))

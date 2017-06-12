@@ -33,6 +33,8 @@ namespace SimplePIM.PIM
                 / 1024//MB
                 * 1.0 / OverallClock.cycle //MB/cycle
                 * OverallClock.reference_clock;
+
+        public abstract bool outstanding_requests();
     }
    
 }

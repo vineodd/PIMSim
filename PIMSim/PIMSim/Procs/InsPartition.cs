@@ -257,6 +257,11 @@ namespace SimplePIM.Procs
            
         }
 
+        public bool trace_done()
+        {
+            return !eof.Aggregate((i, j) => i && j);
+        }
+
         /// <summary>
         /// Print Statistics Info
         /// </summary>

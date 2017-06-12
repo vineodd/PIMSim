@@ -104,7 +104,11 @@ namespace SimplePIM.General
         }
         public void run()
         {
-            for (UInt64 i = 0; i < Config.sim_cycle; i++)
+            UInt64 execution = UInt64.MaxValue;
+            if (Config.sim_type == SIM_TYPE.cycle)
+                execution = Config.sim_cycle;
+
+            for (UInt64 i = 0; i < execution; i++)
             {
                 trace.Step();
                 ins_p.Step();
@@ -122,8 +126,21 @@ namespace SimplePIM.General
                 }
                 if (OverallClock.ifPIMUnitStep(0))
                     pim.Step();
+
+                if (Config.sim_type == SIM_TYPE.file)
+                {
+                    bool done = false;
+                    done = ins_p.trace_done();
+                    proc.ForEach(x => done = done || x.outstanding_requests());
+                    if (Config.use_pim)
+                        pim.unit.ForEach(x => done = done || x.outstanding_requests());
+                    if (!done)
+                        return;
+                    
+                }
                 OverallClock.Step();
             }
+
         }
         public void initAllconfigs(string[] args)
         {

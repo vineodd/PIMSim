@@ -719,6 +719,11 @@ namespace SimplePIM.Procs
             mem_restrict = new Counter(1, 1);
         }
 
+        public bool outstanding_requests()
+        {
+            return MSHR.Count != 0;
+        }
+
         /// <summary>
         /// One cycle of Core.
         /// </summary>
@@ -779,7 +784,7 @@ namespace SimplePIM.Procs
             if (Config.use_cache)
                 handle_cache_req();
             update_ins_w();
-            if (MSHR.Count != 0)
+            if (outstanding_requests())
             {
                 memory_cycle++;
             }

@@ -198,5 +198,9 @@ namespace SimplePIM.PIM
             DEBUG.WriteLine();
         }
 
+        public override bool outstanding_requests()
+        {
+            return curr != null;
+        }
     }
 }

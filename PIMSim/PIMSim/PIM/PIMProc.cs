@@ -302,6 +302,11 @@ namespace SimplePIM.PIM
             }
         }
 
+        public override bool outstanding_requests()
+        {
+            return MSHR.Count != 0;
+        }
+
         /// <summary>
         /// One cycle of Core.
         /// </summary>
@@ -365,7 +370,7 @@ namespace SimplePIM.PIM
 
             update_ins_w();
 
-            if (MSHR.Count != 0)
+            if (outstanding_requests())
             {
                 memory_cycle++;
             }
