@@ -200,6 +200,8 @@ namespace SimplePIM.Configs
 
         public static string pim_config_file => Config.config_path + Path.DirectorySeparatorChar+"PIM_Settings.ini";
 
+
+        public static Trace_Type trace_type = Trace_Type.Detailed;
         #endregion
 
         #region Statistics Config
@@ -493,5 +495,10 @@ namespace SimplePIM.Configs
         PCM,
         HMC,
         HYBRID
+    }
+    public enum Trace_Type
+    {
+        Detailed,
+        General
     }
 }

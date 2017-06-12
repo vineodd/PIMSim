@@ -157,7 +157,7 @@ namespace SimplePIM.General
         private void Usage()
         {
             DEBUG.WriteLine("PIMSim Usage:");
-            DEBUG.WriteLine("PIMSim -t tracefilepath -c configfilepath");
+            DEBUG.WriteLine("PIMSim -t tracefilepath -config configfilepath –o outputfile –n processorcount –c cycle");
             DEBUG.WriteLine("  -t, -trace FILEPATH      specify the path folder of input trace.");
             DEBUG.WriteLine("  -config FILEPATH     specify the path folder of input configs.");
             DEBUG.WriteLine("  -o, -output  FILENAME         specify the file name of output file.");
