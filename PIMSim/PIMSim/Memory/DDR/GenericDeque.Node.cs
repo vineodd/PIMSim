@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace SimplePIM.Memory.DDR
+namespace PIMSim.Memory.DDR
 {
     public partial class Deque<T>
     {

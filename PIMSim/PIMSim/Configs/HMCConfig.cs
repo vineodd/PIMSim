@@ -6,10 +6,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using SimplePIM.Statistics;
+using PIMSim.Statistics;
 #endregion
 
-namespace SimplePIM.Configs
+namespace PIMSim.Configs
 {
     /// <summary>
     /// HMC configs

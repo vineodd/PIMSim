@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SimplePIM.Memory.HMC
+namespace PIMSim.Memory.HMC
 {
     public class hmc_quad
     {

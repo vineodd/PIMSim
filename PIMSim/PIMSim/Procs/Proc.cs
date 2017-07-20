@@ -1,14 +1,14 @@
 ﻿#region Referance
 using System;
 using System.Collections.Generic;
-using SimplePIM.Configs;
-using SimplePIM.General;
-using SimplePIM.Statistics;
-using SimplePIM.PIM;
-using mctrl = SimplePIM.Procs.Mctrl;
+using PIMSim.Configs;
+using PIMSim.General;
+using PIMSim.Statistics;
+using PIMSim.PIM;
+using mctrl = PIMSim.Procs.Mctrl;
 #endregion
 
-namespace SimplePIM.Procs
+namespace PIMSim.Procs
 {
     /// <summary>
     /// This Class performs as a CPU Core.
@@ -684,7 +684,7 @@ namespace SimplePIM.Procs
                 ProcRequest item = new ProcRequest();
                 item.block_addr = addr;
                 item.actual_addr = tlb.scan_page(addr);
-                item.cycle = OverallClock.cycle;
+                item.cycle = GlobalTimer.tick;
                 item.if_mem = true;
                 item.pid = this.pid;
                 item.type = RequestType.FLUSH;

@@ -5,22 +5,23 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
-using SimplePIM.Memory;
-
+using PIMSim.Configs;
+using PIMSim.Memory;
+using Tick = System.UInt64;
+using PIMSim.Events;
 #endregion
 
-namespace SimplePIM.General
+namespace PIMSim.General
 {
     /// <summary>
     /// Overall Clock Synchronization.
     /// </summary>
-    public static class OverallClock 
+    public static class GlobalTimer 
     {
         #region Static Varibales
 
         public readonly static UInt64 reference_clock = Config.proc_frequent;
-
+        public static EventManager eventmanager = new EventManager();
         #endregion
 
         #region Private Vaiables
@@ -33,7 +34,7 @@ namespace SimplePIM.General
         #endregion
 
         #region Public Variables
-        public static UInt64 cycle = 0;
+        public static Tick tick = 0;
 
         #endregion
 
@@ -64,7 +65,8 @@ namespace SimplePIM.General
         /// </summary>
         public static void Step()
         {
-            cycle++;
+            tick++;
+            eventmanager.Step();
         }
 
         /// <summary>
@@ -74,7 +76,7 @@ namespace SimplePIM.General
         /// <returns></returns>
         public static bool ifProcStep(int pid)
         {
-            if (cycle % host_cpu_clock_factor[pid] == 0)
+            if (tick % host_cpu_clock_factor[pid] == 0)
                 return true;
             return false;
         }
@@ -86,7 +88,7 @@ namespace SimplePIM.General
         /// <returns></returns>
         public static bool ifMemoryStep(int pid)
         {
-            if (cycle % ram_clock_factor[pid] == 0)
+            if (tick % ram_clock_factor[pid] == 0)
                 return true;
             return false;
         }
@@ -98,7 +100,7 @@ namespace SimplePIM.General
         /// <returns></returns>
         public static bool ifPIMUnitStep(int pid)
         {
-            if (cycle % pimunit_clock_factor[pid] == 0)
+            if (tick % pimunit_clock_factor[pid] == 0)
                 return true;
             return false;
         }

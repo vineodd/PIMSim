@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
-using SimplePIM.Statistics;
+using PIMSim.Configs;
+using PIMSim.Statistics;
 
-namespace SimplePIM.Memory.HMC
+namespace PIMSim.Memory.HMC
 {
     public partial  class HMCSim
     {

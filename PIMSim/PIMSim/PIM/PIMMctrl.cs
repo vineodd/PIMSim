@@ -2,14 +2,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using SimplePIM.Configs;
-using SimplePIM.Memory;
-using SimplePIM.General;
-using SimplePIM.PIM;
-using SimplePIM.Statistics;
+using PIMSim.Configs;
+using PIMSim.Memory;
+using PIMSim.General;
+using PIMSim.PIM;
+using PIMSim.Statistics;
 #endregion
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     /// <summary>
     /// [Memory Controller Defination] 

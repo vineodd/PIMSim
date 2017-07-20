@@ -6,12 +6,12 @@ using System.Linq;
 using System.Text;
 using System.Reflection;
 using System.Threading.Tasks;
-using SimplePIM.General;
-using SimplePIM.Configs;
+using PIMSim.General;
+using PIMSim.Configs;
 
 #endregion
 
-namespace SimplePIM.General
+namespace PIMSim.General
 {
     /// <summary>
     /// Instruction Defination

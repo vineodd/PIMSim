@@ -4,11 +4,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
-using SimplePIM.Statistics;
+using PIMSim.Configs;
+using PIMSim.Statistics;
 #endregion
 
-namespace SimplePIM.General
+namespace PIMSim.General
 {
     /// <summary>
     /// Instruction Block Defination

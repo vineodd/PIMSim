@@ -4,15 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
-using SimplePIM.Procs;
-using SimplePIM.General;
+using PIMSim.Configs;
+using PIMSim.Procs;
+using PIMSim.General;
 using System.IO;
-using SimplePIM.Statistics;
+using PIMSim.Statistics;
 using System.Reflection;
 #endregion
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     /// <summary>
     /// PIM defination

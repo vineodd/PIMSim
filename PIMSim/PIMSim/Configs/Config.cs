@@ -7,14 +7,14 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Reflection;
 using System.IO;
-using SimplePIM.PIM;
-using SimplePIM.Memory.DDR;
-using SimplePIM.Statistics;
-using SimplePIM.Memory;
+using PIMSim.PIM;
+using PIMSim.Memory.DDR;
+using PIMSim.Statistics;
+using PIMSim.Memory;
 
 #endregion
 
-namespace SimplePIM.Configs
+namespace PIMSim.Configs
 {
     public static class Config
     {

@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Memory;
-using SimplePIM.Procs;
-using SimplePIM.Configs;
+using PIMSim.Memory;
+using PIMSim.Procs;
+using PIMSim.Configs;
 using System.IO;
-using SimplePIM.PIM;
-using SimplePIM.Statistics;
+using PIMSim.PIM;
+using PIMSim.Statistics;
 
-namespace SimplePIM.Memory.HMC
+namespace PIMSim.Memory.HMC
 {
     public class HMCMem : MemObject
     {

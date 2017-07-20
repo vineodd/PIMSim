@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.General;
+using PIMSim.General;
 
 #endregion
 
-namespace SimplePIM.Memory
+namespace PIMSim.Memory
 {
     /// <summary>
     /// Memory Requets Defination

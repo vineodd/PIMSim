@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
-using SimplePIM.Statistics;
-using SimplePIM.Memory;
+using PIMSim.Configs;
+using PIMSim.Statistics;
+using PIMSim.Memory;
 #endregion
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     /// <summary>
     /// Spin Lock Defination

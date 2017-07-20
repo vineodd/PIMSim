@@ -5,12 +5,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.PIM;
-using SimplePIM.Configs;
+using PIMSim.PIM;
+using PIMSim.Configs;
 
 #endregion
 
-namespace SimplePIM.General
+namespace PIMSim.General
 {
     /// <summary>
     /// [Function : InputType]

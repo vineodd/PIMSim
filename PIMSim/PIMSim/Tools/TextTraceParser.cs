@@ -9,7 +9,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 #endregion
 
-namespace SimplePIM.Tools
+namespace PIMSim.Tools
 {
     /// <summary>
     /// Transfer GEM5 trace to usable trace file

@@ -4,19 +4,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
-using SimplePIM.Memory;
-using SimplePIM.General;
-using SimplePIM.Procs;
+using PIMSim.Configs;
+using PIMSim.Memory;
+using PIMSim.General;
+using PIMSim.Procs;
 using System.Reflection;
-using SimplePIM.Memory.DDR;
+using PIMSim.Memory.DDR;
 using System.IO;
-using SimplePIM.PIM;
-using SimplePIM.Memory.HMC;
-using SimplePIM.Statistics;
+using PIMSim.PIM;
+using PIMSim.Memory.HMC;
+using PIMSim.Statistics;
 #endregion
 
-namespace SimplePIM.General
+namespace PIMSim.General
 {
     /// <summary>
     /// PIMSimulator
@@ -100,7 +100,7 @@ namespace SimplePIM.General
             pim = new PIM.PIM(ref ins_p);
             Coherence.init();
             Coherence.linkproc(proc);
-            OverallClock.InitClock();
+            GlobalTimer.InitClock();
         }
         public void run()
         {
@@ -114,17 +114,17 @@ namespace SimplePIM.General
                 ins_p.Step();
                 for (int j = 0; j < Config.N; j++)
                 {
-                    if (OverallClock.ifProcStep(j))
+                    if (GlobalTimer.ifProcStep(j))
                         proc[j].Step();
                 }
                 Mctrl.Step();
                 PIMMctrl.Step();
                 foreach (var mem in MemorySelector.MemoryInfo)
                 {
-                    if (OverallClock.ifMemoryStep(0))
+                    if (GlobalTimer.ifMemoryStep(0))
                         mem.Item3.Step();
                 }
-                if (OverallClock.ifPIMUnitStep(0))
+                if (GlobalTimer.ifPIMUnitStep(0))
                     pim.Step();
 
                 if (Config.sim_type == SIM_TYPE.file)
@@ -138,7 +138,7 @@ namespace SimplePIM.General
                         return;
                     
                 }
-                OverallClock.Step();
+                GlobalTimer.Step();
             }
 
         }

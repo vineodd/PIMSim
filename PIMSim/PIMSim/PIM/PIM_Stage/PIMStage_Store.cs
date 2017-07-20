@@ -5,14 +5,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.General;
-using SimplePIM.Statistics;
-using SimplePIM.Procs;
-using SimplePIM.Configs;
+using PIMSim.General;
+using PIMSim.Statistics;
+using PIMSim.Procs;
+using PIMSim.Configs;
 
 #endregion
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     /// <summary>
     /// PIM pipeline stage : Store
@@ -130,7 +130,7 @@ namespace SimplePIM.PIM
                         //try to add store request to PIM memory controller
                         PIMRequest req = new PIMRequest();
                         req.actual_addr = (UInt64)input;
-                        req.cycle = OverallClock.cycle;
+                        req.cycle = GlobalTimer.tick;
                         req.if_mem = true;
                         req.pid = (Parent as ComputationalUnit).id;
                         req.stage_id.Add(this.id);

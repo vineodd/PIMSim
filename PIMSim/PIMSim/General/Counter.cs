@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 #endregion
 
-namespace SimplePIM.General
+namespace PIMSim.General
 {
     /// <summary>
     /// Implement of Counter.

@@ -5,14 +5,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using SimplePIM.Memory;
-using SimplePIM.Procs;
-using SimplePIM.Configs;
-using SimplePIM.Statistics;
-using SimplePIM.PIM;
+using PIMSim.Memory;
+using PIMSim.Procs;
+using PIMSim.Configs;
+using PIMSim.Statistics;
+using PIMSim.PIM;
 #endregion
 
-namespace SimplePIM.Memory.DDR
+namespace PIMSim.Memory.DDR
 {
     public class DDRMem : MemObject
     {

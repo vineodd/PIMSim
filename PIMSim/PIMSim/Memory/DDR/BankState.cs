@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 
-namespace SimplePIM.Memory.DDR
+namespace PIMSim.Memory.DDR
 {
     public class BankState
     {

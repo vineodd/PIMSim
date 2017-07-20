@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 #endregion
 
-namespace SimplePIM.General
+namespace PIMSim.General
 {
     /// <summary>
     /// Abstract requests class

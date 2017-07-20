@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.PIM;
+using PIMSim.PIM;
 using System.IO;
-using SimplePIM.Statistics;
+using PIMSim.Statistics;
 #endregion
 
-namespace SimplePIM.Configs
+namespace PIMSim.Configs
 {
     /// <summary>
     /// PIM config class

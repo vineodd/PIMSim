@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 #endregion
 
-namespace SimplePIM.Procs
+namespace PIMSim.Procs
 {
     /// <summary>
     /// Cache Replace policy

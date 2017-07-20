@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.General;
-using SimplePIM.Procs;
-using SimplePIM.Configs;
+using PIMSim.General;
+using PIMSim.Procs;
+using PIMSim.Configs;
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     public abstract class ComputationalUnit:SimulatorObj
     {
@@ -31,8 +31,8 @@ namespace SimplePIM.PIM
         public double interal_bandwidth => bandwidth_bit / 8 //byte
                 / 1024//KB
                 / 1024//MB
-                * 1.0 / OverallClock.cycle //MB/cycle
-                * OverallClock.reference_clock;
+                * 1.0 / GlobalTimer.tick //MB/cycle
+                * GlobalTimer.reference_clock;
 
         public abstract bool outstanding_requests();
     }

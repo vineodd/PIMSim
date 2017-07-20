@@ -46,12 +46,14 @@
     <Compile Include="Configs\Config.cs" />
     <Compile Include="Configs\HMCConfig.cs" />
     <Compile Include="Configs\PIMConfigs.cs" />
+    <Compile Include="Events\Event.cs" />
+    <Compile Include="Events\EventManager.cs" />
     <Compile Include="General\Counter.cs" />
     <Compile Include="General\InputType\Function.cs" />
     <Compile Include="General\InputType\InputType.cs" />
     <Compile Include="General\InputType\Instruction.cs" />
     <Compile Include="General\InputType\InstructionBlock.cs" />
-    <Compile Include="General\OverallClock.cs" />
+    <Compile Include="Timer\GlobalTimer.cs" />
     <Compile Include="General\ProcCallBack.cs" />
     <Compile Include="General\ProcRequest.cs" />
     <Compile Include="General\Register.cs" />

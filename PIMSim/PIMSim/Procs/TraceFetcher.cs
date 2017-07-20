@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using SimplePIM.Configs;
-using SimplePIM.General;
-using SimplePIM.Statistics;
+using PIMSim.Configs;
+using PIMSim.General;
+using PIMSim.Statistics;
 #endregion
 
-namespace SimplePIM.Procs
+namespace PIMSim.Procs
 {
     /// <summary>
     /// TraceFetcher Defination

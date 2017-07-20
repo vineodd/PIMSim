@@ -5,10 +5,10 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
-using SimplePIM.Configs;
-using SimplePIM.Statistics;
+using PIMSim.Configs;
+using PIMSim.Statistics;
 
-namespace SimplePIM.Memory.DDR
+namespace PIMSim.Memory.DDR
 {
     public class Bank
     {

@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.General;
-using SimplePIM.Configs;
-using SimplePIM.Statistics;
+using PIMSim.General;
+using PIMSim.Configs;
+using PIMSim.Statistics;
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     public class PIMStage_LoadData : Stage
     {
@@ -72,7 +72,7 @@ namespace SimplePIM.PIM
 
                         PIMRequest req = new PIMRequest();
                         req.actual_addr = (UInt64)input;
-                        req.cycle = OverallClock.cycle;
+                        req.cycle = GlobalTimer.tick;
                         req.if_mem = true;
                         req.pid = (Parent as ComputationalUnit).id;
                         req.stage_id.Add(this.id);

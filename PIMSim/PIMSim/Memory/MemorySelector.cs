@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
+using PIMSim.Configs;
 #endregion
 
-namespace SimplePIM.Memory
+namespace PIMSim.Memory
 {
     /// <summary>
     /// Memory object selector

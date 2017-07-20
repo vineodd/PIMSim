@@ -5,17 +5,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Procs;
-using SimplePIM.Configs;
-using SimplePIM.Memory;
-using SimplePIM.General;
-using SimplePIM.Memory.DDR;
-using SimplePIM.Statistics;
-using mctrl = SimplePIM.PIM.PIMMctrl;
+using PIMSim.Procs;
+using PIMSim.Configs;
+using PIMSim.Memory;
+using PIMSim.General;
+using PIMSim.Memory.DDR;
+using PIMSim.Statistics;
+using mctrl = PIMSim.PIM.PIMMctrl;
 
 #endregion
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     /// <summary>
     /// PIMProc
@@ -173,8 +173,8 @@ namespace SimplePIM.PIM
         private double interal_bandwidth=>bandwidth_bit/ 8 //byte
                 / 1024//KB
                 / 1024//MB
-                *1.0 / OverallClock.cycle //MB/cycle
-                * OverallClock.reference_clock;
+                *1.0 / GlobalTimer.tick //MB/cycle
+                * GlobalTimer.reference_clock;
         #endregion
 
         #region Public Methods

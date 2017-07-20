@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using System.IO;
 #endregion
 
-namespace SimplePIM.Statistics
+namespace PIMSim.Statistics
 {
     /// <summary>
     /// Debug Class 

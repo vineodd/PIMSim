@@ -37,7 +37,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace SimplePIM.Memory.DDR
+namespace PIMSim.Memory.DDR
 {
 	/// <summary>
 	/// Represents a simple double-ended-queue collection of objects.

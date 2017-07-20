@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using SimplePIM.Configs;
+using PIMSim.Configs;
 using System.Threading.Tasks;
-using SimplePIM.Procs;
+using PIMSim.Procs;
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     public static class Coherence
     {

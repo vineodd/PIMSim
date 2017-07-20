@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using SimplePIM.Procs;
+using PIMSim.Procs;
 
-namespace SimplePIM.Memory.DDR
+namespace PIMSim.Memory.DDR
 {
     public class BusPacket
     {

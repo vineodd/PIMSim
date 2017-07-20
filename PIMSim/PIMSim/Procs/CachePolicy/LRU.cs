@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Statistics;
+using PIMSim.Statistics;
 #endregion
 
-namespace SimplePIM.Procs
+namespace PIMSim.Procs
 {
     /// <summary>
     /// LRU implement

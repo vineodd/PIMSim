@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.General;
+using PIMSim.General;
 
 #endregion
 
-namespace SimplePIM.Procs
+namespace PIMSim.Procs
 {
     /// <summary>
     /// Decode Stage

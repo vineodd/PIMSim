@@ -5,13 +5,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
-using SimplePIM.General;
-using SimplePIM.Procs;
+using PIMSim.Configs;
+using PIMSim.General;
+using PIMSim.Procs;
 
 #endregion
 
-namespace SimplePIM.Memory
+namespace PIMSim.Memory
 {
     public abstract class MemObject :SimulatorObj
     {

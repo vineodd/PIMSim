@@ -4,13 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Procs;
-using SimplePIM.Configs;
-using SimplePIM.General;
-using SimplePIM.PIM;
+using PIMSim.Procs;
+using PIMSim.Configs;
+using PIMSim.General;
+using PIMSim.PIM;
 #endregion
 
-namespace SimplePIM.Procs
+namespace PIMSim.Procs
 {
     /// <summary>
     /// Callback information class used by processors and pimunits

@@ -5,13 +5,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.General;
-using SimplePIM.Procs;
-using SimplePIM.Statistics;
+using PIMSim.General;
+using PIMSim.Procs;
+using PIMSim.Statistics;
 
 #endregion
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     /// <summary>
     /// Simple Implement of ADDer
@@ -114,7 +114,7 @@ namespace SimplePIM.PIM
                 if (curr != null)
                 {
                     total_load++;
-                    curr.getServed(OverallClock.cycle);
+                    curr.getServed(GlobalTimer.tick);
                     bandwidth_bit += curr.Length();
                     pipeline[0].set_input(curr.input[0]);
                     pipeline[1].set_input(curr.input[1]);
@@ -149,7 +149,7 @@ namespace SimplePIM.PIM
                             }
                             pipeline[i].get_output(ref addr);
 
-                            total_latency += OverallClock.cycle - curr.servetime;
+                            total_latency += GlobalTimer.tick - curr.servetime;
 
                             curr = null;
                         }

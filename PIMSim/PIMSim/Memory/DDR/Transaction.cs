@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Procs;
-using SimplePIM.Configs;
-using SimplePIM.PIM;
-using SimplePIM.Statistics;
+using PIMSim.Procs;
+using PIMSim.Configs;
+using PIMSim.PIM;
+using PIMSim.Statistics;
 
 
-namespace SimplePIM.Memory.DDR
+namespace PIMSim.Memory.DDR
 {
 
     public class Transaction

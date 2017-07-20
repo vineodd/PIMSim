@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Configs;
-using SimplePIM.Memory;
-using SimplePIM.General;
-using SimplePIM.Procs;
+using PIMSim.Configs;
+using PIMSim.Memory;
+using PIMSim.General;
+using PIMSim.Procs;
 
 namespace SimplePIM
 {

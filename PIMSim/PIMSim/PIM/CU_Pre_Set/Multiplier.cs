@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 #endregion
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     /// <summary>
     /// Multiplier with conventional memory read/write ways.

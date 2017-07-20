@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.Procs;
+using PIMSim.Procs;
 
 #endregion
 
-namespace SimplePIM.General
+namespace PIMSim.General
 {
     #region Public Callback Delegate
 

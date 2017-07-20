@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 #endregion
 
-namespace SimplePIM.Statistics
+namespace PIMSim.Statistics
 {
     /// <summary>
     /// Error Defination class

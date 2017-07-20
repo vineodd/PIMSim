@@ -5,13 +5,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.General;
-using SimplePIM.Statistics;
-using SimplePIM.Configs;
+using PIMSim.General;
+using PIMSim.Statistics;
+using PIMSim.Configs;
 
 #endregion
 
-namespace SimplePIM.Procs
+namespace PIMSim.Procs
 {
     public class InstructionWindow
     {

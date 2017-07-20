@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SimplePIM.General;
+using PIMSim.General;
 
-namespace SimplePIM.PIM
+namespace PIMSim.PIM
 {
     public class PIMRequest : ProcRequest    {  }
 }

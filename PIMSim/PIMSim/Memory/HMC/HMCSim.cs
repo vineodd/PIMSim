@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using SimplePIM.Statistics;
-using SimplePIM.Configs;
+using PIMSim.Statistics;
+using PIMSim.Configs;
 
-namespace SimplePIM.Memory.HMC
+namespace PIMSim.Memory.HMC
 {
     public partial class HMCSim
     {

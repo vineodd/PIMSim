@@ -5,11 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using SimplePIM.Statistics;
-using SimplePIM.Configs;
+using PIMSim.Statistics;
+using PIMSim.Configs;
 #endregion
 
-namespace SimplePIM.Memory.DDR
+namespace PIMSim.Memory.DDR
 {
     /// <summary>
     /// DRAM Configs
