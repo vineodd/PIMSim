@@ -43,16 +43,30 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="APIs\Packctable.cs" />
+    <Compile Include="APIs\Printable.cs" />
     <Compile Include="Configs\Config.cs" />
     <Compile Include="Configs\HMCConfig.cs" />
     <Compile Include="Configs\PIMConfigs.cs" />
     <Compile Include="Events\Event.cs" />
     <Compile Include="Events\EventManager.cs" />
+    <Compile Include="General\AddressRange.cs" />
     <Compile Include="General\Counter.cs" />
+    <Compile Include="General\FlagBit.cs" />
     <Compile Include="General\InputType\Function.cs" />
     <Compile Include="General\InputType\InputType.cs" />
     <Compile Include="General\InputType\Instruction.cs" />
     <Compile Include="General\InputType\InstructionBlock.cs" />
+    <Compile Include="General\Ports\BaseMasterPort.cs" />
+    <Compile Include="General\Ports\BaseSlavePort.cs" />
+    <Compile Include="General\Ports\MasterPort.cs" />
+    <Compile Include="General\Ports\Port.cs" />
+    <Compile Include="General\Ports\PortManager.cs" />
+    <Compile Include="General\Ports\SlavePort.cs" />
+    <Compile Include="General\Ports\TraceFetcherMasterPorts.cs" />
+    <Compile Include="General\Ports\TraceFetcherSlavePort.cs" />
+    <Compile Include="General\Protocols\Command.cs" />
+    <Compile Include="General\Protocols\Packet.cs" />
     <Compile Include="Timer\GlobalTimer.cs" />
     <Compile Include="General\ProcCallBack.cs" />
     <Compile Include="General\ProcRequest.cs" />

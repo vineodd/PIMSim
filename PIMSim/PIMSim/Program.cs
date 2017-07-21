@@ -8,7 +8,7 @@ using PIMSim.Memory;
 using PIMSim.General;
 using PIMSim.Procs;
 
-namespace SimplePIM
+namespace PIMSim
 {
     class Program
     {

@@ -11,8 +11,6 @@ namespace PIMSim.Events
     {
         public new string name = "EventManager";
 
-
-
         public List<Event> event_queue = new List<Event>();
 
         public void Schedule()
