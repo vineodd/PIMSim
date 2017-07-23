@@ -30,12 +30,12 @@ namespace PIMSim.Partitioner
         /// <summary>
         /// inupts to feed to host processors
         /// </summary>
-        private List<Queue<InputType>> all_ins;
+        private List<Queue<Input>> all_ins;
 
         /// <summary>
         /// inputs to feed to pim units
         /// </summary>
-        private List<Queue<InputType>> pim_ins;
+        private List<Queue<Input>> pim_ins;
 
         /// <summary>
         /// Attached TraceFetcher 
@@ -87,19 +87,19 @@ namespace PIMSim.Partitioner
         {
 
             n = Config.N;
-            all_ins = new List<Queue<InputType>>();
+            all_ins = new List<Queue<Input>>();
             eof = new List<bool>();
             for (int i = 0; i < n; i++)
             {
-                all_ins.Add(new Queue<InputType>());
+                all_ins.Add(new Queue<Input>());
                 eof.Add(false);
                 divide_host_reqs.Add(0);
                 divide_host_sent.Add(0);
             }
-            pim_ins = new List<Queue<InputType>>();
+            pim_ins = new List<Queue<Input>>();
             for (int i = 0; i < PIMConfigs.pim_cu_count; i++)
             {
-                pim_ins.Add(new Queue<InputType>());
+                pim_ins.Add(new Queue<Input>());
                 divide_pim_reqs.Add(0);
                 divide_pim_sent.Add(0);
             }
@@ -107,17 +107,7 @@ namespace PIMSim.Partitioner
             data_port.owner = this;
 
         }
-        /// <summary>
-        /// Attach TraceFetcher.
-        /// Before InsP starts to work, you have to use this method to attach TraceFetcher. Otherwise it will throw NullReferenceExceptions.
-        /// </summary>
-        /// <param name="trace_">Attached TraceFetcher</param>
-        public void attach_tracefetcher(ref TraceFetcher trace_)
-        {
-            if (Config.DEBUG_INSP)
-                DEBUG.WriteLine("-- InsP : Attached TraceFetch.");
-            trace = trace_;
-        }
+
 
         /// <summary>
         /// Processors or PIMUnit use this method to get their inputs.
@@ -125,7 +115,7 @@ namespace PIMSim.Partitioner
         /// <param name="pid">pid of unit</param>
         /// <param name="host">true indicates target unit is at host-side. Otherwise at memory-side.</param>
         /// <returns></returns>
-        public InputType get_req(int pid, bool host = false)
+        public Input get_req(int pid, bool host = false)
         {
             if (host)
             {     
@@ -137,7 +127,7 @@ namespace PIMSim.Partitioner
                     divide_host_sent[pid] += ins.Length();
                     return ins;
                 }
-                InputType current = all_ins[pid].Peek();
+                Input current = all_ins[pid].Peek();
                 if (current.cycle > cycle - 1)
                 {
                     //not this time
@@ -179,7 +169,7 @@ namespace PIMSim.Partitioner
                     //when pim queue has no reqs, nothing is sent to PIM.
                     return new Instruction();
                 }
-                InputType current = pim_ins[pid].Peek();
+                Input current = pim_ins[pid].Peek();
                 if (current.cycle > cycle - 1)
                 {
                     //when pim queue has no reqs, nothing is sent to PIM.
@@ -214,7 +204,7 @@ namespace PIMSim.Partitioner
         /// </summary>
         /// <param name="ins_"></param>
         /// <returns></returns>
-        public int corresponding_unit(InputType ins_)
+        public int corresponding_unit(Input ins_)
         {
             return 0;
         }
@@ -254,7 +244,7 @@ namespace PIMSim.Partitioner
 
         public override bool recvFunctionalResp(Packet pkt)
         {
-            InputType to_add = (InputType)SerializationHelper.DeserializeObject(pkt.ReadData());
+            Input to_add = (Input)SerializationHelper.DeserializeObject(pkt.ReadData());
             if (to_add is Instruction)
             {
                 if ((to_add as Instruction).type != InstructionType.EOF)
@@ -282,7 +272,7 @@ namespace PIMSim.Partitioner
         public new bool recvTimingResp(Packet pkt)
         {
             pkt.ts_issue = GlobalTimer.tick;
-            InputType to_add = (InputType)SerializationHelper.DeserializeObject(pkt.ReadData());
+            Input to_add = (Input)SerializationHelper.DeserializeObject(pkt.ReadData());
             if (to_add is Instruction)
             {
                 if ((to_add as Instruction).type != InstructionType.EOF)
@@ -313,7 +303,7 @@ namespace PIMSim.Partitioner
                 var packets = data_port.buffer.Where(x => x.Item1 + x.Item2.linkDelay <= GlobalTimer.tick).ToList();
                 if (packets.Count() > 0)
                 {
-                    packets.ForEach(x => recvTimingResp(x.Item2));
+                    packets.ForEach(x => { recvTimingResp(x.Item2); data_port.buffer.Remove(x); });
                     
                 }
             }
@@ -343,7 +333,8 @@ namespace PIMSim.Partitioner
                     }
                 }
             }
-           
+
+
         }
 
         public bool trace_done()

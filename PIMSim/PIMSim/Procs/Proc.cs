@@ -257,7 +257,7 @@ namespace PIMSim.Procs
         /// <returns>Instruction to be processed. If none, NOP.</returns>
         public Instruction get_ins_from_insp()
         {
-            InputType tp = ins_p.get_req(this.pid, true);
+            Input tp = ins_p.get_req(this.pid, true);
 
             //indentify if input is an instruction
             if (tp is Instruction)

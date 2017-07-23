@@ -21,7 +21,7 @@ namespace PIMSim.General
     /// <para></para> 
     /// </summary>
     [Serializable]
-    public class Function : InputType
+    public class Function : Input
     {
         #region Public Variables
 

@@ -17,7 +17,7 @@ namespace PIMSim.General
     /// Instruction Defination
     /// </summary>
     [Serializable]
-    public class Instruction :InputType
+    public class Instruction :Input
     {
 
         #region Static Variables

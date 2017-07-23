@@ -642,7 +642,7 @@ namespace PIMSim.PIM
                 }
             }
 
-            InputType tp = ins_p.get_req(this.pid, false);
+            Input tp = ins_p.get_req(this.pid, false);
             if (tp is Instruction)
             {
                 switch ((tp as Instruction).type)

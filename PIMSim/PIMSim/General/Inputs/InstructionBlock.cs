@@ -16,7 +16,7 @@ namespace PIMSim.General
     /// <para>Marking code snippet as Instruction Block allows you to get information about this snippet after simulation finished.</para>
     /// </summary>
     [Serializable]
-    public class InstructionBlock : InputType
+    public class InstructionBlock : Input
     {
         #region Private Variables
 

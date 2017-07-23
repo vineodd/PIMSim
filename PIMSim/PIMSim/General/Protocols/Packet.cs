@@ -24,7 +24,7 @@ namespace PIMSim.General.Protocols
 
       //  public Request req; //point to orginal requests;
 
-        private Address addr=0;
+        private Address address=0;
 
         /// True if the request targets the secure memory space.
         private bool _isSecure=false;
@@ -122,5 +122,6 @@ namespace PIMSim.General.Protocols
             data = _data;
             size = _data.Count();
         }
+
     }
 }

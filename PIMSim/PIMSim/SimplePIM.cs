@@ -50,11 +50,10 @@ namespace PIMSim.General
 
             initAllconfigs(args);
             trace = new TraceFetcher();
-            trace.SET_trace_path(Config.trace_path);
 
 
             ins_p = new InsPartition();
-            ins_p.attach_tracefetcher(ref trace);
+
             pg = new PageConverter();
 
             if (Config.shared_cache)

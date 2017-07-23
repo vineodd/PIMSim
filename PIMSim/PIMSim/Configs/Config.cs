@@ -202,6 +202,9 @@ namespace PIMSim.Configs
 
 
         public static Trace_Type trace_type = Trace_Type.Detailed;
+
+
+        public static Text_Type text_type = Text_Type.Txt;
         #endregion
 
         #region Statistics Config
@@ -501,6 +504,12 @@ namespace PIMSim.Configs
     public enum Trace_Type
     {
         Detailed,
-        General
+        PC
+    }
+
+    public enum Text_Type
+    {
+        Txt,
+        Gzip
     }
 }

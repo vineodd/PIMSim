@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using PIMSim.PIM;
 using System.IO;
 using PIMSim.Statistics;
+using PIMSim.General;
 #endregion
 
 namespace PIMSim.Configs
@@ -90,6 +91,12 @@ namespace PIMSim.Configs
         /// Conventional : add to MTRL
         /// </summary>
         public static PIM_Load_Method memory_method = PIM_Load_Method.Conventional;
+
+        /// <summary>
+        /// To indeicate PIM kernal addresses
+        /// </summary>
+        public static List<AddressRange> PIM_kernal = new List<AddressRange>();
+
 
         //cache
         public static int max_l1cache_bit = 16;
