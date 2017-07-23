@@ -14,6 +14,9 @@ using System.IO;
 using PIMSim.PIM;
 using PIMSim.Memory.HMC;
 using PIMSim.Statistics;
+using PIMSim.TraceReader;
+using PIMSim.Partitioner;
+using PIMSim.General.Ports;
 #endregion
 
 namespace PIMSim.General
@@ -101,6 +104,11 @@ namespace PIMSim.General
             Coherence.init();
             Coherence.linkproc(proc);
             GlobalTimer.InitClock();
+            BuildTopology();
+        }
+        public void BuildTopology()
+        {
+            PortManager.bind(ref trace.port, ref ins_p.data_port);
         }
         public void run()
         {

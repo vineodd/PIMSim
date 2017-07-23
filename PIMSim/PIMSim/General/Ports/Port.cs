@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PIMSim.General.Protocols;
+using Cycle = System.UInt64;
 using PortID = System.UInt16;
 
 namespace PIMSim.General.Ports
@@ -14,7 +16,12 @@ namespace PIMSim.General.Ports
         /** Descriptive name (for DPRINTF output) */
         private string portName;
 
+        public List<Tuple<Cycle, Packet>> buffer = new List<Tuple<Cycle, Packet>>();
 
+        public void addPacket(Packet pkt)
+        {
+            buffer.Add(new Tuple<ulong, Packet>(GlobalTimer.tick, pkt));
+        }
 
         /**
          * A numeric identifier to distinguish ports in a vector, and set
@@ -23,7 +30,7 @@ namespace PIMSim.General.Ports
         public PortID id;
 
         /** A reference to the MemObject that owns this port. */
-        public Object owner;
+        public SimulatorObj owner;
 
         /**
          * Abstract base class for ports
@@ -32,11 +39,11 @@ namespace PIMSim.General.Ports
          * @param _owner The MemObject that is the structural owner of this port
          * @param _id A port identifier for vector ports
          */
-        public Port(string _name, ref object _owner, PortID _id)
+        public Port(string _name, PortID _id)
         {
             portName = _name;
             id = _id;
-            owner = _owner;
+           // owner = _owner;
         }
 
         /**

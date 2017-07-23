@@ -13,6 +13,7 @@ namespace PIMSim.General
     /// <summary>
     /// Abstract Inupt Class
     /// </summary>
+    [Serializable]
     public abstract class InputType
     {
         #region Static Varibles

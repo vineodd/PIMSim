@@ -6,6 +6,7 @@ using PIMSim.General;
 using PIMSim.Statistics;
 using PIMSim.PIM;
 using mctrl = PIMSim.Procs.Mctrl;
+using PIMSim.Partitioner;
 #endregion
 
 namespace PIMSim.Procs

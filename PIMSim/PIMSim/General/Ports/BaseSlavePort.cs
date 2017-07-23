@@ -12,7 +12,7 @@ namespace PIMSim.General.Ports
     {
         public BaseMasterPort _baseMasterPort;
 
-        public BaseSlavePort(string name, ref object owner, PortID _id = PortID.MaxValue) : base(name, ref owner, _id)
+        public BaseSlavePort(string name, PortID _id = PortID.MaxValue) : base(name,  _id)
         {
             _baseMasterPort = null;
         }

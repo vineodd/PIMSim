@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using PIMSim.General;
 using PIMSim.Procs;
 using PIMSim.Statistics;
-
+using PIMSim.Partitioner;
 #endregion
 
 namespace PIMSim.PIM

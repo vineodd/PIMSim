@@ -16,6 +16,7 @@ namespace PIMSim.General
     /// <summary>
     /// Instruction Defination
     /// </summary>
+    [Serializable]
     public class Instruction :InputType
     {
 

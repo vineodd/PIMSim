@@ -12,7 +12,7 @@ using PIMSim.General;
 using PIMSim.Memory.DDR;
 using PIMSim.Statistics;
 using mctrl = PIMSim.PIM.PIMMctrl;
-
+using PIMSim.Partitioner;
 #endregion
 
 namespace PIMSim.PIM

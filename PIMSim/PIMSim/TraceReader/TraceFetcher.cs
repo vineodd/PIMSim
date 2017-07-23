@@ -10,9 +10,11 @@ using System.Text.RegularExpressions;
 using PIMSim.Configs;
 using PIMSim.General;
 using PIMSim.Statistics;
+using PIMSim.General.Ports;
+using PIMSim.General.Protocols;
 #endregion
 
-namespace PIMSim.Procs
+namespace PIMSim.TraceReader
 {
     /// <summary>
     /// TraceFetcher Defination
@@ -38,7 +40,7 @@ namespace PIMSim.Procs
         private string path = Config.trace_path;
 
         #endregion
-
+        public TraceFetcherMasterPorts port;
         #region Public Methods
 
         /// <summary>
@@ -78,7 +80,57 @@ namespace PIMSim.Procs
             foreach(var item in sr) { item.Close(); }
             foreach (var item in trace) { item.Close(); }
         }
+        public TraceFetcher()
+        {
+            name = "TraceFetcher";
+            port = new TraceFetcherMasterPorts("TraceFetcher Data Port", PortManager.Allocate());
+            port.owner = this;
+        }
+        public void ServeBuffer()
+        {
+            if (port.buffer.Count() > 0)
+            {
+                var packets = port.buffer.Where(x => x.Item1 + x.Item2.linkDelay <= GlobalTimer.tick).ToList();
+                if (packets.Count() > 0)
+                {
+                    packets.ForEach(x => x.Item2.ts_arrival=GlobalTimer.tick);
+                    packets.ForEach(x => recvTimingReq(x.Item2));
+                  //  packets.ForEach(x => recvFunctionalReq(x.Item2));
+                }
+            }
+        }
+        public new bool recvTimingReq(Packet pkt)
+        {
+            pkt.ts_issue = GlobalTimer.tick;
+            var x = get_req(BitConverter.ToInt32(pkt.ReadData(), 0));
+            PacketManager.Collect(pkt);
+            Packet new_pkt = new Packet(CMD.ReadResp);
+            new_pkt.linkDelay = Config.linkdelay_tracetetcher_to_insp;
+            new_pkt.BuildData(SerializationHelper.SerializeObject(x));
+            return sendTimingResq(ref new_pkt);
 
+        }
+        public new bool recvFunctionalReq(Packet pkt)
+        {
+            pkt.ts_issue = GlobalTimer.tick;
+            var x = get_req(BitConverter.ToInt32(pkt.ReadData(), 0));
+            PacketManager.Collect(pkt);
+            Packet new_pkt = new Packet(CMD.ReadResp);
+            new_pkt.BuildData(SerializationHelper.SerializeObject(x));
+            return sendFunctionalResq(ref new_pkt);
+        }
+
+        public new bool sendFunctionalResq(ref Packet pkt)
+        {
+            port._slavePort.recvFunctionalResp(pkt);
+            return true;
+        }
+
+        public new bool sendTimingResq(ref Packet pkt)
+        {
+            port._slavePort.addPacket(pkt);
+            return true;
+        }
         /// <summary>
         /// Parse one trace line into instruction
         /// </summary>
@@ -290,6 +342,7 @@ namespace PIMSim.Procs
         public override void Step()
         {
             cycle++;
+            ServeBuffer();
         }
 
         #endregion

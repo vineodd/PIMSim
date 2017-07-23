@@ -7,8 +7,11 @@ using System.Threading.Tasks;
 using PIMSim.Configs;
 using PIMSim.General;
 using PIMSim.Statistics;
+using PIMSim.TraceReader;
+using PIMSim.General.Ports;
+using PIMSim.General.Protocols;
 #endregion
-namespace PIMSim.Procs
+namespace PIMSim.Partitioner
 {
     /// <summary>
     /// Instruction Partitioner
@@ -46,6 +49,8 @@ namespace PIMSim.Procs
         private List<bool> eof;
 
         #endregion
+
+        public TraceFetcherSlavePort data_port;
 
         #region Statistics Varibles
         //for statistics
@@ -98,7 +103,8 @@ namespace PIMSim.Procs
                 divide_pim_reqs.Add(0);
                 divide_pim_sent.Add(0);
             }
-
+            data_port = new TraceFetcherSlavePort("Insp Data Port", PortManager.Allocate());
+            data_port.owner = this;
 
         }
         /// <summary>
@@ -213,12 +219,113 @@ namespace PIMSim.Procs
             return 0;
         }
 
+        public override bool sendTimingReq(ref Packet pkt)
+        {
+            DEBUG.Assert(pkt.isRequest() && pkt.isRead());
+            pkt.ts_departure = GlobalTimer.tick;
+            data_port._masterPort.addPacket(pkt);
+            return true;
+        }
+        public bool sendTimeingReq(int dst)
+        {
+            var pkt = buildRequest(dst);
+            pkt.linkDelay = Config.linkdelay_insp_to_tracetetcher;
+            return sendTimingReq(ref pkt);
+        }
+        public override bool sendFunctionalReq(ref Packet pkt)
+        {
+            DEBUG.Assert(pkt.isRequest() && pkt.isRead());
+            pkt.ts_departure = GlobalTimer.tick;
+            data_port._masterPort.recvFunctionalReq(pkt);
+            return true;
+        }
+        public bool sendFunctionalReq(int dst)
+        {
+            var pkt = buildRequest(dst);
+            return sendFunctionalReq(ref pkt);
+        }
+        public Packet buildRequest(int dst)
+        {
+            Packet pkt = new Packet(CMD.ReadReq);
+            pkt.BuildData(dst);
+            return pkt;
+
+        }
+
+        public override bool recvFunctionalResp(Packet pkt)
+        {
+            InputType to_add = (InputType)SerializationHelper.DeserializeObject(pkt.ReadData());
+            if (to_add is Instruction)
+            {
+                if ((to_add as Instruction).type != InstructionType.EOF)
+                {
+                    if (!(to_add as Instruction).pim)
+                        all_ins[(to_add as Instruction).pid].Enqueue(to_add);
+                    else
+                    {
+                        pim_ins[corresponding_unit(null)].Enqueue(to_add);
+                    }
+                    to_add = null;
+                }
+                else
+                {
+                    eof[(to_add as Instruction).pid] = true;
+                }
+            }
+            else
+            {
+                pim_ins[corresponding_unit(null)].Enqueue(to_add);
+            }
+            return true;
+        }
+
+        public new bool recvTimingResp(Packet pkt)
+        {
+            pkt.ts_issue = GlobalTimer.tick;
+            InputType to_add = (InputType)SerializationHelper.DeserializeObject(pkt.ReadData());
+            if (to_add is Instruction)
+            {
+                if ((to_add as Instruction).type != InstructionType.EOF)
+                {
+                    if (!(to_add as Instruction).pim)
+                        all_ins[(to_add as Instruction).pid].Enqueue(to_add);
+                    else
+                    {
+                        pim_ins[corresponding_unit(null)].Enqueue(to_add);
+                    }
+                    to_add = null;
+                }
+                else
+                {
+                    eof[(to_add as Instruction).pid] = true;
+                }
+            }
+            else
+            {
+                pim_ins[corresponding_unit(null)].Enqueue(to_add);
+            }
+            return true;
+        }
+        public void ServeBuffer()
+        {
+            if (data_port.buffer.Count() > 0)
+            {
+                var packets = data_port.buffer.Where(x => x.Item1 + x.Item2.linkDelay <= GlobalTimer.tick).ToList();
+                if (packets.Count() > 0)
+                {
+                    packets.ForEach(x => recvTimingResp(x.Item2));
+                    
+                }
+            }
+        }
+
         /// <summary>
         /// Interal Step
         /// </summary>
         public override void Step()
         {
             cycle++;
+            ServeBuffer();
             for (int i = 0; i < Config.N; i++)
             {
                 for (int j = 0; j < Config.IPC; j++)
@@ -231,28 +338,8 @@ namespace PIMSim.Procs
                             //input waitting queue is full
                             continue;
                         }
-                        InputType to_add = trace.get_req(i);    //get input
-                        if (to_add is Instruction)
-                        {
-                            if ((to_add as Instruction).type != InstructionType.EOF)
-                            {
-                                if(!(to_add as Instruction).pim)
-                                    all_ins[i].Enqueue(to_add);
-                                else
-                                {
-                                    pim_ins[corresponding_unit(null)].Enqueue(to_add);
-                                }
-                                to_add = null;
-                            }
-                            else
-                            {
-                                eof[i] = true;
-                            }
-                        }
-                        else
-                        {
-                            pim_ins[corresponding_unit(null)].Enqueue(to_add);                   
-                        }
+                        sendTimeingReq(i);
+                       // sendFunctionalReq(i);
                     }
                 }
             }

@@ -10,6 +10,7 @@ using PIMSim.General;
 using System.IO;
 using PIMSim.Statistics;
 using System.Reflection;
+using PIMSim.Partitioner;
 #endregion
 
 namespace PIMSim.PIM

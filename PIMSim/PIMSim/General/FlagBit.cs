@@ -306,7 +306,7 @@ namespace PIMSim.General
         {
             string s = tostring(flags);
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < _flags.Count(); i++)
+            for (int i = 0; i < 32; i++)
             {
                 sb.Append(Or(_flags[i], s[i]));
             }
@@ -317,7 +317,7 @@ namespace PIMSim.General
         {
             string s = tostring(flags);
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < _flags.Count(); i++)
+            for (int i = 0; i < 16; i++)
             {
                 sb.Append(Or(_flags[i], s[i]));
             }
@@ -328,7 +328,7 @@ namespace PIMSim.General
         {
             string s = tostring(flags);
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < _flags.Count(); i++)
+            for (int i = 0; i < 64; i++)
             {
                 sb.Append(Or(_flags[i], s[i]));
             }
@@ -339,7 +339,7 @@ namespace PIMSim.General
         {
             string s = flags;
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < _flags.Count(); i++)
+            for (int i = 0; i < flags.Count(); i++)
             {
                 sb.Append(Or(_flags[i], s[i]));
             }

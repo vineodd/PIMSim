@@ -15,6 +15,7 @@ namespace PIMSim.General
     /// Instruction Block is an input of a snippet of code.
     /// <para>Marking code snippet as Instruction Block allows you to get information about this snippet after simulation finished.</para>
     /// </summary>
+    [Serializable]
     public class InstructionBlock : InputType
     {
         #region Private Variables

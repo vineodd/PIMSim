@@ -86,10 +86,12 @@ namespace PIMSim.General.Protocols
         private string SET1(Attribute @att)
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("1");
-            for(int i = 0; i < (int)@att; i++)
+            for(int i = 0; i < (int)@att+1; i++)
             {
-                sb.Append("0");
+                if (i == (int)@att)
+                    sb.Append("1");
+                else
+                    sb.Append("0");
             }
             return sb.ToString();
         }
@@ -105,13 +107,27 @@ namespace PIMSim.General.Protocols
             var max = Math.Max(@att1.Count(), (int)@att2 + 1);
             for (int i = 0; i < max; i++)
             {
-                sb.Append((((i < @att1.Count() ? @att1[i] : '0') == '0') && ((i == (int)@att2 + 1 ? '1' : '0') == '0')) ? "0" : "1");
+                char a, b;
+                if (i < @att1.Count())
+
+                    a = @att1[i];
+                else
+                    a = '0';
+
+                if (i == (int)@att2)
+                    b = '1';
+                else
+                    b = '0';
+                if (a == '0' && b == '0')
+                    sb.Append("0");
+                else
+                    sb.Append("1");
             }
             return sb.ToString();
         }
         private string SET3(Attribute @att1, Attribute @att2, Attribute @att3)
         {
-            return SET2(SET2(SET1(@att1), @att2), @att3);
+            return SET2(SET2(@att1, @att2), @att3);
         }
         private string SET4(Attribute @att1, Attribute @att2, Attribute @att3, Attribute @att4)
         {
@@ -189,7 +205,7 @@ namespace PIMSim.General.Protocols
         public bool isFlush() { return testCmdAttrib(Attribute.IsFlush); }
         private bool testCmdAttrib(Attribute attrib)
         {
-            return _flag[(int)attrib + 1] != '0';
+            return _flag[(int)attrib] != '0';
         }
         //public bool this[int index]
         //{
@@ -210,7 +226,7 @@ namespace PIMSim.General.Protocols
                     _flag.set(SET3(Attribute.IsRead, Attribute.IsRequest, Attribute.NeedsResponse));
                     break;
                 case CMD.ReadResp:
-                    _flag.set(SET3(Attribute.IsRead, Attribute.IsRequest, Attribute.HasData));
+                    _flag.set(SET4(Attribute.IsRead, Attribute.IsRequest, Attribute.HasData, Attribute.IsResponse));
                     break;
                 case CMD.ReadRespWithInvalidate:
                     _flag.set(SET4(Attribute.IsRead, Attribute.IsResponse, Attribute.HasData, Attribute.IsInvalidate));

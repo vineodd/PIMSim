@@ -20,6 +20,7 @@ namespace PIMSim.General
     /// <para>[Duration] Duration time without data load or store.</para> 
     /// <para></para> 
     /// </summary>
+    [Serializable]
     public class Function : InputType
     {
         #region Public Variables

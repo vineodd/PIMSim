@@ -12,7 +12,7 @@ namespace PIMSim.General.Ports
     public static class PortManager
     {
         public static List<Port> ports = new List<Port>();
-
+        public static PortID id = 0;
         /**
 * Bind this master port to a slave port. This also does the
 * mirror action and binds the slave port to the master port.
@@ -31,7 +31,23 @@ namespace PIMSim.General.Ports
             ports.Add(slp);
 
         }
+        public static void bind(ref TraceFetcherMasterPorts msp, ref TraceFetcherSlavePort slp)
+        {
 
+            // bind on the level of the base ports
+            Debug.Assert(!ports.Contains(msp as Port));
+            Debug.Assert(!ports.Contains(slp as Port));
+            msp.bind(ref slp);
+            slp.bind(ref msp);
+            ports.Add(msp);
+            ports.Add(slp);
+
+        }
+        public static PortID Allocate()
+        {
+            id++;
+            return (PortID)(id - 1);
+        }
         /**
          * Unbind this master port and the associated slave port.
          */

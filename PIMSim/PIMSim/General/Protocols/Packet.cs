@@ -22,18 +22,23 @@ namespace PIMSim.General.Protocols
 
         public bool sub_packet = false;
 
-        public Request req; //point to orginal requests;
+      //  public Request req; //point to orginal requests;
 
-        private Address addr;
+        private Address addr=0;
 
         /// True if the request targets the secure memory space.
-        private bool _isSecure;
+        private bool _isSecure=false;
 
         /// The size of the request or transfer.
-        private byte size;
+        private int size=0;
 
-        private List<bool> bytesValid;
+        private List<bool> bytesValid=new List<bool>();
 
+        public Packet(CMD _cmd)
+        {
+            cmd = new Command(_cmd);
+            packet_id = PacketManager.Allocate();
+        }
         /**
          * The extra delay from seeing the packet until the header is
          * transmitted. This delay is used to communicate the crossbar
@@ -41,7 +46,7 @@ namespace PIMSim.General.Protocols
          * that actually makes the packet wait. As the delay is relative,
          * a 32-bit unsigned should be sufficient.
          */
-        public UInt32 headerDelay;
+        public UInt32 headerDelay=0;
 
         /**
          * Keep track of the extra delay incurred by snooping upwards
@@ -49,7 +54,7 @@ namespace PIMSim.General.Protocols
          * by the coherent crossbar to account for the additional request
          * delay.
          */
-        UInt32 snoopDelay;
+        public UInt32 snoopDelay=0;
 
         /**
          * The extra pipelining delay from seeing the packet until the end of
@@ -59,9 +64,9 @@ namespace PIMSim.General.Protocols
          * crossbar does not make the packet wait. As the delay is
          * relative, a 32-bit unsigned should be sufficient.
          */
-        UInt32 payloadDelay;
+        public UInt32 payloadDelay=0;
 
-
+        public UInt16 linkDelay = 0;
         /// Return the string name of the cmd field (for debugging and
         /// tracing).
         public string cmdString() { return cmd.toString(); }
@@ -102,6 +107,20 @@ namespace PIMSim.General.Protocols
         {
 
         }
+        public byte[] ReadData()
+        {
+            return data;
+        }
 
+        public void BuildData(int _data)
+        {
+            data = BitConverter.GetBytes(_data);
+            size = data.Count();
+        }
+        public void BuildData(byte[] _data)
+        {
+            data = _data;
+            size = _data.Count();
+        }
     }
 }

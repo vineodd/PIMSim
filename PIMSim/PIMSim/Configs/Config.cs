@@ -236,6 +236,8 @@ namespace PIMSim.Configs
         public static bool use_pim = true;
         public static bool register_level_check = true;
 
+        public static UInt16 linkdelay_tracetetcher_to_insp = 1;
+        public static UInt16 linkdelay_insp_to_tracetetcher = 1;
         #endregion
 
         #region File Handle

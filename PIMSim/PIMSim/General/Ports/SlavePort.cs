@@ -18,26 +18,13 @@ namespace PIMSim.General.Ports
 
         public MasterPort _masterPort;
 
-        public SlavePort(string name, ref Object owner, PortID id = PortID.MaxValue) : base(name, ref owner, id)
+        public SlavePort(string name, PortID id = PortID.MaxValue) : base(name, id)
         {
             _masterPort = null;
         }
         ~SlavePort() { }
 
-        /**
-         * Send an atomic snoop request packet, where the data is moved
-         * and the state is updated in zero time, without interleaving
-         * with other memory accesses.
-         *
-         * @param pkt Snoop packet to send.
-         *
-         * @return Estimated latency of access.
-         */
-        Cycle sendAtomicSnoop(ref Packet pkt)
-        {
-            Debug.Assert(pkt.isRequest());
-            return _masterPort.recvAtomicSnoop(pkt);
-        }
+
 
         /**
          * Send a functional snoop request packet, where the data is
@@ -69,18 +56,7 @@ namespace PIMSim.General.Ports
             return _masterPort.recvTimingResp(pkt);
         }
 
-        /**
-         * Attempt to send a timing snoop request packet to the master port
-         * by calling its corresponding receive function. Snoop requests
-         * always succeed and hence no return value is needed.
-         *
-         * @param pkt Packet to send.
-         */
-        void sendTimingSnoopReq(ref Packet pkt)
-        {
-            Debug.Assert(pkt.isRequest());
-            _masterPort.recvTimingSnoopReq(pkt);
-        }
+
 
         /**
          * Send a retry to the master port that previously attempted a
@@ -148,160 +124,188 @@ namespace PIMSim.General.Ports
             _masterPort = master_port;
         }
 
-        /**
-         * Receive an atomic request packet from the master port.
-         */
-        public virtual Cycle recvAtomic(Packet pkt) { return Cycle.MaxValue; }
-
-        /**
-         * Receive a functional request packet from the master port.
-         */
-        public virtual void recvFunctional(Packet pkt) { }
-
-        /**
-         * Receive a timing request from the master port.
-         */
-        public virtual bool recvTimingReq(Packet pkt) { return false; }
-
-        /**
-         * Receive a timing snoop response from the master port.
-         */
-        public virtual bool recvTimingSnoopResp(Packet pkt)
-        {
-            Debug.Fail(String.Format("{0} was not expecting a timing snoop response\n", name()));
-            return false;
-        }
 
         /**
          * Called by the master port if sendTimingResp was called on this
          * slave port (causing recvTimingResp to be called on the master
          * port) and was unsuccesful.
          */
-        public virtual void recvRespRetry() { }
-
-        ulong Packctable.sendAtomicSnoop(ref Packet pkt)
+        public Cycle recvAtomicSnoop(Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting an recvAtomicSnoop request\n", name()));
+            return 0;
         }
 
-        public ulong recvAtomicSnoop(Packet pkt)
+        /**
+         * Receive a functional snoop request packet from the slave port.
+         */
+        public void recvFunctionalSnoop(Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a recvFunctionalSnoop request\n", name()));
         }
 
-        public void sendFunctional(ref Packet pkt)
+        /**
+         * Receive a timing response from the slave port.
+         */
+        public bool recvTimingResp(Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a recvTimingResp request\n", name()));
+            return false;
+        }
+
+        /**
+         * Receive a timing snoop request from the slave port.
+         */
+        public void recvTimingSnoopReq(Packet pkt)
+        {
+            Debug.Fail(String.Format("{0} was not expecting a recvTimingSnoopReq request\n", name()));
+        }
+
+        /**
+         * Called by the slave port if sendTimingReq was called on this
+         * master port (causing recvTimingReq to be called on the slave
+         * port) and was unsuccesful.
+         */
+        public void recvReqRetry()
+        {
+            Debug.Fail(String.Format("{0} was not expecting a recvReqRetry request\n", name()));
+        }
+
+        /**
+         * Called by the slave port if sendTimingSnoopResp was called on this
+         * master port (causing recvTimingSnoopResp to be called on the slave
+         * port) and was unsuccesful.
+         */
+        public void recvRetrySnoopResp()
+        {
+            Debug.Fail(String.Format("{0} was not expecting a recvRetrySnoopResp request\n", name()));
+        }
+
+        /**
+         * Called to receive an address range change from the peer slave
+         * port. The default implementation ignores the change and does
+         * nothing. Override this function in a derived class if the owner
+         * needs to be aware of the address ranges, e.g. in an
+         * interconnect component like a bus.
+         */
+        public void recvRangeChange()
+        {
+            Debug.Fail(String.Format("{0} was not expecting a recvRangeChange request\n", name()));
+        }
+
+        public ulong sendAtomicSnoop(ref Packet pkt)
+        {
+            Debug.Fail(String.Format("{0} was not expecting a sendAtomicSnoop request\n", name()));
+            return 0;
         }
 
         public bool sendTimingSnoopResp(ref Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a sendTimingSnoopResp request\n", name()));
+            return false;
         }
 
-        public void recvFunctionalSnoop(Packet pkt)
+        public bool recvTimingSnoopResp(Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a recvTimingSnoopResp request\n", name()));
+            return false;
         }
 
-        public bool sendTimingReq(ref Packet pkt)
+        public void sendTimingSnoopReq(ref Packet pkt)
         {
-            throw new NotImplementedException();
-        }
+            Debug.Fail(String.Format("{0} was not expecting a sendTimingSnoopReq request\n", name()));
 
-        public bool recvTimingResp(Packet pkt)
-        {
-            throw new NotImplementedException();
-        }
-
-        public ulong sendAtomic(ref Packet pkt)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void sendRetryResp()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void recvReqRetry()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void recvTimingSnoopReq(Packet pkt)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void recvRetrySnoopResp()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void recvRangeChange()
-        {
-            throw new NotImplementedException();
-        }
-
-        void Packctable.sendTimingSnoopReq(ref Packet pkt)
-        {
-            throw new NotImplementedException();
         }
 
         public bool sendFunctionalSnoopResp(ref Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a sendFunctionalSnoopResp request\n", name()));
+            return false;
         }
 
         public bool recvFunctionalSnoopResp(Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a recvFunctionalSnoopResp request\n", name()));
+            return false;
         }
 
         public void recvFunctionalSnoopReq(Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a recvFunctionalSnoopReq request\n", name()));
         }
 
         public void sendFunctionalSnoopReq(ref Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a sendFunctionalSnoopReq request\n", name()));
+        }
+
+        public bool sendTimingReq(ref Packet pkt)
+        {
+            Debug.Fail(String.Format("{0} was not expecting a sendTimingReq request\n", name()));
+            return false;
+        }
+
+        public bool recvTimingReq(Packet pkt)
+        {
+            Debug.Fail(String.Format("{0} was not expecting a recvTimingReq request\n", name()));
+            return false;
         }
 
         public bool sendTimingResq(ref Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a sendTimingResq request\n", name()));
+            return false;
         }
 
         public bool sendFunctionalReq(ref Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a sendFunctionalReq request\n", name()));
+            return false;
         }
 
         public bool recvFunctionalReq(Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a recvFunctionalReq request\n", name()));
+            return false;
         }
 
         public bool sendFunctionalResq(ref Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a sendFunctionalResq request\n", name()));
+            return false;
         }
 
         public bool recvFunctionalResp(Packet pkt)
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a recvFunctionalResp request\n", name()));
+            return false;
+        }
+
+        public ulong sendAtomic(ref Packet pkt)
+        {
+            Debug.Fail(String.Format("{0} was not expecting a sendAtomic request\n", name()));
+            return 0;
+        }
+
+        public ulong recvAtomic(Packet pkt)
+        {
+            Debug.Fail(String.Format("{0} was not expecting a recvAtomic request\n", name()));
+            return 0;
         }
 
         public void sendReqRetry()
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a sendReqRetry request\n", name()));
         }
 
         public void recvRetryResp()
         {
-            throw new NotImplementedException();
+            Debug.Fail(String.Format("{0} was not expecting a recvRetryResp request\n", name()));
+        }
+
+        public void sendRetryResp()
+        {
+            Debug.Fail(String.Format("{0} was not expecting a sendRetryResp request\n", name()));
         }
     }
 }
