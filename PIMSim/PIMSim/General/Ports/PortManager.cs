@@ -31,6 +31,20 @@ namespace PIMSim.General.Ports
             ports.Add(slp);
 
         }
+        public static void bind(ref InspCPUMasterPort msp, ref InspCPUSlavePort slp)
+        {
+
+
+
+            // bind on the level of the base ports
+            Debug.Assert(!ports.Contains(msp as Port));
+            Debug.Assert(!ports.Contains(slp as Port));
+            msp.bind(ref slp);
+            slp.bind(ref msp);
+            ports.Add(msp);
+            ports.Add(slp);
+
+        }
         public static void bind(ref TraceFetcherMasterPorts msp, ref TraceFetcherSlavePort slp)
         {
 

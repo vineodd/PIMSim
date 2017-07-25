@@ -304,9 +304,12 @@ namespace PIMSim.PIM
 
         public override bool outstanding_requests()
         {
-            return MSHR.Count != 0;
+            return MSHR.Count == 0;
         }
-
+        public override bool done()
+        {
+            return outstanding_requests() && curr_ins.type == InstructionType.NOP;
+        }
         /// <summary>
         /// One cycle of Core.
         /// </summary>
@@ -694,11 +697,18 @@ namespace PIMSim.PIM
                 }
                 else
                 {
-
-                    if (Config.DEBUG_PIM)
-                        DEBUG.Error("-- Receieved a FUNCTION Input.");
-                    Environment.Exit(Error.InputArgsError);
-                    return null;
+                    if (tp is PCTrace)
+                    {
+                        //  return (tp as PCTrace);
+                        return new Instruction();
+                    }
+                    else
+                    {
+                        if (Config.DEBUG_PIM)
+                            DEBUG.Error("-- Receieved a FUNCTION Input.");
+                        Environment.Exit(Error.InputArgsError);
+                        return null;
+                    }
 
                 }
             }

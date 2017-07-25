@@ -26,6 +26,8 @@ namespace PIMSim.General.Protocols
 
         private Address address=0;
 
+        public PacketSource source = PacketSource.None;
+
         /// True if the request targets the secure memory space.
         private bool _isSecure=false;
 
@@ -123,5 +125,14 @@ namespace PIMSim.General.Protocols
             size = _data.Count();
         }
 
+    }
+
+    public enum PacketSource
+    {
+        Insp,
+        CPU,
+        PIMUnit,
+        TraceFetcher,
+        None
     }
 }

@@ -36,7 +36,7 @@ namespace PIMSim.General
         #region Abstract Methods
         public abstract void Step();
 
-        public virtual ulong sendAtomicSnoop(ref Packet pkt)
+        public virtual ulong sendAtomicSnoop(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
@@ -46,7 +46,7 @@ namespace PIMSim.General
             throw new NotImplementedException();
         }
 
-        public virtual bool sendTimingSnoopResp(ref Packet pkt)
+        public virtual bool sendTimingSnoopResp(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
@@ -61,12 +61,12 @@ namespace PIMSim.General
             throw new NotImplementedException();
         }
 
-        public virtual void sendTimingSnoopReq(ref Packet pkt)
+        public virtual void sendTimingSnoopReq(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
 
-        public virtual bool sendFunctionalSnoopResp(ref Packet pkt)
+        public virtual bool sendFunctionalSnoopResp(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
@@ -81,12 +81,12 @@ namespace PIMSim.General
             throw new NotImplementedException();
         }
 
-        public virtual void sendFunctionalSnoopReq(ref Packet pkt)
+        public virtual void sendFunctionalSnoopReq(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
 
-        public virtual bool sendTimingReq(ref Packet pkt)
+        public virtual bool sendTimingReq(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
@@ -96,7 +96,7 @@ namespace PIMSim.General
             throw new NotImplementedException();
         }
 
-        public virtual bool sendTimingResq(ref Packet pkt)
+        public virtual bool sendTimingResq(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
@@ -106,7 +106,7 @@ namespace PIMSim.General
             throw new NotImplementedException();
         }
 
-        public virtual bool sendFunctionalReq(ref Packet pkt)
+        public virtual bool sendFunctionalReq(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
@@ -116,7 +116,7 @@ namespace PIMSim.General
             throw new NotImplementedException();
         }
 
-        public virtual bool sendFunctionalResq(ref Packet pkt)
+        public virtual bool sendFunctionalResq(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }
@@ -126,7 +126,7 @@ namespace PIMSim.General
             throw new NotImplementedException();
         }
 
-        public virtual ulong sendAtomic(ref Packet pkt)
+        public virtual ulong sendAtomic(PacketSource source, ref Packet pkt)
         {
             throw new NotImplementedException();
         }

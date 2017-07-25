@@ -629,5 +629,13 @@ namespace PIMSim.Memory.HMC
             //   hmc.hmcsim_util_decode_bank(dev, bsize, addr, ref bank);
             return 1;
         }
+
+        public override bool done()
+        {
+
+            return  TransationQueue.Count <= 0 && callback.Count() <= 0;
+
+
+        }
     }
 }

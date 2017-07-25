@@ -70,6 +70,16 @@ namespace PIMSim.Procs
 
         #region Public Methods
 
+
+        public static bool done()
+        {
+            bool res = true;
+            for(int i=0;i < send_queue.Count(); i++)
+            {
+                res = res & (send_queue[i].Count() <= 0);
+            }
+            return wait_queue.Count <= 0 && res;
+        }
         /// <summary>
         /// Constructed Function;
         /// </summary>

@@ -66,10 +66,18 @@ namespace PIMSim.PIM
         private static UInt64 total_add = 0;
         private static UInt64 add_failed = 0;
 
-        #endregion 
+        #endregion
 
         #region Public Methods
-
+        public static bool done()
+        {
+            bool res = true;
+            for (int i = 0; i < send_queue.Count(); i++)
+            {
+                res = res & (send_queue[i].Count() <= 0);
+            }
+            return wait_queue.Count <= 0 && res;
+        }
         /// <summary>
         /// Constructed Function;
         /// </summary>

@@ -35,6 +35,8 @@ namespace PIMSim.PIM
                 * GlobalTimer.reference_clock;
 
         public abstract bool outstanding_requests();
+
+        public virtual bool done() { return true; }
     }
    
 }

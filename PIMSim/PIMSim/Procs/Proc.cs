@@ -7,6 +7,11 @@ using PIMSim.Statistics;
 using PIMSim.PIM;
 using mctrl = PIMSim.Procs.Mctrl;
 using PIMSim.Partitioner;
+using PIMSim.General.Ports;
+using PIMSim.General.Protocols;
+using System.Linq;
+
+
 #endregion
 
 namespace PIMSim.Procs
@@ -18,6 +23,7 @@ namespace PIMSim.Procs
     {
         #region Private Variables
 
+        private UInt64 pc = 0;
         /// <summary>
         /// [Private Level 1 Cache]
         /// </summary>
@@ -72,8 +78,6 @@ namespace PIMSim.Procs
         /// [Processor IPC]
         /// </summary>
         private int IPC;
-
-
 
         /// <summary>
         /// [Arithmetic Logic Unit]
@@ -146,6 +150,9 @@ namespace PIMSim.Procs
         #endregion
 
         #region Public Variables
+
+        public InspCPUSlavePort ins_port;
+
 
         /// <summary>
         /// [Process id]
@@ -234,71 +241,10 @@ namespace PIMSim.Procs
             read_callback = new ReadCallBack(handle_read_callback);
             write_callback = new WriteCallBack(handle_write_callback);
 
-
+            ins_port = new InspCPUSlavePort("CPU Insrtuction Cache", PortManager.Allocate());
+            ins_port.owner = this;
         }
 
-
-        public void HandleNewRequest()
-        {
-            curr_ins = null;
-            curr_ins = get_ins_from_insp();
-            curr_req = null;
-            curr_req = new ProcRequest();
-            curr_req.parse_ins(curr_ins);
-        }
-
-
-
-        /// <summary>
-        /// Get instruction from instruction partitioner.
-        /// We assume that host core can only process intructions(Not Functions and InstrcutionBlocks).
-        /// When core encountered a non-instruction, return error.
-        /// </summary>
-        /// <returns>Instruction to be processed. If none, NOP.</returns>
-        public Instruction get_ins_from_insp()
-        {
-            Input tp = ins_p.get_req(this.pid, true);
-
-            //indentify if input is an instruction
-            if (tp is Instruction)
-            {
-                switch ((tp as Instruction).type)
-                {
-                    case InstructionType.READ:
-                        read_reqs++;
-                        break;
-                    case InstructionType.WRITE:
-                        write_reqs++;
-                        break;
-                    case InstructionType.NOP:
-                        nop++;
-                        break;
-                    case InstructionType.CALCULATION:
-                        cal_ins++;
-                        break;
-                    default:
-                        break;
-                }
-                //return instruction
-                if ((tp as Instruction).is_mem)
-                {
-                    (tp as Instruction).block_addr = tlb.scan_page((tp as Instruction).address);
-
-                }
-
-                if (Config.DEBUG_PROC)
-                    DEBUG.WriteLine("-- Current Instruction : " + (tp as Instruction).ToString());
-                return (tp as Instruction);
-            }
-            else
-            {
-                //Host processor can only process Instructions
-                if (Config.DEBUG_PROC)
-                    DEBUG.Error("-- Receieved a none Instrcution Input.");
-                Environment.Exit(Error.InputArgsError);
-                return null;
-            }
-        }
 
         /// <summary>
         /// Add to MSHR
@@ -307,11 +253,11 @@ namespace PIMSim.Procs
         /// <returns>False when MSHR is full; else true.</returns>
         public bool add_to_mshr(ProcRequest req_)
         {
-            if(MSHR.Exists(x => x.actual_addr == req_.actual_addr && x.block_addr == req_.block_addr))
+            if (MSHR.Exists(x => x.actual_addr == req_.actual_addr && x.block_addr == req_.block_addr))
             {
-                for(int i = 0; i < MSHR.Count; i++)
+                for (int i = 0; i < MSHR.Count; i++)
                 {
-                    if(MSHR[i].actual_addr == req_.actual_addr && MSHR[i].block_addr == req_.block_addr)
+                    if (MSHR[i].actual_addr == req_.actual_addr && MSHR[i].block_addr == req_.block_addr)
                     {
                         if (Config.DEBUG_PROC)
                             DEBUG.WriteLine("-- MSHR : Merge Reqs : [" + req_.type + "] [0x" + req_.actual_addr.ToString("X") + "]");
@@ -610,7 +556,8 @@ namespace PIMSim.Procs
 
                     ins_w.add_ins(curr_ins, this.cycle);
                     ins_w.setLast(ready);
-                    HandleNewRequest();
+                     HandleNewRequest();
+                   // Clear();
                     continue;
                 }
                 if (Config.use_cache)
@@ -624,6 +571,7 @@ namespace PIMSim.Procs
                         curr_ins.ready = true;
                         ins_w.add_ins(curr_ins, this.cycle);
                         HandleNewRequest();
+               
                         continue;
                     }
 
@@ -644,6 +592,7 @@ namespace PIMSim.Procs
 
                             add_to_cache(curr_req);
                             HandleNewRequest();
+                           
                             continue;
                         }
                     }
@@ -661,7 +610,7 @@ namespace PIMSim.Procs
                 }
 
                 HandleNewRequest();
-
+      
             }
         }
 
@@ -722,14 +671,99 @@ namespace PIMSim.Procs
 
         public bool outstanding_requests()
         {
-            return MSHR.Count != 0;
+            return MSHR.Count == 0;
         }
 
+
+
+
+
+
+        /// <summary>
+        /// Get instruction from instruction partitioner.
+        /// We assume that host core can only process intructions(Not Functions and InstrcutionBlocks).
+        /// When core encountered a non-instruction, return error.
+        /// </summary>
+        /// <returns>Instruction to be processed. If none, NOP.</returns>
+        public Instruction get_ins_from_insp()
+        {
+            Input tp;
+            if (Config.trace_type == Trace_Type.PC)
+                tp = ins_p.get_req(this.pid, true, this.pc);
+            else
+                tp = ins_p.get_req(this.pid, true);
+
+            //indentify if input is an instruction
+            if (tp is Instruction)
+            {
+                switch ((tp as Instruction).type)
+                {
+                    case InstructionType.READ:
+                        read_reqs++;
+                        break;
+                    case InstructionType.WRITE:
+                        write_reqs++;
+                        break;
+                    case InstructionType.NOP:
+                        nop++;
+                        break;
+                    case InstructionType.CALCULATION:
+                        cal_ins++;
+                        break;
+                    default:
+                        break;
+                }
+                //return instruction
+                if ((tp as Instruction).is_mem)
+                {
+                    (tp as Instruction).block_addr = tlb.scan_page((tp as Instruction).address);
+
+                }
+
+                if (Config.DEBUG_PROC)
+                    DEBUG.WriteLine("-- Current Instruction : " + (tp as Instruction).ToString());
+                return (tp as Instruction);
+            }
+            else
+            {
+                if (tp is PCTrace)
+                {
+
+
+                    pc = (tp as PCTrace).PC-1;
+                    var res = (tp as PCTrace).parsetoIns();
+                    res.block_addr = tlb.scan_page(res.address);
+                    return res;
+
+                }
+                else
+                {
+                    //Host processor can only process Instructions
+                    if (Config.DEBUG_PROC)
+                        DEBUG.Error("-- Receieved a none Instrcution Input.");
+                    Environment.Exit(Error.InputArgsError);
+                    return null;
+                }
+            }
+        }
+        public void HandleNewRequest()
+        {
+            curr_ins = null;
+            curr_ins = get_ins_from_insp();
+            curr_req = null;
+            curr_req = new ProcRequest();
+            curr_req.parse_ins(curr_ins);
+        }
+        public bool done()
+        {
+            return outstanding_requests() && curr_ins.type == InstructionType.NOP;
+        }
         /// <summary>
         /// One cycle of Core.
         /// </summary>
         public override void Step()
         {
+
             cycle++;
             if (Config.DEBUG_PROC)
             {
@@ -737,8 +771,20 @@ namespace PIMSim.Procs
                 DEBUG.WriteLine("----------Host CPU [" + this.pid + "] Update [Cycle " + cycle + "]------------");
                 DEBUG.WriteLine();
             }
-            //reset all restriction
-            reset_restrict();
+            //if (Config.trace_type == Trace_Type.PC)
+            //{
+            //    if (curr_req != null && curr_req.pc > 0 && pc == 0)
+            //        pc = curr_req.pc;
+            //    else
+            //    {
+            //        get_ins_from_insp();
+            //        return;
+            //    }
+            //}
+            /**
+                * Free all the restricts to enable a new round of CPU cycles.
+            **/
+            reset_restrict();   //reset all restriction
 
             //period statics
             if (cycle % Config.proc_static_period == 0 && cycle != 0)
@@ -748,6 +794,8 @@ namespace PIMSim.Procs
 
             //init current request and instruction when cycle 1.
             //otherwise current request and instruction cannot be null.
+           
+
             if (curr_ins == null || curr_req == null)
             {
                 curr_ins = get_ins_from_insp();
@@ -756,32 +804,54 @@ namespace PIMSim.Procs
                 curr_req.parse_ins(curr_ins);
             }
 
+            if (Config.trace_type == Trace_Type.PC)
+            {
+                pc++;
+                Console.WriteLine(pc.ToString("x"));
+                //if (curr_req.type != RequestType.NOP)
+                //{
+                //    if (pc > curr_req.pc)
+                //    {
+                //        pc = curr_req.pc;
+                //    }
+                //}
+            }
+
             if (Config.sim_type == SIM_TYPE.cycle)
             {
                 //simulater has reach max sim cysle,exit
                 if (cycle > Config.sim_cycle) { return; }
             }
-
-            //if no memory operation, insert ins to ALU
-            if (!curr_ins.is_mem)
+            if (Config.trace_type != Trace_Type.PC)
             {
-                //current instruction is an alg ins or NOP
-                while (cal_restrict.WaitOne())
+                
+                /**
+                    * In PC trace mode, CPU only simulates cache and memory 
+                    * behaviours. ALU should be disabled due to the lack of 
+                    * detailed instruction information. Because that the trace 
+                    * file is fetched by physical mechines, which provide 
+                    * the correctness of execution. PIMSim just needs to 
+                    * send memory or cache requests at exact time.
+                **/
+                if (!curr_ins.is_mem)
                 {
-                    if (curr_ins.type == InstructionType.NOP)
+                    //current instruction is an alg ins or NOP
+                    while (cal_restrict.WaitOne())
                     {
-
-                        continue;
-                    }
-                    else
-                    {
-                        alu.add_ins(curr_ins);
+                        if (curr_ins.type == InstructionType.NOP)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            alu.add_ins(curr_ins);
+                        }
                     }
                 }
+
+                alu.Step();
+
             }
-
-            alu.Step();
-
             if (Config.use_cache)
                 handle_cache_req();
             update_ins_w();
@@ -831,26 +901,21 @@ namespace PIMSim.Procs
 
 
                 mem_restrict.WaitOne();
-                curr_ins = null;
-                curr_ins = get_ins_from_insp();
-                curr_req = null;
-                curr_req = new ProcRequest();
-                curr_req.parse_ins(curr_ins);
+                HandleNewRequest();
             }
             if (curr_req.if_mem)
 
                 handle_current_req();
             else
             {
-                curr_ins = null;
-                curr_ins = get_ins_from_insp();
-                curr_req = null;
-                curr_req = new ProcRequest();
-                curr_req.parse_ins(curr_ins);
-
+                HandleNewRequest();
             }
         }
-
+        public void Clear()
+        {
+            curr_ins = null;
+            curr_req = null;
+        }
         /// <summary>
         /// Print Statics.
         /// </summary>

@@ -107,7 +107,9 @@ namespace PIMSim.General
         }
         public void BuildTopology()
         {
-            PortManager.bind(ref trace.port, ref ins_p.data_port);
+            PortManager.bind(ref trace.port, ref ins_p.ins_port);
+            proc.ForEach(x => PortManager.bind(ref ins_p.data_port, ref x.ins_port));
+            
         }
         public void run()
         {
@@ -119,29 +121,31 @@ namespace PIMSim.General
             {
                 trace.Step();
                 ins_p.Step();
-                for (int j = 0; j < Config.N; j++)
-                {
-                    if (GlobalTimer.ifProcStep(j))
-                        proc[j].Step();
-                }
-                Mctrl.Step();
-                PIMMctrl.Step();
                 foreach (var mem in MemorySelector.MemoryInfo)
                 {
                     if (GlobalTimer.ifMemoryStep(0))
                         mem.Item3.Step();
                 }
+                Mctrl.Step();
+                PIMMctrl.Step();
+                for (int j = 0; j < Config.N; j++)
+                {
+                    if (GlobalTimer.ifProcStep(j))
+                        proc[j].Step();
+                }
+
+
                 if (GlobalTimer.ifPIMUnitStep(0))
                     pim.Step();
 
                 if (Config.sim_type == SIM_TYPE.file)
                 {
-                    bool done = false;
-                    done = ins_p.trace_done();
-                    proc.ForEach(x => done = done || x.outstanding_requests());
+                    bool done = true;
+                    proc.ForEach(x => done = done && x.done());
                     if (Config.use_pim)
-                        pim.unit.ForEach(x => done = done || x.outstanding_requests());
-                    if (!done)
+                        pim.unit.ForEach(x => done = done && x.done());
+                    MemorySelector.MemoryInfo.ForEach(x => done = done && x.Item3.done());
+                    if (done & ins_p.trace_done() & Mctrl.done() & PIMMctrl.done())
                         return;
                     
                 }

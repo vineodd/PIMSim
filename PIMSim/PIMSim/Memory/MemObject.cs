@@ -45,6 +45,7 @@ namespace PIMSim.Memory
         /// <param name="proc_"></param>
         //public abstract void attach_proc_return(ref List<Proc> proc_);
 
+        public abstract bool done();
         #endregion
     }
 }

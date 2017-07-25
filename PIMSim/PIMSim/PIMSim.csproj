@@ -52,6 +52,7 @@
     <Compile Include="Events\EventManager.cs" />
     <Compile Include="General\AddressRange.cs" />
     <Compile Include="General\BUSs\BaseBus.cs" />
+    <Compile Include="General\BUSs\Bus.cs" />
     <Compile Include="General\Counter.cs" />
     <Compile Include="General\FlagBit.cs" />
     <Compile Include="General\Inputs\Function.cs" />
@@ -62,6 +63,8 @@
     <Compile Include="General\Maths\GlobalMath.cs" />
     <Compile Include="General\Ports\BaseMasterPort.cs" />
     <Compile Include="General\Ports\BaseSlavePort.cs" />
+    <Compile Include="General\Ports\InspCPUMasterPort.cs" />
+    <Compile Include="General\Ports\InspCPUSlavePort.cs" />
     <Compile Include="General\Ports\MasterPort.cs" />
     <Compile Include="General\Ports\Port.cs" />
     <Compile Include="General\Ports\PortManager.cs" />

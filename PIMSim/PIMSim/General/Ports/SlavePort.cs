@@ -193,13 +193,13 @@ namespace PIMSim.General.Ports
             Debug.Fail(String.Format("{0} was not expecting a recvRangeChange request\n", name()));
         }
 
-        public ulong sendAtomicSnoop(ref Packet pkt)
+        public ulong sendAtomicSnoop(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendAtomicSnoop request\n", name()));
             return 0;
         }
 
-        public bool sendTimingSnoopResp(ref Packet pkt)
+        public bool sendTimingSnoopResp(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendTimingSnoopResp request\n", name()));
             return false;
@@ -211,13 +211,13 @@ namespace PIMSim.General.Ports
             return false;
         }
 
-        public void sendTimingSnoopReq(ref Packet pkt)
+        public void sendTimingSnoopReq(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendTimingSnoopReq request\n", name()));
 
         }
 
-        public bool sendFunctionalSnoopResp(ref Packet pkt)
+        public bool sendFunctionalSnoopResp(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendFunctionalSnoopResp request\n", name()));
             return false;
@@ -234,12 +234,12 @@ namespace PIMSim.General.Ports
             Debug.Fail(String.Format("{0} was not expecting a recvFunctionalSnoopReq request\n", name()));
         }
 
-        public void sendFunctionalSnoopReq(ref Packet pkt)
+        public void sendFunctionalSnoopReq(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendFunctionalSnoopReq request\n", name()));
         }
 
-        public bool sendTimingReq(ref Packet pkt)
+        public bool sendTimingReq(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendTimingReq request\n", name()));
             return false;
@@ -251,13 +251,13 @@ namespace PIMSim.General.Ports
             return false;
         }
 
-        public bool sendTimingResq(ref Packet pkt)
+        public bool sendTimingResq(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendTimingResq request\n", name()));
             return false;
         }
 
-        public bool sendFunctionalReq(ref Packet pkt)
+        public bool sendFunctionalReq(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendFunctionalReq request\n", name()));
             return false;
@@ -269,7 +269,7 @@ namespace PIMSim.General.Ports
             return false;
         }
 
-        public bool sendFunctionalResq(ref Packet pkt)
+        public bool sendFunctionalResq(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendFunctionalResq request\n", name()));
             return false;
@@ -281,7 +281,7 @@ namespace PIMSim.General.Ports
             return false;
         }
 
-        public ulong sendAtomic(ref Packet pkt)
+        public ulong sendAtomic(PacketSource source, ref Packet pkt)
         {
             Debug.Fail(String.Format("{0} was not expecting a sendAtomic request\n", name()));
             return 0;

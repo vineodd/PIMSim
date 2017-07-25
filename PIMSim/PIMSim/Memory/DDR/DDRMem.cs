@@ -222,5 +222,15 @@ namespace PIMSim.Memory.DDR
             memorySystem.channels[(int)channelNumber].memoryController.addressMapping(addr, ref ch, ref ra, ref ba, ref ro, ref co);
             return ba;
         }
+
+        public override bool done()
+        {
+            bool res = TransationQueue.Count <= 0;
+            if (!res)
+                return false;
+
+            return transactionReceiver.pendingReadRequests.Count() <= 0 && transactionReceiver.pendingWriteRequests.Count() <= 0;
+
+        }
     }
 }

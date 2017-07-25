@@ -50,7 +50,9 @@ namespace PIMSim.Partitioner
 
         #endregion
 
-        public TraceFetcherSlavePort data_port;
+        public TraceFetcherSlavePort ins_port;
+
+        public InspCPUMasterPort data_port;
 
         #region Statistics Varibles
         //for statistics
@@ -103,9 +105,10 @@ namespace PIMSim.Partitioner
                 divide_pim_reqs.Add(0);
                 divide_pim_sent.Add(0);
             }
-            data_port = new TraceFetcherSlavePort("Insp Data Port", PortManager.Allocate());
+            ins_port = new TraceFetcherSlavePort("Insp Ins Port", PortManager.Allocate());
+            ins_port.owner = this;
+            data_port = new InspCPUMasterPort("Insp Data Port", PortManager.Allocate());
             data_port.owner = this;
-
         }
 
 
@@ -115,7 +118,7 @@ namespace PIMSim.Partitioner
         /// <param name="pid">pid of unit</param>
         /// <param name="host">true indicates target unit is at host-side. Otherwise at memory-side.</param>
         /// <returns></returns>
-        public Input get_req(int pid, bool host = false)
+        public Input get_req(int pid, bool host = false,UInt64 pc=0)
         {
             if (host)
             {     
@@ -128,38 +131,59 @@ namespace PIMSim.Partitioner
                     return ins;
                 }
                 Input current = all_ins[pid].Peek();
-                if (current.cycle > cycle - 1)
+                if (!(current is PCTrace))
                 {
-                    //not this time
-                    var ins = new Instruction();
-                    divide_host_reqs[pid]++;
-                    divide_host_sent[pid] += ins.Length();
-                    return ins;
+                    if (current.cycle > cycle - 1)
+                    {
+                        //not this time
+                        var ins = new Instruction();
+                        divide_host_reqs[pid]++;
+                        divide_host_sent[pid] += ins.Length();
+                        return ins;
+                    }
+                    else
+                    {
+
+                        if (current.cycle <= cycle - 1)
+                        {
+                            if (current is Function)
+                            {
+                                //procs cannot process functions
+                                Environment.Exit(1);
+                            }
+                            //pop current inputs
+                            all_ins[pid].Dequeue();
+                            divide_host_reqs[pid]++;
+                            divide_host_sent[pid] += current.Length();
+                            return current;
+                        }
+                        else
+                        {
+                            //if program runs into this part, exit in error
+                            if (Config.DEBUG_INSP)
+                                DEBUG.WriteLine("ERROR : ");
+                            Environment.Exit(1);
+                            return null;
+                        }
+                    }
                 }
                 else
                 {
 
-                    if (current.cycle <= cycle - 1)
+                    var peek = all_ins[pid].Peek() as PCTrace;
+                    if (pc == 0 || pc >= peek.PC)
                     {
-                        if (current is Function)
-                        {
-                            //procs cannot process functions
-                            Environment.Exit(1);
-                        }
-                        //pop current inputs
                         all_ins[pid].Dequeue();
-                        divide_host_reqs[pid]++;
-                        divide_host_sent[pid] += current.Length();
-                        return current;
+                        return peek;
                     }
                     else
                     {
-                        //if program runs into this part, exit in error
-                        if (Config.DEBUG_INSP)
-                            DEBUG.WriteLine("ERROR : ");
-                        Environment.Exit(1);
-                        return null;
+                        var ins = new Instruction();
+                        divide_host_reqs[pid]++;
+                        divide_host_sent[pid] += ins.Length();
+                        return ins;
                     }
+
                 }
             }
             else
@@ -209,101 +233,152 @@ namespace PIMSim.Partitioner
             return 0;
         }
 
-        public override bool sendTimingReq(ref Packet pkt)
+        public override bool sendTimingReq(PacketSource destiny, ref Packet pkt)
         {
-            DEBUG.Assert(pkt.isRequest() && pkt.isRead());
-            pkt.ts_departure = GlobalTimer.tick;
-            data_port._masterPort.addPacket(pkt);
-            return true;
+            switch (destiny)
+            {
+                case PacketSource.TraceFetcher:
+                    DEBUG.Assert(pkt.isRequest() && pkt.isRead());
+                    pkt.ts_departure = GlobalTimer.tick;
+                    ins_port._masterPort.addPacket(pkt);
+                    return true;
+                default:
+                    return false;
+            }
+            
         }
-        public bool sendTimeingReq(int dst)
-        {
-            var pkt = buildRequest(dst);
-            pkt.linkDelay = Config.linkdelay_insp_to_tracetetcher;
-            return sendTimingReq(ref pkt);
-        }
-        public override bool sendFunctionalReq(ref Packet pkt)
-        {
-            DEBUG.Assert(pkt.isRequest() && pkt.isRead());
-            pkt.ts_departure = GlobalTimer.tick;
-            data_port._masterPort.recvFunctionalReq(pkt);
-            return true;
-        }
-        public bool sendFunctionalReq(int dst)
-        {
-            var pkt = buildRequest(dst);
-            return sendFunctionalReq(ref pkt);
-        }
-        public Packet buildRequest(int dst)
-        {
-            Packet pkt = new Packet(CMD.ReadReq);
-            pkt.BuildData(dst);
-            return pkt;
 
+
+
+
+
+        public bool sendTimingReq(int dst,PacketSource destiny)
+        {
+            var pkt = buildTracerRequest(dst, destiny);
+            pkt.linkDelay = Config.linkdelay_insp_to_tracetetcher;
+            return sendTimingReq(destiny, ref pkt);
+        }
+        public override bool sendFunctionalReq(PacketSource destiny, ref Packet pkt)
+        {
+            switch (destiny)
+            {
+                case PacketSource.TraceFetcher:
+                    DEBUG.Assert(pkt.isRequest() && pkt.isRead());
+                    pkt.ts_departure = GlobalTimer.tick;
+                    ins_port._masterPort.recvFunctionalReq(pkt);
+                    return true;
+                default:
+                    return false;
+            }
+            
+        }
+        public bool sendFunctionalReq(int dst, PacketSource destiny)
+        {
+            var pkt = buildTracerRequest(dst, destiny);
+            return sendFunctionalReq(destiny, ref pkt);
+        }
+        public Packet buildTracerRequest(int dst,PacketSource destiny )
+        {
+            switch (destiny)
+            {
+                case PacketSource.TraceFetcher:
+                    Packet pkt = new Packet(CMD.ReadReq);
+                    pkt.source = PacketSource.Insp;
+                    pkt.BuildData(dst);
+                    return pkt;
+
+                default:
+                    return null;
+            } 
         }
 
         public override bool recvFunctionalResp(Packet pkt)
         {
-            Input to_add = (Input)SerializationHelper.DeserializeObject(pkt.ReadData());
-            if (to_add is Instruction)
+            switch (pkt.source)
             {
-                if ((to_add as Instruction).type != InstructionType.EOF)
-                {
-                    if (!(to_add as Instruction).pim)
-                        all_ins[(to_add as Instruction).pid].Enqueue(to_add);
+                case PacketSource.TraceFetcher:
+                    pkt.ts_issue = GlobalTimer.tick;
+                    Input to_add = (Input)SerializationHelper.DeserializeObject(pkt.ReadData());
+                    if (to_add is Instruction )
+                    {
+                        if ((to_add as Instruction).type != InstructionType.EOF)
+                        {
+                            if (!(to_add as Instruction).pim)
+                                all_ins[(to_add as Instruction).pid].Enqueue(to_add);
+                            else
+                            {
+                                pim_ins[corresponding_unit(null)].Enqueue(to_add);
+                            }
+                            to_add = null;
+                        }
+                        else
+                        {
+                            eof[(to_add as Instruction).pid] = true;
+                        }
+                    }
                     else
                     {
-                        pim_ins[corresponding_unit(null)].Enqueue(to_add);
+                        if (to_add is PCTrace)
+                        {
+                            all_ins[(to_add as PCTrace)._id].Enqueue(to_add);
+                        }
+                        else
+                        {
+                            pim_ins[corresponding_unit(null)].Enqueue(to_add);
+                        }
                     }
-                    to_add = null;
-                }
-                else
-                {
-                    eof[(to_add as Instruction).pid] = true;
-                }
+                    return true;
+
+
+                default:
+                    return false;
             }
-            else
-            {
-                pim_ins[corresponding_unit(null)].Enqueue(to_add);
-            }
-            return true;
         }
 
         public new bool recvTimingResp(Packet pkt)
         {
-            pkt.ts_issue = GlobalTimer.tick;
-            Input to_add = (Input)SerializationHelper.DeserializeObject(pkt.ReadData());
-            if (to_add is Instruction)
+            switch (pkt.source)
             {
-                if ((to_add as Instruction).type != InstructionType.EOF)
-                {
-                    if (!(to_add as Instruction).pim)
-                        all_ins[(to_add as Instruction).pid].Enqueue(to_add);
+                case PacketSource.TraceFetcher:
+                    pkt.ts_issue = GlobalTimer.tick;
+                    Input to_add = (Input)SerializationHelper.DeserializeObject(pkt.ReadData());
+                    if (to_add is Instruction)
+                    {
+                        if ((to_add as Instruction).type != InstructionType.EOF)
+                        {
+                            if (!(to_add as Instruction).pim)
+                                all_ins[(to_add as Instruction).pid].Enqueue(to_add);
+                            else
+                            {
+                                pim_ins[corresponding_unit(null)].Enqueue(to_add);
+                            }
+                            to_add = null;
+                        }
+                        else
+                        {
+                            eof[(to_add as Instruction).pid] = true;
+                        }
+                    }
                     else
                     {
                         pim_ins[corresponding_unit(null)].Enqueue(to_add);
                     }
-                    to_add = null;
-                }
-                else
-                {
-                    eof[(to_add as Instruction).pid] = true;
-                }
+                    return true;
+
+                
+                default:
+                    return false;
             }
-            else
-            {
-                pim_ins[corresponding_unit(null)].Enqueue(to_add);
-            }
-            return true;
+            
         }
         public void ServeBuffer()
         {
-            if (data_port.buffer.Count() > 0)
+            if (ins_port.buffer.Count() > 0)
             {
-                var packets = data_port.buffer.Where(x => x.Item1 + x.Item2.linkDelay <= GlobalTimer.tick).ToList();
+                var packets = ins_port.buffer.Where(x => x.Item1 + x.Item2.linkDelay <= GlobalTimer.tick).ToList();
                 if (packets.Count() > 0)
                 {
-                    packets.ForEach(x => { recvTimingResp(x.Item2); data_port.buffer.Remove(x); });
+                    packets.ForEach(x => { recvTimingResp(x.Item2); ins_port.buffer.Remove(x); });
                     
                 }
             }
@@ -328,8 +403,8 @@ namespace PIMSim.Partitioner
                             //input waitting queue is full
                             continue;
                         }
-                        sendTimeingReq(i);
-                       // sendFunctionalReq(i);
+                      //  sendTimingReq(i, PacketSource.TraceFetcher);
+                        sendFunctionalReq(i,PacketSource.TraceFetcher);
                     }
                 }
             }
@@ -339,7 +414,25 @@ namespace PIMSim.Partitioner
 
         public bool trace_done()
         {
-            return !eof.Aggregate((i, j) => i && j);
+            bool res = true;
+            for(int i = 0; i < eof.Count(); i++)
+            {
+                res = res & eof[i];
+            }
+            if (!res)
+                return false;
+            for(int i = 0; i < all_ins.Count(); i++)
+            {
+                res = res & (all_ins[i].Count <= 0);
+            }
+            if (!res)
+                return false;
+            for (int i = 0; i < pim_ins.Count(); i++)
+            {
+                res = res & (pim_ins[i].Count <= 0);
+            }
+            return res;
+          //  return !eof.Aggregate((i, j) => i && j);
         }
 
         /// <summary>

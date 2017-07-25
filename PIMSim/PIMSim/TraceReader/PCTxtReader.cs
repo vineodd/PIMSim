@@ -26,7 +26,7 @@ namespace PIMSim.TraceReader
                     continue;
                 if (currentline.Contains(";"))
                     currentline = currentline.Substring(0, currentline.IndexOf(";") + 1);
-                return new PCTrace(currentline);
+                return new PCTrace(currentline, pid_);
 
             }
         }
