@@ -12,7 +12,7 @@ PIMSim provides simulation of Process-In-Memory(PIM) and applies to the followin
     + Researchers who want to build new PIM designs.
     + Programmers who want to discover the potential of PIM architecture.
 
-PIMSim can provide following experimental statistics information:
+PIMSim can provide following experimental statistics:
 
     + PIM
      --Speed up while applying new PIM designs
@@ -46,10 +46,20 @@ If you want to know the internal bandwidth of PIM or the detailed off-chip traff
 
 3.1    Prepare input traces.
 
-PIMSim is a trace-based simulator. All the trace filename should be “ CPUx.trace ” (x indicate the id of CPU, or you can customize your own inputs). Detailed trace input is aim to get detailed simulation of instructions and cycles. General trace input is designed for best simulation speed and the situations that only cares about memory behaviors. The traces can be fetched by either running programs on full-system simulator or dynamic program analysis tools on physical machines. For each trace line, it should provide cycle, instruction, [read/write], [Data], [Address]. The square bracket mean this information can be null.
+PIMSim is a trace-based simulator. All the trace filename should be “ CPUx.trace ” (x indicate the id of CPU, or you can customize your own inputs). Currently, PIMSim supports two types of traces: Detailed trace input and PC-based trace input. Detailed trace input is aim to get detailed simulation of instructions and cycles. PC-based trace input is designed for best simulation speed and the situations that only cares about memory behaviors. The traces can be fetched by either running programs on full-system simulator or dynamic program analysis tools on physical machines. The formats of trace line are listed below:
 
-Input trace format：
+3.1.1 Trace Formation
 
+PC-Based trace input:
+    
+    [64bits PC] [64bits memory access address(first bit 0: Read,   first bit 1: Write]
+    7f8a8af36ff6 7f8a8b154b80
+    7f8a8af36ffd 80007f8a8b154cd8
+    7f8a8af37007 7f8a8b154fb8
+
+Detailed trace format：
+
+      [cycle]|[instruction]|[read/write]|[data]|[address]
       0|ld t1, SS:[rsp]|R|D=0x0000000000000001 A=0x7de145ffee20
       1|addi rsp, rsp, 0x8
       2|ld t1, SS:[rsp]|R|D=0x0000000000000001 A=0x024ee20
@@ -58,7 +68,12 @@ Input trace format：
       6|and rsp, rsp, t1
       7|st rax, SS:[rsp + 0xffdfff8]|W|D=0x0000000000000000 A=0x04fee18
 
-There are four input labels are applied to indicate target operation is executed at memory-side:
+
+3.1.2 PIM Partition methods
+
+In PC-Based trace input, you can customize your PIM kernal PC (start pc and end pc) in config files.
+
+In Detailed trace input, there are four input labels are applied to indicate target operation is executed at memory-side:
 
 a.    You can use “PIM_Operation” to indicate that this instruction should be executed in memory-side units, like this :
 
@@ -92,8 +107,19 @@ d.	You can customize your own PIM operation policy by modifying PIMConfigs.cs. F
 
 PIMSim has two kinds of configuration inputs: PIM settings and RAM settings. For PIM settings, you can attach them by PIMConfig Class in "/Configs/PIMConfigs.cs". For RAM settings, we modified and integrate HMCSim (https://github.com/tactcomplabs/gc64-hmcsim) and DRAMSim2 (https://github.com/dramninjasUMD/DRAMSim2) to adapt PIM Simulation. If you need simulate HMC or DRAM (or both of them), you should provide configure files of them. Detailed document of HMCSIM and DRAMSim2 can be found on their GitHub. In the future, we'll add more new memory simulations such as NVM, Memristor and so on.
 
+3.3 How to get Detailed PIM kernal addresses?
 
-3.3   Building PIMSim
+You can use three methods to get detailed PIM kernal information:
+
+    + Instruction Instrumentation Tool 
+        Pintool (https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool) 
+    + Performance Profiler
+        OProfile (http://oprofile.sourceforge.net/news/) 
+        VTune (https://software.intel.com/en-us/intel-vtune-amplifier-xe/)
+    + Hardware Profiler
+        HMTT (http://asg.ict.ac.cn/hmtt/)
+
+3.4   Building PIMSim
 
 To build PIMSim, you can locate the root folder of PIMSim and type:
 
@@ -104,7 +130,7 @@ To clean the previous buildings, you can type:
       $make clean
 
 
-3.4   Running PIMSim
+3.5   Running PIMSim
 
 You can run PIMSim by providing such paramaters:
 
