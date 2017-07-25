@@ -194,7 +194,7 @@ namespace PIMSim.Memory.HMC
                 default:
                     /* normal response, just return */
                     return;
-                    break;
+                   
             }
         }
         public UInt32 hmcsim_cmc_rawtoidx(UInt32 raw)

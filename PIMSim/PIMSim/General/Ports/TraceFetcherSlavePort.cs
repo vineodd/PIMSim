@@ -43,14 +43,14 @@ namespace PIMSim.General.Ports
         }
 
 
-        public new bool sendTimingReq(ref Packet pkt)
+        public bool sendTimingReq(ref Packet pkt)
         {
             Debug.Assert(pkt.isRequest() && pkt.isRead());
             pkt.ts_departure = GlobalTimer.tick;
             _masterPort.addPacket(pkt);
             return true;
         }
-        public new bool sendFunctionalReq(ref Packet pkt)
+        public bool sendFunctionalReq(ref Packet pkt)
         {
             Debug.Assert(pkt.isRequest() && pkt.isRead());
             pkt.ts_departure = GlobalTimer.tick;

@@ -37,10 +37,6 @@ namespace PIMSim.Partitioner
         /// </summary>
         private List<Queue<Input>> pim_ins;
 
-        /// <summary>
-        /// Attached TraceFetcher 
-        /// </summary>
-        private TraceFetcher trace;
 
         /// <summary>
         /// End of file flag list.
@@ -221,6 +217,7 @@ namespace PIMSim.Partitioner
             }
           
         }
+
         /// <summary>
         /// Link input with corresponding PIM units.
         /// You can modify it by names, pids.
@@ -249,9 +246,6 @@ namespace PIMSim.Partitioner
         }
 
 
-
-
-
         public bool sendTimingReq(int dst,PacketSource destiny)
         {
             var pkt = buildTracerRequest(dst, destiny);
@@ -277,6 +271,7 @@ namespace PIMSim.Partitioner
             var pkt = buildTracerRequest(dst, destiny);
             return sendFunctionalReq(destiny, ref pkt);
         }
+
         public Packet buildTracerRequest(int dst,PacketSource destiny )
         {
             switch (destiny)
@@ -371,6 +366,10 @@ namespace PIMSim.Partitioner
             }
             
         }
+
+        /// <summary>
+        /// Serve buffer
+        /// </summary>
         public void ServeBuffer()
         {
             if (ins_port.buffer.Count() > 0)
@@ -390,30 +389,59 @@ namespace PIMSim.Partitioner
         public override void Step()
         {
             cycle++;
-            ServeBuffer();
+            PartitionMethod();
+        }
+        /// <summary>
+        /// Replace or achieve your own partion methods here.
+        /// </summary>
+        public void PartitionMethod()
+        {
+            /**
+            *   The default partition methods is to identify the PIM_ label
+            *   marked in the trace file. We use two lists to store trace 
+            *   inputs :
+            *       all_ins is the host-side processors input queues.
+            *       pim_ins is the memory-side input queues.
+            **/
+
+            /**
+            *   ServeBuffer here is to process timing responses sent by 
+            *   TraceFetcher. We use a queue to store inputs temporarily.
+            *
+            *   Need not while using functional mode.
+            **/
+            //ServeBuffer();
+
             for (int i = 0; i < Config.N; i++)
             {
                 for (int j = 0; j < Config.IPC; j++)
                 {
                     if (!eof[i])
                     {
-                        //not running out of traces.
+                        //run until out of traces.
                         if (all_ins[i].Count() >= Config.max_insp_waitting_queue)
                         {
-                            //input waitting queue is full
+                            //input waitting queue is full.
+                            //avoid the memory occupation.
                             continue;
                         }
-                      //  sendTimingReq(i, PacketSource.TraceFetcher);
-                        sendFunctionalReq(i,PacketSource.TraceFetcher);
+
+                        //sendTimingReq(i, PacketSource.TraceFetcher);
+                        sendFunctionalReq(i, PacketSource.TraceFetcher);
                     }
                 }
             }
-
-
         }
 
-        public bool trace_done()
+        /// <summary>
+        /// Indicate whether we've already processed every input traces.
+        /// </summary>
+        /// <returns> true when all the inputs were processed.</returns>
+        public bool done()
         {
+            /**
+            *   Make sure each queue is empty and all the eof flag is set.
+            **/
             bool res = true;
             for(int i = 0; i < eof.Count(); i++)
             {
@@ -432,7 +460,8 @@ namespace PIMSim.Partitioner
                 res = res & (pim_ins[i].Count <= 0);
             }
             return res;
-          //  return !eof.Aggregate((i, j) => i && j);
+            //
+            //return !eof.Aggregate((i, j) => i && j);
         }
 
         /// <summary>

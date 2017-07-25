@@ -31,35 +31,9 @@ namespace PIMSim.General.Ports
             _slavePort = null;
         }
 
-        public new bool recvFunctionalReq(Packet pkt)
-        {
-            Debug.Assert(owner != null);
-            Debug.Assert(pkt.isRead() && pkt.isRequest());
-            return (owner as InsPartition).recvFunctionalReq(pkt);
-        }
-        public new bool recvTimingReq(Packet pkt)
-        {
-            Debug.Assert(owner != null);
-            Debug.Assert(pkt.isRead() && pkt.isRequest());
-            addPacket(pkt);
-            return true;
-        }
+  
 
-        public new bool sendFunctionalResq(ref Packet pkt)
-        {
-            Debug.Assert(owner != null);
-            Debug.Assert(pkt.hasData() && pkt.isRequest());
-            pkt.ts_departure = GlobalTimer.tick;
-            return _slavePort.recvFunctionalResp(pkt);
-        }
-
-        public new bool sendTimingResq(ref Packet pkt)
-        {
-            Debug.Assert(owner != null);
-            Debug.Assert(pkt.hasData() && pkt.isRequest());
-            pkt.ts_departure = GlobalTimer.tick;
-            return _slavePort.recvTimingResp(pkt);
-        }
+       
 
     }
 }

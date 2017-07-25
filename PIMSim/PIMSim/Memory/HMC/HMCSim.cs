@@ -1635,7 +1635,7 @@ namespace PIMSim.Memory.HMC
                     break;
                 default:
                     return -1;
-                    break;
+
             }
 
             /*
@@ -2801,14 +2801,14 @@ namespace PIMSim.Memory.HMC
                      *
                      */
                     return Macros.HMC_ERROR;
-                    break;
+
                 case Macros.HMC_REG_RVID:
                     /*
                      * Read-Only
                      *
                      */
                     return Macros.HMC_ERROR;
-                    break;
+
                 default:
                     return -1;
             }
@@ -2894,7 +2894,7 @@ namespace PIMSim.Memory.HMC
                             break;
                         default:
                             return -1;
-                            break;
+
                     }
                 }
                 else if (capacity == 4)
@@ -2916,7 +2916,7 @@ namespace PIMSim.Memory.HMC
                             break;
                         default:
                             return -1;
-                            break;
+                           
                     }
                 }
                 else {
@@ -2949,7 +2949,7 @@ namespace PIMSim.Memory.HMC
                             break;
                         default:
                             return -1;
-                            break;
+                           
                     }
                 }
                 else if (capacity == 8)
@@ -2971,7 +2971,7 @@ namespace PIMSim.Memory.HMC
                             break;
                         default:
                             return -1;
-                            break;
+                            
                     }
                 }
                 else {

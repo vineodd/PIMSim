@@ -553,7 +553,6 @@ namespace PIMSim.Memory.DDR
                     {
                         return false;
                     }
-                    break;
                 case BusPacketType.WRITE:
                 case BusPacketType.WRITE_P:
                     if (bankStates[(int)busPacket.rank][(int)busPacket.bank].currentBankState == CurrentBankState.RowActive &&
@@ -567,7 +566,6 @@ namespace PIMSim.Memory.DDR
                     {
                         return false;
                     }
-                    break;
                 case BusPacketType.READ_P:
                 case BusPacketType.READ:
                     if (bankStates[(int)busPacket.rank][(int)busPacket.bank].currentBankState == CurrentBankState. RowActive &&
@@ -581,7 +579,6 @@ namespace PIMSim.Memory.DDR
                     {
                         return false;
                     }
-                    break;
                 case BusPacketType.PRECHARGE:
                     if (bankStates[(int)busPacket.rank][(int)busPacket.bank].currentBankState ==CurrentBankState. RowActive &&
                             currentClockCycle >= bankStates[(int)busPacket.rank][(int)busPacket.bank].nextPrecharge)
@@ -592,7 +589,6 @@ namespace PIMSim.Memory.DDR
                     {
                         return false;
                     }
-                    break;
                 default:
                     if (Config.DEBUG_MEMORY)
                         DEBUG.WriteLine("ERROT == Error - Trying to issue a crazy bus packet type : ");

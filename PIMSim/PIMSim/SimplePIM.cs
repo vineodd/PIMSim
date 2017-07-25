@@ -145,7 +145,7 @@ namespace PIMSim.General
                     if (Config.use_pim)
                         pim.unit.ForEach(x => done = done && x.done());
                     MemorySelector.MemoryInfo.ForEach(x => done = done && x.Item3.done());
-                    if (done & ins_p.trace_done() & Mctrl.done() & PIMMctrl.done())
+                    if (done & ins_p.done() & Mctrl.done() & PIMMctrl.done())
                         return;
                     
                 }

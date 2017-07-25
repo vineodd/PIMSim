@@ -38,20 +38,7 @@ namespace PIMSim.General.Ports
             _masterPort = null;
         }
 
-        public new bool sendTimingReq(ref Packet pkt)
-        {
-            Debug.Assert(pkt.isRequest() && pkt.isRead());
-            pkt.ts_departure = GlobalTimer.tick;
-            _masterPort.addPacket(pkt);
-            return true;
-        }
-        public new bool sendFunctionalReq(ref Packet pkt)
-        {
-            Debug.Assert(pkt.isRequest() && pkt.isRead());
-            pkt.ts_departure = GlobalTimer.tick;
-            return _masterPort.recvFunctionalReq(pkt);
-        }
-
+      
         public new bool recvFunctionalResp(Packet pkt)
         {
             Debug.Assert(pkt.isRequest() && pkt.isResponse());
