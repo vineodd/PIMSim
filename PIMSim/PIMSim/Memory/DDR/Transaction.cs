@@ -206,9 +206,9 @@ namespace PIMSim.Memory.DDR
             {
                 if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
                 {
-                    foreach (var pimproc in (callback.getsource() as List<PIMProc>))
+                    foreach (var pimproc in (callback.getsource() as List<ComputationalUnit>))
                     {
-                        pimproc.read_callback(callback);
+                        (pimproc as PIMProc).read_callback(callback);
                     }
                     goto endr;
 
@@ -292,9 +292,9 @@ namespace PIMSim.Memory.DDR
                 {
                     if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
                     {
-                        foreach (var pimproc in (callback.getsource() as List<PIMProc>))
+                        foreach (var pimproc in (callback.getsource() as List<ComputationalUnit>))
                         {
-                            pimproc.write_callback(callback);
+                            (pimproc as PIMProc).write_callback(callback);
                         }
 
                         goto endw;

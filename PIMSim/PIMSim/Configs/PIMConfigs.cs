@@ -211,11 +211,19 @@ namespace PIMSim.Configs
                     }
                     continue;
                 }
+                if ((split[0] == "PIM_Kernal"))
+                {
+                    string split_method = split[1].Replace("(", ""); 
+                    var kernal = split_method.Split(')').ToList().Where(x=>x!="").ToList();
+                    kernal.ForEach(x => { var st = x.Split(',').ToList();  PIM_kernal.Add(new AddressRange(Convert.ToUInt64(st[0], 16), Convert.ToUInt64(st[1], 16))); });
+                    continue;
+                }
                 SetValue(split[0], split[1]);
 
             }
             sr.Close();
             fs.Close();
+            Calulate_CacheSize();
         }
 
         /// <summary>
@@ -234,6 +242,24 @@ namespace PIMSim.Configs
             catch 
             {
                 DEBUG.WriteLine("WARNING: Failed to set Parms:" + name + " = " + value.ToString() + ", plz check if necessary.");
+                return false;
+            }
+            return true;
+        }
+        public static bool Calulate_CacheSize()
+        {
+            try
+            {
+
+                if (use_l1_cache)
+                {
+                    l1cache_size = 1 << max_l1cache_bit;
+                }
+            }
+            catch
+            {
+                DEBUG.WriteLine("ERROR : Faield to set $ and block size.");
+                Environment.Exit(1);    //exit code 1: config set failed
                 return false;
             }
             return true;

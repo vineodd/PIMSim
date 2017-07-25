@@ -23,7 +23,7 @@ namespace PIMSim.PIM
     public class PIMProc : ComputationalUnit
     {
         #region Private Variables
-
+        private UInt64 pc = 0;
         /// <summary>
         /// [Private Level 1 Cache]
         /// </summary>
@@ -51,7 +51,7 @@ namespace PIMSim.PIM
         /// </summary>
         private int IPC;
 
-
+        private bool started = false;
 
         /// <summary>
         /// [Arithmetic Logic Unit]
@@ -337,37 +337,60 @@ namespace PIMSim.PIM
             if (curr_ins == null || curr_req == null)
             {
                 curr_ins = get_ins_from_insp();
+                if (!started)
+                {
+                    if (curr_ins.type == InstructionType.NOP)
+                    {
+                            return;
+                    }
+                    else
+                    {
+                        started = true;
+                    }
+                }
                 if (curr_req == null)
                     curr_req = new ProcRequest();
                 curr_req.parse_ins(curr_ins);
             }
-
+            if (Config.trace_type == Trace_Type.PC)
+            {
+                pc++;
+                Console.WriteLine(pc.ToString("x"));
+                //if (curr_req.type != RequestType.NOP)
+                //{
+                //    if (pc > curr_req.pc)
+                //    {
+                //        pc = curr_req.pc;
+                //    }
+                //}
+            }
             if (Config.sim_type == SIM_TYPE.cycle)
             {
                 //simulater has reach max sim cysle,exit
                 if (cycle > Config.sim_cycle) { return; }
             }
-
-            //if no memory operation, insert ins to ALU
-            if (!curr_ins.is_mem)       
+            if (Config.trace_type != Trace_Type.PC)
             {
-                //current instruction is an alg ins or NOP
-                while (cal_restrict.WaitOne())
+                //if no memory operation, insert ins to ALU
+                if (!curr_ins.is_mem)
                 {
-                    if (curr_ins.type == InstructionType.NOP)
+                    //current instruction is an alg ins or NOP
+                    while (cal_restrict.WaitOne())
                     {
-                        continue;
-                    }
-                    else
-                    {
+                        if (curr_ins.type == InstructionType.NOP)
+                        {
+                            continue;
+                        }
+                        else
+                        {
 
-                        alu.add_ins(curr_ins);
+                            alu.add_ins(curr_ins);
 
+                        }
                     }
                 }
+                alu.Step();
             }
-            alu.Step();
-
             if (PIMConfigs.use_l1_cache)
                 handle_cache_req();
 
@@ -645,7 +668,11 @@ namespace PIMSim.PIM
                 }
             }
 
-            Input tp = ins_p.get_req(this.pid, false);
+            Input tp;
+            if (Config.trace_type == Trace_Type.PC)
+                tp = ins_p.get_req(this.pid, false, this.pc);
+            else
+                tp = ins_p.get_req(this.pid, false);
             if (tp is Instruction)
             {
                 switch ((tp as Instruction).type)
@@ -699,8 +726,10 @@ namespace PIMSim.PIM
                 {
                     if (tp is PCTrace)
                     {
-                        //  return (tp as PCTrace);
-                        return new Instruction();
+                        pc = (tp as PCTrace).PC - 1;
+                        var res = (tp as PCTrace).parsetoIns();
+                        res.block_addr = tlb.scan_page(res.address);
+                        return res;
                     }
                     else
                     {
@@ -737,7 +766,7 @@ namespace PIMSim.PIM
                 }
                 bandwidth_bit = bandwidth_bit + PIMConfigs.l1_cacheline_size * 8;
             }
-            
+            Coherence.spin_lock.relese_lock(callback.address);
         }
 
         /// <summary>
@@ -763,7 +792,10 @@ namespace PIMSim.PIM
                 }
                 bandwidth_bit = bandwidth_bit + PIMConfigs.l1_cacheline_size * 8;
             }
-            
+
+            Coherence.spin_lock.relese_lock(callback.address);
+
+
         }
 
         /// <summary>

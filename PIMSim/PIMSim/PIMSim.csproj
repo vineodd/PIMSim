@@ -169,15 +169,17 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Docs\document.docx" />
-    <None Include="examples\1cpu1pu_function\config.ini" />
-    <None Include="examples\1cpu1pu_function\CPU0.trace" />
-    <None Include="examples\1cpu1pu_function\DRAM.ini" />
-    <None Include="examples\1cpu1pu_function\hmc_config.ini" />
-    <None Include="examples\1cpu1pu_function\PIM_Settings.ini" />
+    <None Include="examples\1cpu1pu_function_detail\config.ini" />
+    <None Include="examples\1cpu1pu_function_detail\CPU0.trace" />
+    <None Include="examples\1cpu1pu_function_detail\DRAM.ini" />
+    <None Include="examples\1cpu1pu_function_detail\hmc_config.ini" />
+    <None Include="examples\1cpu1pu_function_detail\PIM_Settings.ini" />
+    <None Include="examples\1cpu_1pu_cpu_pc\config.ini" />
+    <None Include="examples\1cpu_1pu_cpu_pc\CPU0.trace" />
+    <None Include="examples\1cpu_1pu_cpu_pc\DRAM.ini" />
+    <None Include="examples\1cpu_1pu_cpu_pc\hmc_config.ini" />
+    <None Include="examples\1cpu_1pu_cpu_pc\PIM_Settings.ini" />
     <None Include="Makefile" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Docs\ClassDiagram.png" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

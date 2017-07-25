@@ -507,9 +507,9 @@ namespace PIMSim.Memory.HMC
                             {
                                 if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
                                 {
-                                    foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                    foreach (var pimproc in (callback[item].Item2.getsource() as List<ComputationalUnit>))
                                     {
-                                        pimproc.read_callback(callback[item].Item2);
+                                        (pimproc as PIMProc).read_callback(callback[item].Item2);
                                     }
 
 
@@ -555,9 +555,9 @@ namespace PIMSim.Memory.HMC
                                     {
                                         if (PIMConfigs.unit_type == PIM_Unit_Type.Processors)
                                         {
-                                            foreach (var pimproc in (callback[item].Item2.getsource() as List<PIMProc>))
+                                            foreach (var pimproc in (callback[item].Item2.getsource() as List<ComputationalUnit>))
                                             {
-                                                pimproc.write_callback(callback[item].Item2);
+                                               ( pimproc as PIMProc).write_callback(callback[item].Item2);
                                             }
 
 

@@ -190,28 +190,47 @@ namespace PIMSim.Partitioner
                     return new Instruction();
                 }
                 Input current = pim_ins[pid].Peek();
-                if (current.cycle > cycle - 1)
+                if (!(current is PCTrace))
                 {
-                    //when pim queue has no reqs, nothing is sent to PIM.
-                    return new Instruction();
-                }
-                else
-                {
-                    if (current.cycle <= cycle - 1)
+                    if (current.cycle > cycle - 1)
                     {
-
-                        pim_ins[pid].Dequeue();
-                        divide_pim_reqs[pid]++;
-                        divide_pim_sent[pid] += current.Length();
-                        return current;
+                        //when pim queue has no reqs, nothing is sent to PIM.
+                        return new Instruction();
                     }
                     else
                     {
-                        //if program runs into this part, exit in error
-                        if (Config.DEBUG_INSP)
-                            DEBUG.WriteLine("ERROR : ");
-                        Environment.Exit(1);
-                        return null;
+                        if (current.cycle <= cycle - 1)
+                        {
+
+                            pim_ins[pid].Dequeue();
+                            divide_pim_reqs[pid]++;
+                            divide_pim_sent[pid] += current.Length();
+                            return current;
+                        }
+                        else
+                        {
+                            //if program runs into this part, exit in error
+                            if (Config.DEBUG_INSP)
+                                DEBUG.WriteLine("ERROR : ");
+                            Environment.Exit(1);
+                            return null;
+                        }
+                    }
+                }
+                else
+                {
+                    var peek = pim_ins[pid].Peek() as PCTrace;
+                    if (pc == 0 || pc >= peek.PC)
+                    {
+                        pim_ins[pid].Dequeue();
+                        return peek;
+                    }
+                    else
+                    {
+                        var ins = new Instruction();
+                        divide_host_reqs[pid]++;
+                        divide_host_sent[pid] += ins.Length();
+                        return ins;
                     }
                 }
             }
@@ -315,7 +334,12 @@ namespace PIMSim.Partitioner
                     {
                         if (to_add is PCTrace)
                         {
-                            all_ins[(to_add as PCTrace)._id].Enqueue(to_add);
+                            bool contain = false;
+                            PIMConfigs.PIM_kernal.ForEach(x => { if (x.contains((to_add as PCTrace).PC)) contain = true; });
+                            if(contain)
+                                pim_ins[(to_add as PCTrace)._id].Enqueue(to_add);
+                            else
+                                all_ins[(to_add as PCTrace)._id].Enqueue(to_add);
                         }
                         else
                         {

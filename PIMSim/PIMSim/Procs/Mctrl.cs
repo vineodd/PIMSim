@@ -139,9 +139,9 @@ namespace PIMSim.Procs
                 return false;
             }
             req_ = send_queue[pid].Peek();
-            req_.pim = pim ? true : false;
+            req_.pim = false;
             if (Config.DEBUG_MTRL)
-                DEBUG.WriteLine("--" + (pim ? "PIM " : "") + " MTRL [" + pid + "] : Push Requests : [" + req_.memtype + "] [0x" + req_.address.ToString("X") + "]");
+                DEBUG.WriteLine("--" + " MTRL [" + pid + "] : Push Requests : [" + req_.memtype + "] [0x" + req_.address.ToString("X") + "]");
             send_queue[pid].Dequeue();
             return true;
         }
@@ -170,19 +170,19 @@ namespace PIMSim.Procs
                         //    DEBUG.WriteLine("-- Use Coherence : [" + Config.pim_config.Consistency_Model.ToString() + "]");
                         if (!Coherence.spin_lock.get_lock_state(peek.actual_addr))
                         {
-                            if (pim)
-                            {
+                            //if (pim)
+                            //{
                           
-                                Coherence.spin_lock.setlock(peek.actual_addr);
+                            //    Coherence.spin_lock.setlock(peek.actual_addr);
 
-                                //when pim units start to perform, flush all relative data in the host core
-                                if (!Coherence.flush(peek.block_addr))
-                                {
-                                    Coherence.spin_lock.relese_lock(peek.actual_addr);
-                                    DEBUG.WriteLine("-- Waiting Host cores flushing data : [0x" + peek.block_addr.ToString("X") + "] [0x" + peek.actual_addr.ToString("X") + "]");
-                                    continue;
-                                }
-                            }
+                            //    //when pim units start to perform, flush all relative data in the host core
+                            //    if (!Coherence.flush(peek.block_addr))
+                            //    {
+                            //        Coherence.spin_lock.relese_lock(peek.actual_addr);
+                            //        DEBUG.WriteLine("-- Waiting Host cores flushing data : [0x" + peek.block_addr.ToString("X") + "] [0x" + peek.actual_addr.ToString("X") + "]");
+                            //        continue;
+                            //    }
+                            //}
                             send_queue[MemorySelector.get_id(wait_queue[i].actual_addr)].Enqueue(transfer(wait_queue[i]));
                             wait_queue.RemoveAt(i);
                             i--;

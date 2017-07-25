@@ -147,19 +147,19 @@ namespace PIMSim.General
          *
          * @return true if interleaved
          */
-        bool interleaved() { return intlvBits != 0; }
+        public bool interleaved() { return intlvBits != 0; }
 
         /**
          * Determine if the range interleaving is hashed or not.
          */
-        bool hashed() { return interleaved() && xorHighBit != 0; }
+        public bool hashed() { return interleaved() && xorHighBit != 0; }
 
         /**
          * Determing the interleaving granularity of the range.
          *
          * @return The size of the regions created by the interleaving bits
          */
-        UInt64 granularity()
+        public UInt64 granularity()
         {
             return (ulong)1 << (intlvHighBit - intlvBits + 1);
         }
@@ -170,14 +170,14 @@ namespace PIMSim.General
          *
          * @return The number of stripes spanned by the interleaving bits
          */
-        UInt32 stripes() { return (uint)1 << intlvBits; }
+        public UInt32 stripes() { return (uint)1 << intlvBits; }
 
         /**
          * Get the size of the address range. For a case where
          * interleaving is used we make the simplifying assumption that
          * the size is a divisible by the size of the interleaving slice.
          */
-        Addr size()
+        public Addr size()
         {
             return (_end - _start + 1) >> intlvBits;
         }
@@ -185,17 +185,17 @@ namespace PIMSim.General
         /**
          * Determine if the range is valid.
          */
-        bool valid() { return _start <= _end; }
+        public bool valid() { return _start <= _end; }
 
         /**
          * Get the start address of the range.
          */
-        Addr start() { return _start; }
+        public Addr start() { return _start; }
 
         /**
          * Get the end address of the range.
          */
-        Addr end() { return _end; }
+        public Addr end() { return _end; }
 
         /**
          * Get a string representation of the range. This could
@@ -234,7 +234,7 @@ namespace PIMSim.General
          * @param r Range to evaluate merging with
          * @return true if the two ranges would merge
          */
-        bool mergesWith(AddressRange r)
+        public bool mergesWith(AddressRange r)
         {
             return r._start == _start && r._end == _end &&
                 r.intlvHighBit == intlvHighBit &&
@@ -250,7 +250,7 @@ namespace PIMSim.General
          * @param r Range to intersect with
          * @return true if the intersection of the two ranges is not empty
          */
-        bool intersects(AddressRange r)
+        public bool intersects(AddressRange r)
         {
             if (_start > r._end || _end < r._start)
                 // start with the simple case of no overlap at all,
@@ -283,7 +283,7 @@ namespace PIMSim.General
          * @param r Range to compare with
          * @return true if the this range is a subset of the other one
          */
-        bool isSubset(AddressRange r)
+        public bool isSubset(AddressRange r)
         {
             if (interleaved())
                 Debug.Fail(String.Format("Cannot test subset of interleaved range %s\n", ToString()));
@@ -296,7 +296,7 @@ namespace PIMSim.General
          * @param a Address to compare with
          * @return true if the address is in the range
          */
-        bool contains(Addr a)
+        public bool contains(Addr a)
         {
             // check if the address is in the range and if there is either
             // no interleaving, or with interleaving also if the selected
@@ -345,7 +345,7 @@ namespace PIMSim.General
          * @param the input address
          * @return the address without the interleaved bits
          */
-        Addr removeIntlvBits(Addr a)
+        public Addr removeIntlvBits(Addr a)
         {
             var intlv_low_bit = intlvHighBit - intlvBits + 1;
             return insertBits(a >> intlvBits, intlv_low_bit - 1, 0, a);
@@ -377,7 +377,7 @@ namespace PIMSim.General
          * @param the input address
          * @return the flat offset in the address range
          */
-        Addr getOffset(Addr a)
+        public Addr getOffset(Addr a)
         {
             bool in_range = a >= _start && a <= _end;
             if (!in_range)
