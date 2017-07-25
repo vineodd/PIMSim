@@ -111,13 +111,13 @@ PIMSim has two kinds of configuration inputs: PIM settings and RAM settings. For
 
 You can use three methods to get detailed PIM kernal information:
 
-    + Instruction Instrumentation Tool 
-        Pintool (https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool) 
+    + Instruction Instrumentation Tool 
+      Pintool (https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool) 
     + Performance Profiler
-        OProfile (http://oprofile.sourceforge.net/news/) 
-        VTune (https://software.intel.com/en-us/intel-vtune-amplifier-xe/)
+      OProfile (http://oprofile.sourceforge.net/news/) 
+      VTune (https://software.intel.com/en-us/intel-vtune-amplifier-xe/)
     + Hardware Profiler
-        HMTT (http://asg.ict.ac.cn/hmtt/)
+      HMTT (http://asg.ict.ac.cn/hmtt/)
 
 3.4   Building PIMSim
 
