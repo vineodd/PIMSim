@@ -33,7 +33,7 @@ Add support to GEM5 full-sytem simulation.
 
 
 
-# More old ones:
+# And older ones:
 
 - [Mapping irregular applications to DIVA, a PIM-based data-intensive architecture](http://dl.acm.org/citation.cfm?id=331589)
 
