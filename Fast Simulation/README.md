@@ -2,7 +2,7 @@
 
 1.	About PIMSim
 
-PIMSim is a trace-based simulator of PIM architecture, which provides both host-side and memory-side simulation. Besides, PIMSim provides high degree of freedom of PIM unit configuration which can be defined by users. PIMSim provides three input types to adapt different simulation demanding. PIMSim aims to support new memory types such as HMC, HBM et.
+PIMSim is a trace-based simulator of PIM architecture, which provides both host-side and memory-side simulation. Besides, PIMSim provides high degree of freedom of PIM unit configuration which can be defined by users. PIMSim provides three input types to adapt different simulation demanding. PIMSim aims to support new memory types such as HMC, HBM et.  
 
 2.  What can PIMSim do?
 
