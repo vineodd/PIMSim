@@ -5,8 +5,11 @@ Add support to GEM5 full-sytem simulation.
 + Add PIM instructions in GEM5.
 + Executable PIM binary compiler.
 + Detailed User Instruction to help you custmize your own PIM system.
-      
       
+# Author
+      Xu Sheng (xusheng02@ict.ac.cn), Yinhe Han 
+      
+      Control Computing Laboratory, State Key Laboratory of Computer Architecture, ICT, CAS.
 # Some recent PIM papers:
 
 - [Buddy-ram: Improving the performance and efficiency of bulk bitwise operations using DRAM](https://arxiv.org/abs/1611.09988) (MICRO 17)
