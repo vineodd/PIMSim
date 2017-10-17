@@ -7,7 +7,7 @@ Add support to GEM5 full-sytem simulation.
 + Detailed User Instruction to help you custmize your own PIM system.
       
       
-Some recent PIM papers:
+# Some recent PIM papers:
 
 - Buddy-ram: Improving the performance and efficiency of bulk bitwise operations using DRAM (MICRO 17)
 
@@ -33,7 +33,7 @@ Some recent PIM papers:
 
 - A scalable processing-in-memory accelerator for parallel graph processing (ISCA 15)
 
-More odd ones:
+# More odd ones:
 
 - Mapping irregular applications to DIVA, a PIM-based data-intensive architecture
 
