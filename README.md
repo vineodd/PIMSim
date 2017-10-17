@@ -33,7 +33,7 @@ Add support to GEM5 full-sytem simulation.
 
 - A scalable processing-in-memory accelerator for parallel graph processing (ISCA 15)
 
-# More odd ones:
+# More old ones:
 
 - Mapping irregular applications to DIVA, a PIM-based data-intensive architecture
 
