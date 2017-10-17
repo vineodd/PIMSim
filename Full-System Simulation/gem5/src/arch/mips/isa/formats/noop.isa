@@ -1,0 +1,139 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2007 MIPS Technologies, Inc.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Korey Sewell
+
+////////////////////////////////////////////////////////////////////
+//
+// Nop
+//
+
+output header {{
+    /**
+     * Static instruction class for no-ops.  This is a leaf class.
+     */
+    class Nop : public MipsStaticInst
+    {
+        /// Disassembly of original instruction.
+        const std::string originalDisassembly;
+
+      public:
+        /// Constructor
+        Nop(const std::string _originalDisassembly, MachInst _machInst)
+            : MipsStaticInst("nop", _machInst, No_OpClass),
+              originalDisassembly(_originalDisassembly)
+        {
+            flags[IsNop] = true;
+        }
+
+        ~Nop() { }
+
+        std::string
+        generateDisassembly(Addr pc, const SymbolTable *symtab) const;
+
+        %(BasicExecDeclare)s
+    };
+}};
+
+output decoder {{
+    std::string Nop::generateDisassembly(Addr pc,
+                                         const SymbolTable *symtab) const
+    {
+        return csprintf("%-10s %s", "nop", originalDisassembly);
+    }
+
+    /// Helper function for decoding nops.  Substitute Nop object
+    /// for original inst passed in as arg (and delete latter).
+    inline
+    MipsStaticInst *
+    makeNop(MipsStaticInst *inst)
+    {
+        std::string nop_str = "(" + inst->disassemble(0) + ")";
+        MipsStaticInst *nop = new Nop(nop_str, inst->machInst);
+        delete inst;
+        return nop;
+    }
+}};
+
+output exec {{
+    Fault
+    Nop::execute(CPU_EXEC_CONTEXT *, Trace::InstRecord *) const
+    {
+        return NoFault;
+    }
+}};
+
+// Int & FP operate instructions use RD as dest, so check for
+// RD == 0 to detect nops
+def template RegNopCheckDecode {{
+ {
+     MipsStaticInst *i = new %(class_name)s(machInst);
+     //if (RD == 0) {
+         //i = makeNop(i);
+         //}
+     return i;
+ }
+}};
+
+def template OperateNopCheckDecode {{
+ {
+     MipsStaticInst *i = new %(class_name)s(machInst);
+     //if (RD == 0) {
+     // i = makeNop(i);
+     //}
+     return i;
+ }
+}};
+
+// IntImm & Memory  instructions use Rt as dest, so check for
+// Rt == 0 to detect nops
+def template ImmNopCheckDecode {{
+ {
+     MipsStaticInst *i = new %(class_name)s(machInst);
+     //if (RT == 0) {
+     // i = makeNop(i);
+     // }
+     return i;
+ }
+}};
+
+
+// Like BasicOperate format, but generates NOP if RC/FC == 31
+def format BasicOperateWithNopCheck(code, *opt_args) {{
+    iop = InstObjParams(name, Name, 'MipsStaticInst', code,
+                        opt_args)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    decode_block = OperateNopCheckDecode.subst(iop)
+    exec_output = BasicExecute.subst(iop)
+}};
+
+def format Nop() {{
+        decode_block = 'return new Nop(\"\",machInst);\n'
+}};
+

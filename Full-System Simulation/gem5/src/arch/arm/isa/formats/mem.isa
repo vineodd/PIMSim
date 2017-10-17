@@ -1,0 +1,1058 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Copyright (c) 2007-2008 The Florida State University
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+def format AddrMode2(imm) {{
+    if eval(imm):
+        imm = True
+    else:
+        imm = False
+
+    def buildPUBWLCase(p, u, b, w, l):
+        return (p << 4) + (u << 3) + (b << 2) + (w << 1) + (l << 0)
+
+    header_output = decoder_output = exec_output = ""
+    decode_block = "switch(PUBWL) {\n"
+
+    # Loop over all the values of p, u, b, w and l and build instructions and
+    # a decode block for them.
+    for p in (0, 1):
+        for u in (0, 1):
+            for b in (0, 1):
+                for w in (0, 1):
+                    post = (p == 0)
+                    user = (p == 0 and w == 1)
+                    writeback = (p == 0 or w == 1)
+                    add = (u == 1)
+                    if b == 0:
+                        size = 4
+                    else:
+                        size = 1
+                    if add:
+                        addStr = "true"
+                    else:
+                        addStr = "false"
+                    if imm:
+                        newDecode = "return new %s(machInst, RD, RN," + \
+                                                  "%s, machInst.immed11_0);"
+                        loadClass = loadImmClassName(post, add, writeback,
+                                                     size, False, user)
+                        storeClass = storeImmClassName(post, add, writeback,
+                                                       size, False, user)
+                        loadDecode = newDecode % (loadClass, addStr)
+                        storeDecode = newDecode % (storeClass, addStr)
+                    else:
+                        newDecode = "return new %s(machInst, RD, RN, %s," + \
+                                                  "machInst.shiftSize," + \
+                                                  "machInst.shift, RM);"
+                        loadClass = loadRegClassName(post, add, writeback,
+                                                     size, False, user)
+                        storeClass = storeRegClassName(post, add, writeback,
+                                                       size, False, user)
+                        loadDecode = newDecode % (loadClass, addStr)
+                        storeDecode = newDecode % (storeClass, addStr)
+                    decode = '''
+                        case %#x:
+                          {%s}
+                          break;
+                    '''
+                    decode_block += decode % \
+                        (buildPUBWLCase(p,u,b,w,1), loadDecode)
+                    decode_block += decode % \
+                        (buildPUBWLCase(p,u,b,w,0), storeDecode)
+    decode_block += '''
+        default:
+          return new Unknown(machInst);
+        break;
+    }'''
+}};
+
+def format AddrMode3() {{
+    decode = '''
+    {
+        const uint32_t op1 = bits(machInst, 24, 20);
+        const uint32_t op2 = bits(machInst, 6, 5);
+        const uint32_t puiw = bits(machInst, 24, 21);
+        const uint32_t imm = IMMED_HI_11_8 << 4 | IMMED_LO_3_0;
+        switch (op2) {
+          case 0x1:
+            if (op1 & 0x1) {
+                %(ldrh)s
+            } else {
+                %(strh)s
+            }
+          case 0x2:
+            if (op1 & 0x1) {
+                %(ldrsb)s
+            } else if ((RT %% 2) == 0) {
+                %(ldrd)s
+            } else {
+                return new Unknown(machInst);
+            }
+          case 0x3:
+            if (op1 & 0x1) {
+                %(ldrsh)s
+            } else {
+                %(strd)s
+            }
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    '''
+
+    def decodePuiwCase(load, d, p, u, i, w, size=4, sign=False):
+        post = (p == 0)
+        user = (p == 0 and w == 1)
+        writeback = (p == 0 or w == 1)
+        add = (u == 1)
+        caseVal = (p << 3) + (u << 2) + (i << 1) + (w << 0)
+        decode = '''
+          case %#x:
+            return new '''% caseVal
+        if add:
+            addStr = "true"
+        else:
+            addStr = "false"
+        if d:
+            dests = "RT & ~1, RT | 1"
+        else:
+            dests = "RT"
+        if i:
+            if load:
+                if d:
+                    className = loadDoubleImmClassName(post, add, writeback)
+                else:
+                    className = loadImmClassName(post, add, writeback, \
+                                                 size=size, sign=sign, \
+                                                 user=user)
+            else:
+                if d:
+                    className = storeDoubleImmClassName(post, add, writeback)
+                else:
+                    className = storeImmClassName(post, add, writeback, \
+                                                  size=size, sign=sign, \
+                                                  user=user)
+            decode += ("%s(machInst, %s, RN, %s, imm);\n" % \
+                       (className, dests, addStr))
+        else:
+            if load:
+                if d:
+                    className = loadDoubleRegClassName(post, add, writeback)
+                else:
+                    className = loadRegClassName(post, add, writeback, \
+                                                 size=size, sign=sign, \
+                                                 user=user)
+            else:
+                if d:
+                    className = storeDoubleRegClassName(post, add, writeback)
+                else:
+                    className = storeRegClassName(post, add, writeback, \
+                                                  size=size, sign=sign, \
+                                                  user=user)
+            decode += ("%s(machInst, %s, RN, %s, 0, LSL, RM);\n" % \
+                       (className, dests, addStr))
+        return decode
+
+    def decodePuiw(load, d, size=4, sign=False):
+        global decodePuiwCase
+        decode = "switch (puiw) {\n"
+        for p in (0, 1):
+            for u in (0, 1):
+                for i in (0, 1):
+                    for w in (0, 1):
+                        decode += decodePuiwCase(load, d, p, u, i, w,
+                                                 size, sign)
+        decode += '''
+          default:
+            return new Unknown(machInst);
+        }
+        '''
+        return decode
+
+    subs = {
+        "ldrh" : decodePuiw(True, False, size=2),
+        "strh" : decodePuiw(False, False, size=2),
+        "ldrsb" : decodePuiw(True, False, size=1, sign=True),
+        "ldrd" : decodePuiw(True, True),
+        "ldrsh" : decodePuiw(True, False, size=2, sign=True),
+        "strd" : decodePuiw(False, True)
+    }
+    decode_block = decode % subs
+}};
+
+def format ArmSyncMem() {{
+    decode_block = '''
+    {
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const IntRegIndex rt = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+        const IntRegIndex rt2 = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        switch (PUBWL) {
+          case 0x10:
+            return new Swp(machInst, rt, rt2, rn);
+          case 0x14:
+            return new Swpb(machInst, rt, rt2, rn);
+          case 0x18:
+            return new %(strex)s(machInst, rt, rt2, rn, true, 0);
+          case 0x19:
+            return new %(ldrex)s(machInst, rt, rn, true, 0);
+          case 0x1a:
+            return new %(strexd)s(machInst, rt, rt2, rt2 + 1, rn, true, 0);
+          case 0x1b:
+            return new %(ldrexd)s(machInst, rt, rt + 1, rn, true, 0);
+          case 0x1c:
+            return new %(strexb)s(machInst, rt, rt2, rn, true, 0);
+          case 0x1d:
+            return new %(ldrexb)s(machInst, rt, rn, true, 0);
+          case 0x1e:
+            return new %(strexh)s(machInst, rt, rt2, rn, true, 0);
+          case 0x1f:
+            return new %(ldrexh)s(machInst, rt, rn, true, 0);
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    ''' % {
+        "ldrex" : "LDREX_" + loadImmClassName(False, True, False, size=4),
+        "ldrexb" : "LDREXB_" + loadImmClassName(False, True, False, size=1),
+        "ldrexh" : "LDREXH_" + loadImmClassName(False, True, False, size=2),
+        "ldrexd" : "LDREXD_" + loadDoubleImmClassName(False, True, False),
+        "strex" : "STREX_" + storeImmClassName(False, True, False, size=4),
+        "strexb" : "STREXB_" + storeImmClassName(False, True, False, size=1),
+        "strexh" : "STREXH_" + storeImmClassName(False, True, False, size=2),
+        "strexd" : "STREXD_" + storeDoubleImmClassName(False, True, False)
+    }
+}};
+
+def format Thumb32SrsRfe() {{
+    decode_block = '''
+    {
+        const bool wb = (bits(machInst, 21) == 1);
+        const bool add = (bits(machInst, 24, 23) == 0x3);
+        if (bits(machInst, 20) == 1) {
+            // post == add
+            const IntRegIndex rn =
+                (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+            if (!add && !wb) {
+                return new %(rfe)s(machInst, rn, RfeOp::DecrementBefore, wb);
+            } else if (add && !wb) {
+                return new %(rfe_u)s(machInst, rn, RfeOp::IncrementAfter, wb);
+            } else if (!add && wb) {
+                return new %(rfe_w)s(machInst, rn, RfeOp::DecrementBefore, wb);
+            } else {
+                return new %(rfe_uw)s(machInst, rn, RfeOp::IncrementAfter, wb);
+            }
+        } else {
+            const uint32_t mode = bits(machInst, 4, 0);
+            if (badMode32((OperatingMode)mode))
+                return new Unknown(machInst);
+            if (!add && !wb) {
+                return new %(srs)s(machInst, mode,
+                        SrsOp::DecrementBefore, wb);
+            } else if (add && !wb) {
+                return new %(srs_u)s(machInst, mode,
+                        SrsOp::IncrementAfter, wb);
+            } else if (!add && wb) {
+                return new %(srs_w)s(machInst, mode,
+                        SrsOp::DecrementBefore, wb);
+            } else {
+                return new %(srs_uw)s(machInst, mode,
+                        SrsOp::IncrementAfter, wb);
+            }
+        }
+    }
+    ''' % {
+        "rfe" : "RFE_" + loadImmClassName(False, False, False, 8),
+        "rfe_u" : "RFE_" + loadImmClassName(True, True, False, 8),
+        "rfe_w" : "RFE_" + loadImmClassName(False, False, True, 8),
+        "rfe_uw" : "RFE_" + loadImmClassName(True, True, True, 8),
+        "srs" : "SRS_" + storeImmClassName(False, False, False, 8),
+        "srs_u" : "SRS_" + storeImmClassName(True, True, False, 8),
+        "srs_w" : "SRS_" + storeImmClassName(False, False, True, 8),
+        "srs_uw" : "SRS_" + storeImmClassName(True, True, True, 8)
+    }
+}};
+
+def format Thumb32LdrStrDExTbh() {{
+    decode_block = '''
+    {
+        const uint32_t op1 = bits(machInst, 24, 23);
+        const uint32_t op2 = bits(machInst, 21, 20);
+        const uint32_t op3 = bits(machInst, 7, 4);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const IntRegIndex rt = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+        const IntRegIndex rt2 = (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        const uint32_t imm8 = bits(machInst, 7, 0);
+        if (bits(op1, 1) == 0 && bits(op2, 1) == 0) {
+            if (op1 == 0) {
+                const uint32_t imm = bits(machInst, 7, 0) << 2;
+                if (op2 == 0) {
+                    return new %(strex)s(machInst, rt2, rt, rn, true, imm);
+                } else {
+                    return new %(ldrex)s(machInst, rt, rn, true, imm);
+                }
+            } else {
+                if (op2 == 0) {
+                    switch (op3) {
+                      case 0x4:
+                        return new %(strexb)s(machInst, rd, rt, rn, true, 0);
+                      case 0x5:
+                        return new %(strexh)s(machInst, rd, rt, rn, true, 0);
+                      case 0x7:
+                        return new %(strexd)s(machInst, rd, rt,
+                                              rt2, rn, true, 0);
+                      default:
+                        return new Unknown(machInst);
+                    }
+                } else {
+                    switch (op3) {
+                      case 0x0:
+                        return new Tbb(machInst, rn, rd);
+                      case 0x1:
+                        return new Tbh(machInst, rn, rd);
+                      case 0x4:
+                        return new %(ldrexb)s(machInst, rt, rn, true, 0);
+                      case 0x5:
+                        return new %(ldrexh)s(machInst, rt, rn, true, 0);
+                      case 0x7:
+                        return new %(ldrexd)s(machInst, rt, rt2, rn, true, 0);
+                      default:
+                        return new Unknown(machInst);
+                    }
+                }
+            }
+        } else {
+            const uint32_t puw = (bits(machInst, 24, 23) << 1) |
+                                  bits(machInst, 21);
+            const uint32_t dimm = imm8 << 2;
+            if (bits(op2, 0) == 0) {
+                switch (puw) {
+                  case 0x1:
+                    return new %(strd_w)s(machInst, rt, rt2, rn, false, dimm);
+                  case 0x3:
+                    return new %(strd_uw)s(machInst, rt, rt2, rn, true, dimm);
+                  case 0x4:
+                    return new %(strd_p)s(machInst, rt, rt2, rn, false, dimm);
+                  case 0x5:
+                    return new %(strd_pw)s(machInst, rt, rt2, rn, false, dimm);
+                  case 0x6:
+                    return new %(strd_pu)s(machInst, rt, rt2, rn, true, dimm);
+                  case 0x7:
+                    return new %(strd_puw)s(machInst, rt, rt2, rn, true, dimm);
+                  default:
+                    return new Unknown(machInst);
+                }
+            } else {
+                switch (puw) {
+                  case 0x1:
+                    return new %(ldrd_w)s(machInst, rt, rt2, rn, false, dimm);
+                  case 0x3:
+                    return new %(ldrd_uw)s(machInst, rt, rt2, rn, true, dimm);
+                  case 0x4:
+                    return new %(ldrd_p)s(machInst, rt, rt2, rn, false, dimm);
+                  case 0x5:
+                    return new %(ldrd_pw)s(machInst, rt, rt2, rn, false, dimm);
+                  case 0x6:
+                    return new %(ldrd_pu)s(machInst, rt, rt2, rn, true, dimm);
+                  case 0x7:
+                    return new %(ldrd_puw)s(machInst, rt, rt2, rn, true, dimm);
+                  default:
+                    return new Unknown(machInst);
+                }
+            }
+        }
+    }
+    ''' % {
+        "ldrex" : "LDREX_" + loadImmClassName(False, True, False, size=4),
+        "ldrexb" : "LDREXB_" + loadImmClassName(False, True, False, size=1),
+        "ldrexh" : "LDREXH_" + loadImmClassName(False, True, False, size=2),
+        "ldrexd" : "LDREXD_" + loadDoubleImmClassName(False, True, False),
+        "strex" : "STREX_" + storeImmClassName(False, True, False, size=4),
+        "strexb" : "STREXB_" + storeImmClassName(False, True, False, size=1),
+        "strexh" : "STREXH_" + storeImmClassName(False, True, False, size=2),
+        "strexd" : "STREXD_" + storeDoubleImmClassName(False, True, False),
+        "ldrd_w" : loadDoubleImmClassName(True, False, True),
+        "ldrd_uw" : loadDoubleImmClassName(True, True, True),
+        "ldrd_p" : loadDoubleImmClassName(False, False, False),
+        "ldrd_pw" : loadDoubleImmClassName(False, False, True),
+        "ldrd_pu" : loadDoubleImmClassName(False, True, False),
+        "ldrd_puw" : loadDoubleImmClassName(False, True, True),
+        "strd_w" : storeDoubleImmClassName(True, False, True),
+        "strd_uw" : storeDoubleImmClassName(True, True, True),
+        "strd_p" : storeDoubleImmClassName(False, False, False),
+        "strd_pw" : storeDoubleImmClassName(False, False, True),
+        "strd_pu" : storeDoubleImmClassName(False, True, False),
+        "strd_puw" : storeDoubleImmClassName(False, True, True)
+    }
+}};
+
+def format Thumb32LoadWord() {{
+    decode = '''
+    {
+        uint32_t op1 = bits(machInst, 24, 23);
+        if (bits(op1, 1) == 0) {
+            uint32_t op2 = bits(machInst, 11, 6);
+            if (HTRN == 0xF) {
+                if (UP) {
+                    return new %(literal_u)s(machInst, RT, INTREG_PC,
+                                             true, IMMED_11_0);
+                } else {
+                    return new %(literal)s(machInst, RT, INTREG_PC,
+                                           false, IMMED_11_0);
+                }
+            } else if (op1 == 0x1) {
+                return new %(imm_pu)s(machInst, RT, RN, true, IMMED_11_0);
+            } else if (op2 == 0) {
+                return new %(register)s(machInst, RT, RN, UP,
+                                        bits(machInst, 5, 4), LSL, RM);
+            } else if ((op2 & 0x3c) == 0x38) {
+                return new %(ldrt)s(machInst, RT, RN, true, IMMED_7_0);
+            } else if ((op2 & 0x3c) == 0x30 || //P
+                       (op2 & 0x24) == 0x24) { //W
+                uint32_t puw = bits(machInst, 10, 8);
+                uint32_t imm = IMMED_7_0;
+                switch (puw) {
+                  case 0:
+                  case 2:
+                    // If we're here, either P or W must have been set.
+                    panic("Neither P or W set, but that "
+                            "shouldn't be possible.\\n");
+                  case 1:
+                    return new %(imm_w)s(machInst, RT, RN, false, imm);
+                  case 3:
+                    return new %(imm_uw)s(machInst, RT, RN, true, imm);
+                  case 4:
+                    return new %(imm_p)s(machInst, RT, RN, false, imm);
+                  case 5:
+                    return new %(imm_pw)s(machInst, RT, RN, false, imm);
+                  case 6:
+                    return new %(imm_pu)s(machInst, RT, RN, true, imm);
+                  case 7:
+                    return new %(imm_puw)s(machInst, RT, RN, true, imm);
+                }
+            }
+        } else {
+            return new Unknown(machInst);
+        }
+    }
+    '''
+    classNames = {
+        "literal_u" : loadImmClassName(False, True, False),
+        "literal" : loadImmClassName(False, False, False),
+        "register" : loadRegClassName(False, True, False),
+        "ldrt" : loadImmClassName(False, True, False, user=True),
+        "imm_w" : loadImmClassName(True, False, True),
+        "imm_uw" : loadImmClassName(True, True, True),
+        "imm_p" : loadImmClassName(False, False, False),
+        "imm_pw" : loadImmClassName(False, False, True),
+        "imm_pu" : loadImmClassName(False, True, False),
+        "imm_puw" : loadImmClassName(False, True, True)
+    }
+    decode_block = decode % classNames
+}};
+
+def format Thumb32StoreSingle() {{
+    def buildPuwDecode(size):
+        puwDecode = '''
+                {
+                    uint32_t puw = bits(machInst, 10, 8);
+                    uint32_t imm = IMMED_7_0;
+                    switch (puw) {
+                      case 0:
+                      case 2:
+                        // If we're here, either P or W must have been set.
+                        panic("Neither P or W set, but that "
+                                "shouldn't be possible.\\n");
+                      case 1:
+                        return new %(imm_w)s(machInst, RT, RN, false, imm);
+                      case 3:
+                        return new %(imm_uw)s(machInst, RT, RN, true, imm);
+                      case 4:
+                        return new %(imm_p)s(machInst, RT, RN, false, imm);
+                      case 5:
+                        return new %(imm_pw)s(machInst, RT, RN, false, imm);
+                      case 6:
+                        return new %(imm_pu)s(machInst, RT, RN, true, imm);
+                      case 7:
+                        return new %(imm_puw)s(machInst, RT, RN, true, imm);
+                    }
+                }
+        '''
+        return puwDecode % {
+            "imm_w" : storeImmClassName(True, False, True, size=size),
+            "imm_uw" : storeImmClassName(True, True, True, size=size),
+            "imm_p" : storeImmClassName(False, False, False, size=size),
+            "imm_pw" : storeImmClassName(False, False, True, size=size),
+            "imm_pu" : storeImmClassName(False, True, False, size=size),
+            "imm_puw" : storeImmClassName(False, True, True, size=size)
+        }
+    decode = '''
+    {
+        uint32_t op1 = bits(machInst, 23, 21);
+        uint32_t op2 = bits(machInst, 11, 6);
+        bool op2Puw = ((op2 & 0x24) == 0x24 ||
+                       (op2 & 0x3c) == 0x30);
+        if (RN == 0xf) {
+            return new Unknown(machInst);
+        }
+        if (op1 == 4) {
+            return new %(strb_imm)s(machInst, RT, RN, true, IMMED_11_0);
+        } else if (op1 == 0 && op2Puw) {
+            %(strb_puw)s;
+        } else if (op1 == 0 && ((op2 & 0x3c) == 0x38)) {
+            return new %(strbt)s(machInst, RT, RN, true, IMMED_7_0);
+        } else if (op1 == 0 && op2 == 0) {
+            return new %(strb_reg)s(machInst, RT, RN, true,
+                                    bits(machInst, 5, 4), LSL, RM);
+        } else if (op1 == 5) {
+            return new %(strh_imm)s(machInst, RT, RN, true, IMMED_11_0);
+        } else if (op1 == 1 && op2Puw) {
+            %(strh_puw)s;
+        } else if (op1 == 1 && ((op2 & 0x3c) == 0x38)) {
+            return new %(strht)s(machInst, RT, RN, true, IMMED_7_0);
+        } else if (op1 == 1 && op2 == 0) {
+            return new %(strh_reg)s(machInst, RT, RN, true,
+                                    bits(machInst, 5, 4), LSL, RM);
+        } else if (op1 == 6) {
+            return new %(str_imm)s(machInst, RT, RN, true, IMMED_11_0);
+        } else if (op1 == 2 && op2Puw) {
+            %(str_puw)s;
+        } else if (op1 == 2 && ((op2 & 0x3c) == 0x38)) {
+            return new %(strt)s(machInst, RT, RN, true, IMMED_7_0);
+        } else if (op1 == 2 && op2 == 0) {
+            return new %(str_reg)s(machInst, RT, RN, true,
+                                   bits(machInst, 5, 4), LSL, RM);
+        } else {
+            return new Unknown(machInst);
+        }
+    }
+    '''
+    classNames = {
+        "strb_imm" : storeImmClassName(False, True, False, size=1),
+        "strb_puw" : buildPuwDecode(1),
+        "strbt" : storeImmClassName(False, True, False, user=True, size=1),
+        "strb_reg" : storeRegClassName(False, True, False, size=1),
+        "strh_imm" : storeImmClassName(False, True, False, size=2),
+        "strh_puw" : buildPuwDecode(2),
+        "strht" : storeImmClassName(False, True, False, user=True, size=2),
+        "strh_reg" : storeRegClassName(False, True, False, size=2),
+        "str_imm" : storeImmClassName(False, True, False),
+        "str_puw" : buildPuwDecode(4),
+        "strt" : storeImmClassName(False, True, False, user=True),
+        "str_reg" : storeRegClassName(False, True, False)
+    }
+    decode_block = decode % classNames
+}};
+
+def format LoadByteMemoryHints() {{
+    decode = '''
+    {
+        const uint32_t op1 = bits(machInst, 24, 23);
+        const uint32_t op2 = bits(machInst, 11, 6);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const IntRegIndex rt = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        const uint32_t imm12 = bits(machInst, 11, 0);
+        const uint32_t imm8 = bits(machInst, 7, 0);
+        bool pldw = bits(machInst, 21);
+        const uint32_t imm2 = bits(machInst, 5, 4);
+        if (rn == 0xf) {
+            if (rt == 0xf) {
+                const bool add = bits(machInst, 23);
+                if (bits(op1, 1) == 1) {
+                    if (add) {
+                        return new %(pli_iulit)s(machInst, INTREG_ZERO,
+                                                 INTREG_PC, true, imm12);
+                    } else {
+                        return new %(pli_ilit)s(machInst, INTREG_ZERO,
+                                                INTREG_PC, false, imm12);
+                    }
+                } else {
+                    if (add) {
+                        return new %(pld_iulit)s(machInst, INTREG_ZERO,
+                                                 INTREG_PC, true, imm12);
+                    } else {
+                        return new %(pld_ilit)s(machInst, INTREG_ZERO,
+                                                INTREG_PC, false, imm12);
+                    }
+                }
+            } else {
+                if (bits(op1, 1) == 1) {
+                    if (bits(machInst, 23)) {
+                        return new %(ldrsb_lit_u)s(machInst, rt, INTREG_PC,
+                                                   true, imm12);
+                    } else {
+                        return new %(ldrsb_lit)s(machInst, rt, INTREG_PC,
+                                                 false, imm12);
+                    }
+                } else {
+                    if (bits(machInst, 23)) {
+                        return new %(ldrb_lit_u)s(machInst, rt, INTREG_PC,
+                                                  true, imm12);
+                    } else {
+                        return new %(ldrb_lit)s(machInst, rt, INTREG_PC,
+                                                false, imm12);
+                    }
+                }
+            }
+        } else if (rt == 0xf) {
+            switch (op1) {
+              case 0x0:
+                if (op2 == 0x0) {
+                    if (pldw) {
+                        return new %(pldw_radd)s(machInst, INTREG_ZERO,
+                                                 rn, true, imm2, LSL, rm);
+                    } else {
+                        return new %(pld_radd)s(machInst, INTREG_ZERO,
+                                                rn, true, imm2, LSL, rm);
+                    }
+                } else if (bits(op2, 5, 2) == 0xc) {
+                    if (pldw) {
+                        return new %(pldw_isub)s(machInst, INTREG_ZERO,
+                                                 rn, false, imm8);
+                    } else {
+                        return new %(pld_isub)s(machInst, INTREG_ZERO,
+                                                rn, false, imm8);
+                    }
+                }
+                break;
+              case 0x1:
+                if (pldw) {
+                    return new %(pldw_iadd)s(machInst, INTREG_ZERO,
+                                             rn, true, imm12);
+                } else {
+                    return new %(pld_iadd)s(machInst, INTREG_ZERO,
+                                            rn, true, imm12);
+                }
+              case 0x2:
+                if (op2 == 0x0) {
+                    return new %(pli_radd)s(machInst, INTREG_ZERO, rn,
+                                            true, imm2, LSL, rm);
+                } else if (bits(op2, 5, 2) == 0xc) {
+                    return new %(pli_ilit)s(machInst, INTREG_ZERO,
+                                            INTREG_PC, false, imm8);
+                }
+                break;
+              case 0x3:
+                return new %(pli_iulit)s(machInst, INTREG_ZERO,
+                                        INTREG_PC, true, imm12);
+            }
+            return new Unknown(machInst);
+        } else {
+            switch (op1) {
+              case 0x0:
+                if (op2 == 0) {
+                    return new %(ldrb_radd)s(machInst, rt, rn, true,
+                                             imm2, LSL, rm);
+                } else if (bits(op2, 5, 2) == 0xe) {
+                    return new %(ldrbt)s(machInst, rt, rn, true, imm8);
+                } else if ((op2 & 0x24) == 0x24 || bits(op2, 5, 2) == 0xc) {
+                    const uint32_t puw = bits(machInst, 10, 8);
+                    switch (puw) {
+                      case 0x1:
+                        return new %(ldrb_iw)s(machInst, rt,
+                                               rn, false, imm8);
+                      case 0x3:
+                        return new %(ldrb_iuw)s(machInst, rt,
+                                                rn, true, imm8);
+                      case 0x4:
+                        return new %(ldrb_ip)s(machInst, rt,
+                                               rn, false, imm8);
+                      case 0x5:
+                        return new %(ldrb_ipw)s(machInst, rt,
+                                                rn, false, imm8);
+                      case 0x7:
+                        return new %(ldrb_ipuw)s(machInst, rt,
+                                                 rn, true, imm8);
+                    }
+                }
+                break;
+              case 0x1:
+                return new %(ldrb_iadd)s(machInst, rt, rn, true, imm12);
+              case 0x2:
+                if (op2 == 0) {
+                    return new %(ldrsb_radd)s(machInst, rt, rn, true,
+                                              imm2, LSL, rm);
+                } else if (bits(op2, 5, 2) == 0xe) {
+                    return new %(ldrsbt)s(machInst, rt, rn, true, imm8);
+                } else if ((op2 & 0x24) == 0x24 || bits(op2, 5, 2) == 0xc) {
+                    const uint32_t puw = bits(machInst, 10, 8);
+                    switch (puw) {
+                      case 0x1:
+                        return new %(ldrsb_iw)s(machInst, rt,
+                                                rn, false, imm8);
+                      case 0x3:
+                        return new %(ldrsb_iuw)s(machInst, rt,
+                                                 rn, true, imm8);
+                      case 0x4:
+                        return new %(ldrsb_ip)s(machInst, rt,
+                                                rn, false, imm8);
+                      case 0x5:
+                        return new %(ldrsb_ipw)s(machInst, rt,
+                                                 rn, false, imm8);
+                      case 0x7:
+                        return new %(ldrsb_ipuw)s(machInst, rt,
+                                                  rn, true, imm8);
+                    }
+                }
+                break;
+              case 0x3:
+                return new %(ldrsb_iadd)s(machInst, rt, rn, true, imm12);
+            }
+            return new Unknown(machInst);
+        }
+    }
+    '''
+    substDict = {
+        "ldrsb_lit_u" : loadImmClassName(False, True, False, 1, True),
+        "ldrsb_lit" : loadImmClassName(False, False, False, 1, True),
+        "ldrb_lit_u" : loadImmClassName(False, True, False, 1),
+        "ldrb_lit" : loadImmClassName(False, False, False, 1),
+        "ldrsb_radd" : loadRegClassName(False, True, False, 1, True),
+        "ldrb_radd" : loadRegClassName(False, True, False, 1),
+        "ldrsb_iw" : loadImmClassName(True, False, True, 1, True),
+        "ldrsb_iuw" : loadImmClassName(True, True, True, 1, True),
+        "ldrsb_ip" : loadImmClassName(False, False, False, 1, True),
+        "ldrsb_ipw" : loadImmClassName(False, False, True, 1, True),
+        "ldrsb_ipuw" : loadImmClassName(False, True, True, 1, True),
+        "ldrsb_iadd" : loadImmClassName(False, True, False, 1, True),
+        "ldrb_iw" : loadImmClassName(True, False, True, 1),
+        "ldrb_iuw" : loadImmClassName(True, True, True, 1),
+        "ldrb_ip" : loadImmClassName(False, False, False, 1),
+        "ldrb_ipw" : loadImmClassName(False, False, True, 1),
+        "ldrb_ipuw" : loadImmClassName(False, True, True, 1),
+        "ldrb_iadd" : loadImmClassName(False, True, False, 1),
+        "ldrbt" : loadImmClassName(False, True, False, 1, user=True),
+        "ldrsbt" : loadImmClassName(False, True, False, 1, True, user=True),
+        "pldw_radd" : "PLDW_" + loadRegClassName(False, True, False, 1),
+        "pld_radd" : "PLD_" + loadRegClassName(False, True, False, 1),
+        "pldw_isub" : "PLDW_" + loadImmClassName(False, False, False, 1),
+        "pld_isub" : "PLD_" + loadImmClassName(False, False, False, 1),
+        "pldw_iadd" : "PLDW_" + loadImmClassName(False, True, False, 1),
+        "pld_iadd" : "PLD_" + loadImmClassName(False, True, False, 1),
+        "pld_iulit" : "PLD_" + loadImmClassName(False, True, False, 1),
+        "pld_ilit" : "PLD_" + loadImmClassName(False, False, False, 1),
+        "pli_iulit" : "PLI_" + loadImmClassName(False, True, False, 1),
+        "pli_ilit" : "PLI_" + loadImmClassName(False, False, False, 1),
+        "pli_radd" : "PLI_" + loadRegClassName(False, True, False, 1),
+        "pli_iulit" : "PLI_" + loadImmClassName(False, True, False, 1),
+        "pli_ilit" : "PLI_" + loadImmClassName(False, False, False, 1)
+    }
+    decode_block = decode % substDict
+}};
+
+def format LoadHalfwordMemoryHints() {{
+    decode = '''
+    {
+        const uint32_t op1 = bits(machInst, 24, 23);
+        const uint32_t op2 = bits(machInst, 11, 6);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const IntRegIndex rt = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        const uint32_t imm12 = bits(machInst, 11, 0);
+        const uint32_t imm8 = bits(machInst, 7, 0);
+        bool pldw = bits(machInst, 21);
+        const uint32_t imm2 = bits(machInst, 5, 4);
+        if (rn == 0xf) {
+            if (rt == 0xf) {
+                if (bits(op1, 1) == 1) {
+                    // Unallocated memory hint
+                    return new NopInst(machInst);
+                } else {
+                    return new Unknown(machInst);
+                }
+            } else {
+                if (bits(op1, 1) == 1) {
+                    if (bits(machInst, 23)) {
+                        return new %(ldrsh_lit_u)s(machInst, rt, INTREG_PC,
+                                                   true, imm12);
+                    } else {
+                        return new %(ldrsh_lit)s(machInst, rt, INTREG_PC,
+                                                 false, imm12);
+                    }
+                } else {
+                    if (bits(machInst, 23)) {
+                        return new %(ldrh_lit_u)s(machInst, rt, INTREG_PC,
+                                                  true, imm12);
+                    } else {
+                        return new %(ldrh_lit)s(machInst, rt, INTREG_PC,
+                                                false, imm12);
+                    }
+                }
+            }
+        } else if (rt == 0xf) {
+            switch (op1) {
+              case 0x0:
+                if (op2 == 0x0) {
+                    if (pldw) {
+                        return new %(pldw_radd)s(machInst, INTREG_ZERO,
+                                                 rn, true, imm2, LSL, rm);
+                    } else {
+                        return new %(pld_radd)s(machInst, INTREG_ZERO,
+                                                rn, true, imm2, LSL, rm);
+                    }
+                } else if (bits(op2, 5, 2) == 0xc) {
+                    if (pldw) {
+                        return new %(pldw_isub)s(machInst, INTREG_ZERO,
+                                                 rn, false, imm8);
+                    } else {
+                        return new %(pld_isub)s(machInst, INTREG_ZERO,
+                                                rn, false, imm8);
+                    }
+                }
+                break;
+              case 0x1:
+                if (pldw) {
+                    return new %(pldw_iadd)s(machInst, INTREG_ZERO,
+                                             rn, true, imm12);
+                } else {
+                    return new %(pld_iadd)s(machInst, INTREG_ZERO,
+                                            rn, true, imm12);
+                }
+              case 0x2:
+                if (op2 == 0x0 || bits(op2, 5, 2) == 0xc) {
+                    // Unallocated memory hint
+                    return new NopInst(machInst);
+                }
+                break;
+              case 0x3:
+                return new NopInst(machInst);
+            }
+            return new Unknown(machInst);
+        } else {
+            switch (op1) {
+              case 0x0:
+                if (op2 == 0) {
+                    return new %(ldrh_radd)s(machInst, rt, rn, true,
+                                             imm2, LSL, rm);
+                } else if (bits(op2, 5, 2) == 0xe) {
+                    return new %(ldrht)s(machInst, rt, rn, true, imm8);
+                } else if ((op2 & 0x24) == 0x24 || bits(op2, 5, 2) == 0xc) {
+                    const uint32_t puw = bits(machInst, 10, 8);
+                    switch (puw) {
+                      case 0x1:
+                        return new %(ldrh_iw)s(machInst, rt,
+                                               rn, false, imm8);
+                      case 0x3:
+                        return new %(ldrh_iuw)s(machInst, rt,
+                                                rn, true, imm8);
+                      case 0x4:
+                        return new %(ldrh_ip)s(machInst, rt,
+                                               rn, false, imm8);
+                      case 0x5:
+                        return new %(ldrh_ipw)s(machInst, rt,
+                                                rn, false, imm8);
+                      case 0x7:
+                        return new %(ldrh_ipuw)s(machInst, rt,
+                                                 rn, true, imm8);
+                    }
+                }
+                break;
+              case 0x1:
+                return new %(ldrh_iadd)s(machInst, rt, rn, true, imm12);
+              case 0x2:
+                if (op2 == 0) {
+                    return new %(ldrsh_radd)s(machInst, rt, rn, true,
+                                              imm2, LSL, rm);
+                } else if (bits(op2, 5, 2) == 0xe) {
+                    return new %(ldrsht)s(machInst, rt, rn, true, imm8);
+                } else if ((op2 & 0x24) == 0x24 || bits(op2, 5, 2) == 0xc) {
+                    const uint32_t puw = bits(machInst, 10, 8);
+                    switch (puw) {
+                      case 0x1:
+                        return new %(ldrsh_iw)s(machInst, rt,
+                                                rn, false, imm8);
+                      case 0x3:
+                        return new %(ldrsh_iuw)s(machInst, rt,
+                                                 rn, true, imm8);
+                      case 0x4:
+                        return new %(ldrsh_ip)s(machInst, rt,
+                                                rn, false, imm8);
+                      case 0x5:
+                        return new %(ldrsh_ipw)s(machInst, rt,
+                                                 rn, false, imm8);
+                      case 0x7:
+                        return new %(ldrsh_ipuw)s(machInst, rt,
+                                                  rn, true, imm8);
+                    }
+                }
+                break;
+              case 0x3:
+                return new %(ldrsh_iadd)s(machInst, rt, rn, true, imm12);
+            }
+            return new Unknown(machInst);
+        }
+    }
+    '''
+    substDict = {
+        "ldrsh_lit_u" : loadImmClassName(False, True, False, 2, True),
+        "ldrsh_lit" : loadImmClassName(False, False, False, 2, True),
+        "ldrh_lit_u" : loadImmClassName(False, True, False, 2),
+        "ldrh_lit" : loadImmClassName(False, False, False, 2),
+        "ldrsh_radd" : loadRegClassName(False, True, False, 2, True),
+        "ldrh_radd" : loadRegClassName(False, True, False, 2),
+        "ldrsh_iw" : loadImmClassName(True, False, True, 2, True),
+        "ldrsh_iuw" : loadImmClassName(True, True, True, 2, True),
+        "ldrsh_ip" : loadImmClassName(False, False, False, 2, True),
+        "ldrsh_ipw" : loadImmClassName(False, False, True, 2, True),
+        "ldrsh_ipuw" : loadImmClassName(False, True, True, 2, True),
+        "ldrsh_iadd" : loadImmClassName(False, True, False, 2, True),
+        "ldrh_iw" : loadImmClassName(True, False, True, 2),
+        "ldrh_iuw" : loadImmClassName(True, True, True, 2),
+        "ldrh_ip" : loadImmClassName(False, False, False, 2),
+        "ldrh_ipw" : loadImmClassName(False, False, True, 2),
+        "ldrh_ipuw" : loadImmClassName(False, True, True, 2),
+        "ldrh_iadd" : loadImmClassName(False, True, False, 2),
+        "ldrht" : loadImmClassName(False, True, False, 2, user=True),
+        "ldrsht" : loadImmClassName(False, True, False, 2, True, user=True),
+        "pldw_radd" : "PLDW_" + loadRegClassName(False, True, False, 1),
+        "pld_radd" : "PLD_" + loadRegClassName(False, True, False, 1),
+        "pldw_isub" : "PLDW_" + loadImmClassName(False, False, False, 1),
+        "pld_isub" : "PLD_" + loadImmClassName(False, False, False, 1),
+        "pldw_iadd" : "PLDW_" + loadImmClassName(False, True, False, 1),
+        "pld_iadd" : "PLD_" + loadImmClassName(False, True, False, 1)
+    }
+    decode_block = decode % substDict
+}};
+
+def format Thumb16MemReg() {{
+    decode = '''
+    {
+        const uint32_t opb = bits(machInst, 11, 9);
+        const uint32_t rt = bits(machInst, 2, 0);
+        const uint32_t rn = bits(machInst, 5, 3);
+        const uint32_t rm = bits(machInst, 8, 6);
+        switch (opb) {
+          case 0x0:
+            return new %(str)s(machInst, rt, rn, true, 0, LSL, rm);
+          case 0x1:
+            return new %(strh)s(machInst, rt, rn, true, 0, LSL, rm);
+          case 0x2:
+            return new %(strb)s(machInst, rt, rn, true, 0, LSL, rm);
+          case 0x3:
+            return new %(ldrsb)s(machInst, rt, rn, true, 0, LSL, rm);
+          case 0x4:
+            return new %(ldr)s(machInst, rt, rn, true, 0, LSL, rm);
+          case 0x5:
+            return new %(ldrh)s(machInst, rt, rn, true, 0, LSL, rm);
+          case 0x6:
+            return new %(ldrb)s(machInst, rt, rn, true, 0, LSL, rm);
+          case 0x7:
+            return new %(ldrsh)s(machInst, rt, rn, true, 0, LSL, rm);
+        }
+    }
+    '''
+    classNames = {
+        "str" : storeRegClassName(False, True, False),
+        "strh" : storeRegClassName(False, True, False, size=2),
+        "strb" : storeRegClassName(False, True, False, size=1),
+        "ldrsb" : loadRegClassName(False, True, False, sign=True, size=1),
+        "ldr" : loadRegClassName(False, True, False),
+        "ldrh" : loadRegClassName(False, True, False, size=2),
+        "ldrb" : loadRegClassName(False, True, False, size=1),
+        "ldrsh" : loadRegClassName(False, True, False, sign=True, size=2),
+    }
+    decode_block = decode % classNames
+}};
+
+def format Thumb16MemImm() {{
+    decode = '''
+    {
+        const uint32_t opa = bits(machInst, 15, 12);
+        const uint32_t opb = bits(machInst, 11, 9);
+        const uint32_t lrt = bits(machInst, 2, 0);
+        const uint32_t lrn = bits(machInst, 5, 3);
+        const uint32_t hrt = bits(machInst, 10, 8);
+        const uint32_t imm5 = bits(machInst, 10, 6);
+        const uint32_t imm8 = bits(machInst, 7, 0);
+        const bool load = bits(opb, 2);
+        switch (opa) {
+          case 0x6:
+            if (load) {
+                return new %(ldr)s(machInst, lrt, lrn, true, imm5 << 2);
+            } else {
+                return new %(str)s(machInst, lrt, lrn, true, imm5 << 2);
+            }
+          case 0x7:
+            if (load) {
+                return new %(ldrb)s(machInst, lrt, lrn, true, imm5);
+            } else {
+                return new %(strb)s(machInst, lrt, lrn, true, imm5);
+            }
+          case 0x8:
+            if (load) {
+                return new %(ldrh)s(machInst, lrt, lrn, true, imm5 << 1);
+            } else {
+                return new %(strh)s(machInst, lrt, lrn, true, imm5 << 1);
+            }
+          case 0x9:
+            if (load) {
+                return new %(ldr)s(machInst, hrt, INTREG_SP, true, imm8 << 2);
+            } else {
+                return new %(str)s(machInst, hrt, INTREG_SP, true, imm8 << 2);
+            }
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    '''
+    classNames = {
+        "ldr" : loadImmClassName(False, True, False),
+        "str" : storeImmClassName(False, True, False),
+        "ldrh" : loadImmClassName(False, True, False, size=2),
+        "strh" : storeImmClassName(False, True, False, size=2),
+        "ldrb" : loadImmClassName(False, True, False, size=1),
+        "strb" : storeImmClassName(False, True, False, size=1),
+    }
+    decode_block = decode % classNames
+}};
+
+def format Thumb16MemLit() {{
+    decode_block = '''
+    {
+        const uint32_t rt = bits(machInst, 10, 8);
+        const uint32_t imm8 = bits(machInst, 7, 0);
+        return new %s(machInst, rt, INTREG_PC, true, imm8 << 2);
+    }
+    ''' % loadImmClassName(False, True, False)
+}};
+

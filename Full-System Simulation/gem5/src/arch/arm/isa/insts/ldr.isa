@@ -1,0 +1,372 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010-2011 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+let {{
+    import math
+
+    header_output = ""
+    decoder_output = ""
+    exec_output = ""
+
+    class LoadInst(LoadStoreInst):
+        execBase = 'Load'
+
+        def __init__(self, mnem, post, add, writeback,
+                     size=4, sign=False, user=False, flavor="normal"):
+            super(LoadInst, self).__init__()
+
+            self.name = mnem
+            self.post = post
+            self.add = add
+            self.writeback = writeback
+            self.size = size
+            self.sign = sign
+            self.user = user
+            self.flavor = flavor
+            self.rasPop = False
+
+            if self.add:
+                self.op = " +"
+            else:
+                self.op = " -"
+
+            self.memFlags = ["ArmISA::TLB::MustBeOne"]
+            self.codeBlobs = {"postacc_code" : ""}
+
+        def emitHelper(self, base = 'Memory', wbDecl = None, instFlags = [], pcDecl = None):
+
+            global header_output, decoder_output, exec_output
+
+            codeBlobs = self.codeBlobs
+            codeBlobs["predicate_test"] = pickPredicate(codeBlobs)
+            (newHeader,
+             newDecoder,
+             newExec) = self.fillTemplates(self.name, self.Name, codeBlobs,
+                                           self.memFlags, instFlags, base,
+                                           wbDecl, pcDecl, self.rasPop,
+                                           self.size, self.sign)
+
+            header_output += newHeader
+            decoder_output += newDecoder
+            exec_output += newExec
+
+    class RfeInst(LoadInst):
+        decConstBase = 'Rfe'
+
+        def __init__(self, mnem, post, add, writeback):
+            super(RfeInst, self).__init__(mnem, post, add, writeback)
+            self.Name = "RFE_" + loadImmClassName(post, add, writeback, 8)
+
+            self.memFlags.append("ArmISA::TLB::AlignWord")
+
+        def emit(self):
+            offset = 0
+            if self.post != self.add:
+                offset += 4
+            if not self.add:
+                offset -= 8
+            self.codeBlobs["ea_code"] = "EA = Base + %d;" % offset
+
+            wbDiff = -8
+            if self.add:
+                wbDiff = 8
+            accCode = '''
+            CPSR cpsr = Cpsr;
+            cpsr.nz = CondCodesNZ;
+            cpsr.c = CondCodesC;
+            cpsr.v = CondCodesV;
+            cpsr.ge = CondCodesGE;
+            URc = cpsr;
+            URa = cSwap<uint32_t>(Mem_ud, cpsr.e);
+            URb = cSwap<uint32_t>(Mem_ud >> 32, cpsr.e);
+            '''
+            self.codeBlobs["memacc_code"] = accCode
+
+            wbDecl = None
+            pcDecl = "MicroUopSetPCCPSR(machInst, INTREG_UREG0, INTREG_UREG1, INTREG_UREG2);"
+
+            if self.writeback:
+                wbDecl = "MicroAddiUop(machInst, base, base, %d);" % wbDiff
+            self.emitHelper('RfeOp', wbDecl, ["IsSerializeAfter", "IsNonSpeculative"], pcDecl)
+
+    class LoadImmInst(LoadInst):
+        def __init__(self, *args, **kargs):
+            super(LoadImmInst, self).__init__(*args, **kargs)
+            self.offset = self.op + " imm"
+
+            if self.add:
+                self.wbDecl = "MicroAddiUop(machInst, base, base, imm);"
+            else:
+                self.wbDecl = "MicroSubiUop(machInst, base, base, imm);"
+
+            if self.add and self.post and self.writeback and not self.sign and \
+               not self.user and self.size == 4:
+                self.rasPop = True
+
+    class LoadRegInst(LoadInst):
+        def __init__(self, *args, **kargs):
+            super(LoadRegInst, self).__init__(*args, **kargs)
+            self.offset = self.op + " shift_rm_imm(Index, shiftAmt," + \
+                                    " shiftType, OptShiftRmCondCodesC)"
+            if self.add:
+                 self.wbDecl = '''
+                     MicroAddUop(machInst, base, base, wbIndexReg, shiftAmt, shiftType);
+                 '''
+            else:
+                 self.wbDecl = '''
+                     MicroSubUop(machInst, base, base, wbIndexReg, shiftAmt, shiftType);
+                 '''
+
+    class LoadSingle(LoadInst):
+        def __init__(self, *args, **kargs):
+            super(LoadSingle, self).__init__(*args, **kargs)
+
+            # Build the default class name
+            self.Name = self.nameFunc(self.post, self.add, self.writeback,
+                                      self.size, self.sign, self.user)
+
+            # Add memory request flags where necessary
+            self.memFlags.append("%d" % int(math.log(self.size, 2)))
+            if self.user:
+                self.memFlags.append("ArmISA::TLB::UserMode")
+
+            self.instFlags = []
+            if self.flavor == "dprefetch":
+                self.memFlags.append("Request::PREFETCH")
+                self.instFlags = ['IsDataPrefetch']
+            elif self.flavor == "iprefetch":
+                self.memFlags.append("Request::PREFETCH")
+                self.instFlags = ['IsInstPrefetch']
+            elif self.flavor == "exclusive":
+                self.memFlags.append("Request::LLSC")
+            elif self.flavor == "normal":
+                self.memFlags.append("ArmISA::TLB::AllowUnaligned")
+
+            # Disambiguate the class name for different flavors of loads
+            if self.flavor != "normal":
+                self.Name = "%s_%s" % (self.name.upper(), self.Name)
+
+        def emit(self):
+            # Address compuation code
+            eaCode = "EA = Base"
+            if not self.post:
+                eaCode += self.offset
+            eaCode += ";"
+
+            if self.flavor == "fp":
+                eaCode += vfpEnabledCheckCode
+
+            self.codeBlobs["ea_code"] = eaCode
+
+            # Code that actually handles the access
+            if self.flavor == "dprefetch" or self.flavor == "iprefetch":
+                accCode = 'uint64_t temp = Mem%s; temp = temp;'
+            elif self.flavor == "fp":
+                accCode = "FpDest_uw = cSwap(Mem%s, ((CPSR)Cpsr).e);\n"
+            else:
+                accCode = "IWDest = cSwap(Mem%s, ((CPSR)Cpsr).e);"
+            accCode = accCode % buildMemSuffix(self.sign, self.size)
+
+            self.codeBlobs["memacc_code"] = accCode
+
+            # Push it out to the output files
+            base = buildMemBase(self.basePrefix, self.post, self.writeback)
+            wbDecl = None
+            if self.writeback:
+                wbDecl = self.wbDecl
+            self.emitHelper(base, wbDecl, self.instFlags)
+
+    def loadImmClassName(post, add, writeback, size=4, sign=False, user=False):
+        return memClassName("LOAD_IMM", post, add, writeback, size, sign, user)
+
+    class LoadImm(LoadImmInst, LoadSingle):
+        decConstBase = 'LoadImm'
+        basePrefix = 'MemoryImm'
+        nameFunc = staticmethod(loadImmClassName)
+
+    def loadRegClassName(post, add, writeback, size=4, sign=False, user=False):
+        return memClassName("LOAD_REG", post, add, writeback, size, sign, user)
+
+    class LoadReg(LoadRegInst, LoadSingle):
+        decConstBase = 'LoadReg'
+        basePrefix = 'MemoryReg'
+        nameFunc = staticmethod(loadRegClassName)
+
+    class LoadDouble(LoadInst):
+        def __init__(self, *args, **kargs):
+            super(LoadDouble, self).__init__(*args, **kargs)
+
+            # Build the default class name
+            self.Name = self.nameFunc(self.post, self.add, self.writeback)
+
+            # Add memory request flags where necessary
+            if self.flavor == "exclusive":
+                self.memFlags.append("Request::LLSC")
+                self.memFlags.append("ArmISA::TLB::AlignDoubleWord")
+            else:
+                self.memFlags.append("ArmISA::TLB::AlignWord")
+
+            # Disambiguate the class name for different flavors of loads
+            if self.flavor != "normal":
+                self.Name = "%s_%s" % (self.name.upper(), self.Name)
+
+        def emit(self):
+            # Address computation code
+            eaCode = "EA = Base"
+            if not self.post:
+                eaCode += self.offset
+            eaCode += ";"
+
+            if self.flavor == "fp":
+                eaCode += vfpEnabledCheckCode
+
+            self.codeBlobs["ea_code"] = eaCode
+
+            # Code that actually handles the access
+            if self.flavor != "fp":
+                accCode = '''
+                CPSR cpsr = Cpsr;
+                Dest = cSwap<uint32_t>(Mem_ud, cpsr.e);
+                Dest2 = cSwap<uint32_t>(Mem_ud >> 32, cpsr.e);
+                '''
+            else:
+                accCode = '''
+                uint64_t swappedMem = cSwap(Mem_ud, ((CPSR)Cpsr).e);
+                FpDest_uw = (uint32_t)swappedMem;
+                FpDest2_uw = (uint32_t)(swappedMem >> 32);
+                '''
+
+            self.codeBlobs["memacc_code"] = accCode
+
+            # Push it out to the output files
+            base = buildMemBase(self.basePrefix, self.post, self.writeback)
+            wbDecl = None
+            if self.writeback:
+                wbDecl = self.wbDecl
+            self.emitHelper(base, wbDecl)
+
+    def loadDoubleImmClassName(post, add, writeback):
+        return memClassName("LOAD_IMMD", post, add, writeback, 4, False, False)
+
+    class LoadDoubleImm(LoadImmInst, LoadDouble):
+        decConstBase = 'LoadStoreDImm'
+        basePrefix = 'MemoryDImm'
+        nameFunc = staticmethod(loadDoubleImmClassName)
+
+    def loadDoubleRegClassName(post, add, writeback):
+        return memClassName("LOAD_REGD", post, add, writeback, 4, False, False)
+
+    class LoadDoubleReg(LoadRegInst, LoadDouble):
+        decConstBase = 'LoadDReg'
+        basePrefix = 'MemoryDReg'
+        nameFunc = staticmethod(loadDoubleRegClassName)
+
+    def buildLoads(mnem, size=4, sign=False, user=False):
+        LoadImm(mnem, True, True, True, size, sign, user).emit()
+        LoadReg(mnem, True, True, True, size, sign, user).emit()
+        LoadImm(mnem, True, False, True, size, sign, user).emit()
+        LoadReg(mnem, True, False, True, size, sign, user).emit()
+        LoadImm(mnem, False, True, True, size, sign, user).emit()
+        LoadReg(mnem, False, True, True, size, sign, user).emit()
+        LoadImm(mnem, False, False, True, size, sign, user).emit()
+        LoadReg(mnem, False, False, True, size, sign, user).emit()
+        LoadImm(mnem, False, True, False, size, sign, user).emit()
+        LoadReg(mnem, False, True, False, size, sign, user).emit()
+        LoadImm(mnem, False, False, False, size, sign, user).emit()
+        LoadReg(mnem, False, False, False, size, sign, user).emit()
+
+    def buildDoubleLoads(mnem):
+        LoadDoubleImm(mnem, True, True, True).emit()
+        LoadDoubleReg(mnem, True, True, True).emit()
+        LoadDoubleImm(mnem, True, False, True).emit()
+        LoadDoubleReg(mnem, True, False, True).emit()
+        LoadDoubleImm(mnem, False, True, True).emit()
+        LoadDoubleReg(mnem, False, True, True).emit()
+        LoadDoubleImm(mnem, False, False, True).emit()
+        LoadDoubleReg(mnem, False, False, True).emit()
+        LoadDoubleImm(mnem, False, True, False).emit()
+        LoadDoubleReg(mnem, False, True, False).emit()
+        LoadDoubleImm(mnem, False, False, False).emit()
+        LoadDoubleReg(mnem, False, False, False).emit()
+
+    def buildRfeLoads(mnem):
+        RfeInst(mnem, True, True, True).emit()
+        RfeInst(mnem, True, True, False).emit()
+        RfeInst(mnem, True, False, True).emit()
+        RfeInst(mnem, True, False, False).emit()
+        RfeInst(mnem, False, True, True).emit()
+        RfeInst(mnem, False, True, False).emit()
+        RfeInst(mnem, False, False, True).emit()
+        RfeInst(mnem, False, False, False).emit()
+
+    def buildPrefetches(mnem, type):
+        LoadReg(mnem, False, False, False, size=1, flavor=type).emit()
+        LoadImm(mnem, False, False, False, size=1, flavor=type).emit()
+        LoadReg(mnem, False, True, False, size=1, flavor=type).emit()
+        LoadImm(mnem, False, True, False, size=1, flavor=type).emit()
+
+    buildLoads("ldr")
+    buildLoads("ldrt", user=True)
+    buildLoads("ldrb", size=1)
+    buildLoads("ldrbt", size=1, user=True)
+    buildLoads("ldrsb", size=1, sign=True)
+    buildLoads("ldrsbt", size=1, sign=True, user=True)
+    buildLoads("ldrh", size=2)
+    buildLoads("ldrht", size=2, user=True)
+    buildLoads("ldrsh", size=2, sign=True)
+    buildLoads("ldrsht", size=2, sign=True, user=True)
+
+    buildDoubleLoads("ldrd")
+
+    buildRfeLoads("rfe")
+
+    buildPrefetches("pld", "dprefetch")
+    buildPrefetches("pldw", "dprefetch")
+    buildPrefetches("pli", "iprefetch")
+
+    LoadImm("ldrex", False, True, False, size=4, flavor="exclusive").emit()
+    LoadImm("ldrexh", False, True, False, size=2, flavor="exclusive").emit()
+    LoadImm("ldrexb", False, True, False, size=1, flavor="exclusive").emit()
+    LoadDoubleImm("ldrexd", False, True, False, flavor="exclusive").emit()
+
+    LoadImm("vldr", False, True, False, size=4, flavor="fp").emit()
+    LoadImm("vldr", False, False, False, size=4, flavor="fp").emit()
+    LoadDoubleImm("vldr", False, True, False, flavor="fp").emit()
+    LoadDoubleImm("vldr", False, False, False, flavor="fp").emit()
+}};

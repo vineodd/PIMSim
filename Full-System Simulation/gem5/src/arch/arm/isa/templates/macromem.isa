@@ -1,0 +1,648 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010-2014 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Copyright (c) 2007-2008 The Florida State University
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Stephen Hines
+//          Gabe Black
+
+////////////////////////////////////////////////////////////////////
+//
+// Load/store microops
+//
+
+def template MicroMemDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst,
+                       RegIndex _ura, RegIndex _urb, bool _up,
+                       uint8_t _imm);
+        %(BasicExecDeclare)s
+        %(InitiateAccDeclare)s
+        %(CompleteAccDeclare)s
+    };
+}};
+
+def template MicroMemConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   RegIndex _ura,
+                                   RegIndex _urb,
+                                   bool _up,
+                                   uint8_t _imm)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _ura, _urb, _up, _imm)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+    }
+}};
+
+
+def template MicroMemPairDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst,
+                       RegIndex _dreg1, RegIndex _dreg2, RegIndex _base,
+                       bool _up, uint8_t _imm);
+        %(BasicExecDeclare)s
+        %(InitiateAccDeclare)s
+        %(CompleteAccDeclare)s
+    };
+}};
+
+def template MicroMemPairConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   RegIndex _dreg1,
+                                   RegIndex _dreg2,
+                                   RegIndex _base,
+                                   bool _up,
+                                   uint8_t _imm)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _dreg1, _dreg2, _base, _up, _imm)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+    }
+}};
+
+////////////////////////////////////////////////////////////////////
+//
+// Neon load/store microops
+//
+
+def template MicroNeonMemDeclare {{
+    template <class Element>
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst, RegIndex _dest,
+                       RegIndex _ura, uint32_t _imm, unsigned extraMemFlags)
+            : %(base_class)s("%(mnemonic)s", machInst,
+                              %(op_class)s, _dest, _ura, _imm)
+        {
+            memAccessFlags |= extraMemFlags;
+            %(constructor)s;
+            if (!(condCode == COND_AL || condCode == COND_UC)) {
+                for (int x = 0; x < _numDestRegs; x++) {
+                    _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+                }
+            }
+        }
+
+        %(BasicExecDeclare)s
+        %(InitiateAccDeclare)s
+        %(CompleteAccDeclare)s
+    };
+}};
+
+////////////////////////////////////////////////////////////////////
+//
+// PC   = Integer(ura)
+// CPSR = Integer(urb)
+//
+
+def template MicroSetPCCPSRDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst,
+                       IntRegIndex _ura,
+                       IntRegIndex _urb,
+                       IntRegIndex _urc);
+        %(BasicExecDeclare)s
+    };
+}};
+
+def template MicroSetPCCPSRConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   IntRegIndex _ura,
+                                   IntRegIndex _urb,
+                                   IntRegIndex _urc)
+          : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                           _ura, _urb, _urc)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            flags[IsCondControl] = true;
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        } else {
+            flags[IsUncondControl] = true;
+        }
+    }
+}};
+
+////////////////////////////////////////////////////////////////////
+//
+// Integer = Integer op Integer microops
+//
+
+def template MicroIntDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst,
+                       RegIndex _ura, RegIndex _urb, RegIndex _urc);
+        %(BasicExecDeclare)s
+    };
+}};
+
+def template MicroIntConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   RegIndex _ura,
+                                   RegIndex _urb,
+                                   RegIndex _urc)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _ura, _urb, _urc)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+    }
+}};
+
+def template MicroNeonMemExecDeclare {{
+    template
+    Fault %(class_name)s<%(targs)s>::execute(
+            CPU_EXEC_CONTEXT *, Trace::InstRecord *) const;
+    template
+    Fault %(class_name)s<%(targs)s>::initiateAcc(
+            CPU_EXEC_CONTEXT *, Trace::InstRecord *) const;
+    template
+    Fault %(class_name)s<%(targs)s>::completeAcc(PacketPtr,
+            CPU_EXEC_CONTEXT *, Trace::InstRecord *) const;
+}};
+
+def template MicroNeonExecDeclare {{
+    template
+    Fault %(class_name)s<%(targs)s>::execute(
+            CPU_EXEC_CONTEXT *, Trace::InstRecord *) const;
+}};
+
+////////////////////////////////////////////////////////////////////
+//
+// Neon (de)interlacing microops
+//
+
+def template MicroNeonMixDeclare {{
+    template <class Element>
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst, RegIndex _dest, RegIndex _op1,
+                       uint8_t _step) :
+            %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                           _dest, _op1, _step)
+        {
+            %(constructor)s;
+            if (!(condCode == COND_AL || condCode == COND_UC)) {
+                for (int x = 0; x < _numDestRegs; x++) {
+                    _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+                }
+            }
+        }
+
+        %(BasicExecDeclare)s
+    };
+}};
+
+def template MicroNeonMixExecute {{
+    template <class Element>
+    Fault %(class_name)s<Element>::execute(CPU_EXEC_CONTEXT *xc,
+            Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+        uint64_t resTemp = 0;
+        resTemp = resTemp;
+        %(op_decl)s;
+        %(op_rd)s;
+
+        if (%(predicate_test)s)
+        {
+            %(code)s;
+            if (fault == NoFault)
+            {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+////////////////////////////////////////////////////////////////////
+//
+// Neon (un)packing microops using a particular lane
+//
+
+def template MicroNeonMixLaneDeclare {{
+    template <class Element>
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst, RegIndex _dest, RegIndex _op1,
+                       uint8_t _step, unsigned _lane) :
+            %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                           _dest, _op1, _step, _lane)
+        {
+            %(constructor)s;
+            if (!(condCode == COND_AL || condCode == COND_UC)) {
+                for (int x = 0; x < _numDestRegs; x++) {
+                    _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+                }
+            }
+        }
+
+        %(BasicExecDeclare)s
+    };
+}};
+
+////////////////////////////////////////////////////////////////////
+//
+// Integer = Integer
+//
+
+def template MicroIntMovDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst,
+                       RegIndex _ura, RegIndex _urb);
+        %(BasicExecDeclare)s
+    };
+}};
+def template MicroIntMovConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   RegIndex _ura,
+                                   RegIndex _urb)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _ura, _urb)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+    }
+}};
+
+////////////////////////////////////////////////////////////////////
+//
+// Integer = Integer op Immediate microops
+//
+
+def template MicroIntImmDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst,
+                       RegIndex _ura, RegIndex _urb,
+                       int32_t _imm);
+        %(BasicExecDeclare)s
+    };
+}};
+
+def template MicroIntImmConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   RegIndex _ura,
+                                   RegIndex _urb,
+                                   int32_t _imm)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _ura, _urb, _imm)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+    }
+}};
+
+def template MicroIntImmXConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   RegIndex _ura,
+                                   RegIndex _urb,
+                                   int32_t _imm)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _ura, _urb, _imm)
+    {
+        %(constructor)s;
+    }
+}};
+
+def template MicroIntRegDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst,
+                       RegIndex _ura, RegIndex _urb, RegIndex _urc,
+                       int32_t _shiftAmt, ArmShiftType _shiftType);
+        %(BasicExecDeclare)s
+    };
+}};
+
+def template MicroIntXERegConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   RegIndex _ura, RegIndex _urb, RegIndex _urc,
+                                   ArmExtendType _type, uint32_t _shiftAmt)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _ura, _urb, _urc, _type, _shiftAmt)
+    {
+        %(constructor)s;
+    }
+}};
+
+def template MicroIntXERegDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst machInst,
+                       RegIndex _ura, RegIndex _urb, RegIndex _urc,
+                       ArmExtendType _type, uint32_t _shiftAmt);
+        %(BasicExecDeclare)s
+    };
+}};
+
+def template MicroIntRegConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                   RegIndex _ura, RegIndex _urb, RegIndex _urc,
+                                   int32_t _shiftAmt, ArmShiftType _shiftType)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _ura, _urb, _urc, _shiftAmt, _shiftType)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+    }
+}};
+
+////////////////////////////////////////////////////////////////////
+//
+// Macro Memory-format instructions
+//
+
+def template MacroMemDeclare {{
+/**
+ * Static instructions class for a store multiple instruction
+ */
+class %(class_name)s : public %(base_class)s
+{
+    public:
+        // Constructor
+        %(class_name)s(ExtMachInst machInst, IntRegIndex rn,
+                bool index, bool up, bool user, bool writeback, bool load,
+                uint32_t reglist);
+        %(BasicExecPanic)s
+};
+}};
+
+def template MacroMemConstructor {{
+%(class_name)s::%(class_name)s(ExtMachInst machInst, IntRegIndex rn,
+        bool index, bool up, bool user, bool writeback, bool load,
+        uint32_t reglist)
+    : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s, rn,
+                     index, up, user, writeback, load, reglist)
+{
+    %(constructor)s;
+    if (!(condCode == COND_AL || condCode == COND_UC)) {
+        for (int x = 0; x < _numDestRegs; x++) {
+            _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+        }
+    }
+}
+
+}};
+
+def template BigFpMemImmDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+  public:
+    // Constructor
+    %(class_name)s(const char *mnemonic, ExtMachInst machInst,
+                   bool load, IntRegIndex dest, IntRegIndex base, int64_t imm);
+    %(BasicExecPanic)s
+};
+}};
+
+def template BigFpMemImmConstructor {{
+%(class_name)s::%(class_name)s(const char *mnemonic, ExtMachInst machInst,
+        bool load, IntRegIndex dest, IntRegIndex base, int64_t imm)
+    : %(base_class)s(mnemonic, machInst, %(op_class)s, load, dest, base, imm)
+{
+    %(constructor)s;
+}
+}};
+
+def template BigFpMemRegDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+  public:
+    // Constructor
+    %(class_name)s(const char *mnemonic, ExtMachInst machInst,
+                   bool load, IntRegIndex dest, IntRegIndex base,
+                   IntRegIndex offset, ArmExtendType type, int64_t imm);
+    %(BasicExecPanic)s
+};
+}};
+
+def template BigFpMemRegConstructor {{
+%(class_name)s::%(class_name)s(const char *mnemonic, ExtMachInst machInst,
+        bool load, IntRegIndex dest, IntRegIndex base,
+        IntRegIndex offset, ArmExtendType type, int64_t imm)
+    : %(base_class)s(mnemonic, machInst, %(op_class)s, load, dest, base,
+                     offset, type, imm)
+{
+    %(constructor)s;
+}
+}};
+
+def template BigFpMemLitDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+  public:
+    // Constructor
+    %(class_name)s(const char *mnemonic, ExtMachInst machInst,
+                   IntRegIndex dest, int64_t imm);
+    %(BasicExecPanic)s
+};
+}};
+
+def template BigFpMemLitConstructor {{
+%(class_name)s::%(class_name)s(const char *mnemonic, ExtMachInst machInst,
+        IntRegIndex dest, int64_t imm)
+    : %(base_class)s(mnemonic, machInst, %(op_class)s, dest, imm)
+{
+    %(constructor)s;
+}
+}};
+
+def template PairMemDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+    public:
+        // Constructor
+        %(class_name)s(const char *mnemonic, ExtMachInst machInst,
+                uint32_t size, bool fp, bool load, bool noAlloc, bool signExt,
+                bool exclusive, bool acrel, uint32_t imm,
+                AddrMode mode, IntRegIndex rn, IntRegIndex rt,
+                IntRegIndex rt2);
+        %(BasicExecPanic)s
+};
+}};
+
+def template PairMemConstructor {{
+%(class_name)s::%(class_name)s(const char *mnemonic, ExtMachInst machInst,
+        uint32_t size, bool fp, bool load, bool noAlloc, bool signExt,
+        bool exclusive, bool acrel, uint32_t imm, AddrMode mode,
+        IntRegIndex rn, IntRegIndex rt, IntRegIndex rt2)
+    : %(base_class)s(mnemonic, machInst, %(op_class)s, size,
+                     fp, load, noAlloc, signExt, exclusive, acrel,
+                     imm, mode, rn, rt, rt2)
+{
+    %(constructor)s;
+}
+}};
+
+def template VMemMultDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+    public:
+        // Constructor
+        %(class_name)s(ExtMachInst machInst, unsigned width,
+                RegIndex rn, RegIndex vd, unsigned regs, unsigned inc,
+                uint32_t size, uint32_t align, RegIndex rm);
+        %(BasicExecPanic)s
+};
+}};
+
+def template VMemMultConstructor {{
+%(class_name)s::%(class_name)s(ExtMachInst machInst, unsigned width,
+        RegIndex rn, RegIndex vd, unsigned regs, unsigned inc,
+        uint32_t size, uint32_t align, RegIndex rm)
+    : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s, width,
+                     rn, vd, regs, inc, size, align, rm)
+{
+    %(constructor)s;
+    if (!(condCode == COND_AL || condCode == COND_UC)) {
+        for (int x = 0; x < _numDestRegs; x++) {
+            _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+        }
+    }
+}
+}};
+
+def template VMemSingleDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+    public:
+        // Constructor
+        %(class_name)s(ExtMachInst machInst, bool all, unsigned width,
+                RegIndex rn, RegIndex vd, unsigned regs, unsigned inc,
+                uint32_t size, uint32_t align, RegIndex rm, unsigned lane = 0);
+        %(BasicExecPanic)s
+};
+}};
+
+def template VMemSingleConstructor {{
+%(class_name)s::%(class_name)s(ExtMachInst machInst, bool all, unsigned width,
+        RegIndex rn, RegIndex vd, unsigned regs, unsigned inc,
+        uint32_t size, uint32_t align, RegIndex rm, unsigned lane)
+    : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s, all, width,
+                     rn, vd, regs, inc, size, align, rm, lane)
+{
+    %(constructor)s;
+    if (!(condCode == COND_AL || condCode == COND_UC)) {
+        for (int x = 0; x < _numDestRegs; x++) {
+            _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+        }
+    }
+}
+}};
+
+def template MacroVFPMemDeclare {{
+/**
+ * Static instructions class for a store multiple instruction
+ */
+class %(class_name)s : public %(base_class)s
+{
+    public:
+        // Constructor
+        %(class_name)s(ExtMachInst machInst, IntRegIndex rn,
+                RegIndex vd, bool single, bool up, bool writeback,
+                bool load, uint32_t offset);
+        %(BasicExecPanic)s
+};
+}};
+
+def template MacroVFPMemConstructor {{
+%(class_name)s::%(class_name)s(ExtMachInst machInst, IntRegIndex rn,
+        RegIndex vd, bool single, bool up, bool writeback, bool load,
+        uint32_t offset)
+    : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s, rn,
+                     vd, single, up, writeback, load, offset)
+{
+    %(constructor)s;
+    if (!(condCode == COND_AL || condCode == COND_UC)) {
+        for (int x = 0; x < _numDestRegs; x++) {
+            _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+        }
+    }
+}
+
+}};

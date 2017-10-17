@@ -1,0 +1,304 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010, 2012-2013 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Copyright (c) 2007-2008 The Florida State University
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Stephen Hines
+
+////////////////////////////////////////////////////////////////////
+//
+// Control transfer instructions
+//
+
+def format ArmBBlxImm() {{
+    decode_block = '''
+        if (machInst.condCode == 0xF) {
+            int32_t imm = (sext<26>(bits(machInst, 23, 0) << 2)) |
+                          (bits(machInst, 24) << 1);
+            return new BlxImm(machInst, imm, COND_UC);
+        } else {
+            return new B(machInst, sext<26>(bits(machInst, 23, 0) << 2),
+                         (ConditionCode)(uint32_t)machInst.condCode);
+        }
+    '''
+}};
+
+def format ArmBlBlxImm() {{
+    decode_block = '''
+        if (machInst.condCode == 0xF) {
+            int32_t imm = (sext<26>(bits(machInst, 23, 0) << 2)) |
+                          (bits(machInst, 24) << 1);
+            return new BlxImm(machInst, imm, COND_UC);
+        } else {
+            return new Bl(machInst, sext<26>(bits(machInst, 23, 0) << 2),
+                          (ConditionCode)(uint32_t)machInst.condCode);
+        }
+    '''
+}};
+
+def format ArmBxClz() {{
+    decode_block = '''
+    {
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+        if (OPCODE == 0x9) {
+            return new BxReg(machInst, rm,
+                    (ConditionCode)(uint32_t)machInst.condCode);
+        } else if (OPCODE == 0xb) {
+            return new Clz(machInst, rd, rm);
+        } else {
+            return new Unknown(machInst);
+        }
+    }
+    '''
+}};
+
+def format ArmBlxReg() {{
+    decode_block = '''
+        return new BlxReg(machInst, (IntRegIndex)(uint32_t)bits(machInst, 3, 0),
+                          (ConditionCode)(uint32_t)machInst.condCode);
+    '''
+}};
+
+def format Thumb16CondBranchAndSvc() {{
+    decode_block = '''
+        if (bits(machInst, 11, 9) != 0x7) {
+            return new B(machInst, sext<9>(bits(machInst, 7, 0) << 1),
+                         (ConditionCode)(uint32_t)bits(machInst, 11, 8));
+        } else if (bits(machInst, 8)) {
+            return new Svc(machInst, bits(machInst, 7, 0));
+        } else {
+            // This space will not be allocated in the future.
+            return new Unknown(machInst);
+        }
+    '''
+}};
+
+def format Thumb16UncondBranch() {{
+    decode_block = '''
+        return new B(machInst, sext<12>(bits(machInst, 10, 0) << 1), COND_UC);
+    '''
+}};
+
+def format Thumb32BranchesAndMiscCtrl() {{
+    decode_block = '''
+    {
+        const uint32_t op = bits(machInst, 26, 20);
+        const uint32_t op1 = bits(machInst, 14, 12);
+        switch (op1 & 0x5) {
+          case 0x0:
+            if (op == 127) {
+                if (op1 & 0x2) {
+                    // Permanently undefined.
+                    return new Unknown(machInst);
+                } else {
+                    return new Smc(machInst);
+                }
+            } else if ((op & 0x38) != 0x38) {
+                const uint32_t s = bits(machInst, 26);
+                const uint32_t j1 = bits(machInst, 13);
+                const uint32_t j2 = bits(machInst, 11);
+                const uint32_t imm6 = bits(machInst, 21, 16);
+                const uint32_t imm11 = bits(machInst, 10, 0);
+                const int32_t imm = sext<21>((s << 20) |
+                                             (j2 << 19) | (j1 << 18) |
+                                             (imm6 << 12) | (imm11 << 1));
+                return new B(machInst, imm,
+                             (ConditionCode)(uint32_t)bits(machInst, 25, 22));
+            } else {
+                // HIGH: 12-11=10, LOW: 15-14=00, 12=0
+                switch (op) {
+                  case 0x38:
+                  case 0x39:
+                    {
+                        const IntRegIndex rn =
+                            (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+                        const uint8_t byteMask = bits(machInst, 11, 8);
+                        const bool    r        = bits(machInst, 20);
+                        if (bits(machInst, 5)) {
+                            const uint8_t sysM = (bits(machInst, 4) << 4) |
+                                                  byteMask;
+                            return new MsrBankedReg(machInst, rn, sysM, r);
+                        } else {
+                            if (r) {
+                                return new MsrSpsrReg(machInst, rn, byteMask);
+                            } else {
+                                return new MsrCpsrReg(machInst, rn, byteMask);
+                            }
+                        }
+                    }
+                  case 0x3a:
+                    {
+                        const uint32_t op1 = bits(machInst, 10, 8);
+                        const uint32_t op2 = bits(machInst, 7, 0);
+                        if (op1 != 0) {
+                            const bool enable = bits(machInst, 10, 9) == 0x2;
+                            const uint32_t mods = bits(machInst, 8, 0) |
+                                                  ((enable ? 1 : 0) << 9);
+                            return new Cps(machInst, mods);
+                        } else if ((op2 & 0xf0) == 0xf0) {
+                            return new Dbg(machInst);
+                        } else {
+                            switch (op2) {
+                              case 0x0:
+                                return new NopInst(machInst);
+                              case 0x1:
+                                return new YieldInst(machInst);
+                              case 0x2:
+                                return new WfeInst(machInst);
+                              case 0x3:
+                                return new WfiInst(machInst);
+                              case 0x4:
+                                return new SevInst(machInst);
+                              default:
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                  case 0x3b:
+                    {
+                        const uint32_t op = bits(machInst, 7, 4);
+                        switch (op) {
+                          case 0x0:
+                            return new Leavex(machInst);
+                          case 0x1:
+                            return new Enterx(machInst);
+                          case 0x2:
+                            return new Clrex(machInst);
+                          case 0x4:
+                            return new Dsb(machInst, 0);
+                          case 0x5:
+                            return new Dmb(machInst, 0);
+                          case 0x6:
+                            return new Isb(machInst, 0);
+                          default:
+                            break;
+                        }
+                        break;
+                    }
+                  case 0x3c:
+                    {
+                        return new BxjReg(machInst,
+                                 (IntRegIndex)(uint32_t)bits(machInst, 19, 16),
+                                 COND_UC);
+                    }
+                  case 0x3d:
+                    {
+                        const uint32_t imm32 = bits(machInst, 7, 0);
+                        if (imm32 == 0) {
+                            return new Eret(machInst);
+                        } else {
+                            return new SubsImmPclr(machInst, INTREG_PC,
+                                                   INTREG_LR, imm32, false);
+                        }
+                    }
+                  case 0x3e:
+                  case 0x3f:
+                    {
+
+                        const IntRegIndex rd =
+                            (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+                        const bool    r        = bits(machInst, 20);
+                        if (bits(machInst, 5)) {
+                            const uint8_t sysM = (bits(machInst, 4) << 4) |
+                                                  bits(machInst, 11, 8);
+                            return new MrsBankedReg(machInst, rd, sysM, r);
+                        } else {
+                            if (r) {
+                                return new MrsSpsr(machInst, rd);
+                            } else {
+                                return new MrsCpsr(machInst, rd);
+                            }
+                        }
+                    }
+                  case 0xfe:
+                    {
+                        uint32_t imm16 = (bits(machInst, 19, 16) << 12) |
+                                         (bits(machInst, 11,  0) <<  0);
+                        return new Hvc(machInst, imm16);
+                    }
+                }
+                break;
+            }
+          case 0x1:
+            {
+                const uint32_t s = bits(machInst, 26);
+                const uint32_t i1 = !(bits(machInst, 13) ^ s);
+                const uint32_t i2 = !(bits(machInst, 11) ^ s);
+                const uint32_t imm10 = bits(machInst, 25, 16);
+                const uint32_t imm11 = bits(machInst, 10, 0);
+                const int32_t imm = sext<25>((s << 24) |
+                                             (i1 << 23) | (i2 << 22) |
+                                             (imm10 << 12) | (imm11 << 1));
+                return new B(machInst, imm, COND_UC);
+            }
+          case 0x4:
+            {
+                if (bits(machInst, 0) == 1) {
+                    return new Unknown(machInst);
+                }
+                const uint32_t s = bits(machInst, 26);
+                const uint32_t i1 = !(bits(machInst, 13) ^ s);
+                const uint32_t i2 = !(bits(machInst, 11) ^ s);
+                const uint32_t imm10h = bits(machInst, 25, 16);
+                const uint32_t imm10l = bits(machInst, 10, 1);
+                const int32_t imm = sext<25>((s << 24) |
+                                             (i1 << 23) | (i2 << 22) |
+                                             (imm10h << 12) | (imm10l << 2));
+                return new BlxImm(machInst, imm, COND_UC);
+            }
+          case 0x5:
+            {
+                const uint32_t s = bits(machInst, 26);
+                const uint32_t i1 = !(bits(machInst, 13) ^ s);
+                const uint32_t i2 = !(bits(machInst, 11) ^ s);
+                const uint32_t imm10 = bits(machInst, 25, 16);
+                const uint32_t imm11 = bits(machInst, 10, 0);
+                const int32_t imm = sext<25>((s << 24) |
+                                             (i1 << 23) | (i2 << 22) |
+                                             (imm10 << 12) | (imm11 << 1));
+                return new Bl(machInst, imm, COND_UC);
+            }
+          default:
+            break;
+        }
+        return new Unknown(machInst);
+    }
+    '''
+}};

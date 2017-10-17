@@ -1,0 +1,601 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2007 MIPS Technologies, Inc.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Steve Reinhardt
+//          Korey Sewell
+
+////////////////////////////////////////////////////////////////////
+//
+// Memory-format instructions
+//
+
+output header {{
+    /**
+     * Base class for general Mips memory-format instructions.
+     */
+    class Memory : public MipsStaticInst
+    {
+      protected:
+        /// Memory request flags.  See mem_req_base.hh.
+        Request::Flags memAccessFlags;
+
+        /// Displacement for EA calculation (signed).
+        int32_t disp;
+
+        /// Constructor
+        Memory(const char *mnem, MachInst _machInst, OpClass __opClass)
+            : MipsStaticInst(mnem, _machInst, __opClass),
+              disp(sext<16>(OFFSET))
+        {
+        }
+
+        std::string
+        generateDisassembly(Addr pc, const SymbolTable *symtab) const;
+    };
+
+     /**
+     * Base class for a few miscellaneous memory-format insts
+     * that don't interpret the disp field
+     */
+    class MemoryNoDisp : public Memory
+    {
+      protected:
+        /// Constructor
+        MemoryNoDisp(const char *mnem, ExtMachInst _machInst, OpClass __opClass)
+            : Memory(mnem, _machInst, __opClass)
+        {
+        }
+
+        std::string
+        generateDisassembly(Addr pc, const SymbolTable *symtab) const;
+    };
+}};
+
+
+output decoder {{
+    std::string
+    Memory::generateDisassembly(Addr pc, const SymbolTable *symtab) const
+    {
+        return csprintf("%-10s %c%d, %d(r%d)", mnemonic,
+                        flags[IsFloating] ? 'f' : 'r', RT, disp, RS);
+    }
+
+    std::string
+    MemoryNoDisp::generateDisassembly(Addr pc, const SymbolTable *symtab) const
+    {
+        return csprintf("%-10s %c%d, r%d(r%d)", mnemonic,
+                        flags[IsFloating] ? 'f' : 'r',
+                        flags[IsFloating] ? FD : RD,
+                        RS, RT);
+    }
+
+}};
+
+output header {{
+    uint64_t getMemData(%(CPU_exec_context)s *xc, Packet *packet);
+
+}};
+
+output exec {{
+    /** return data in cases where there the size of data is only
+        known in the packet
+    */
+    uint64_t getMemData(CPU_EXEC_CONTEXT *xc, Packet *packet) {
+        switch (packet->getSize())
+        {
+          case 1:
+            return packet->get<uint8_t>();
+
+          case 2:
+            return packet->get<uint16_t>();
+
+          case 4:
+            return packet->get<uint32_t>();
+
+          case 8:
+            return packet->get<uint64_t>();
+
+          default:
+            std::cerr << "bad store data size = " << packet->getSize() << std::endl;
+
+            assert(0);
+            return 0;
+        }
+    }
+
+
+}};
+
+def template LoadStoreDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst);
+
+        %(BasicExecDeclare)s
+
+        %(EACompDeclare)s
+
+        %(InitiateAccDeclare)s
+
+        %(CompleteAccDeclare)s
+    };
+}};
+
+def template EACompDeclare {{
+    Fault eaComp(%(CPU_exec_context)s *, Trace::InstRecord *) const;
+}};
+
+def template InitiateAccDeclare {{
+    Fault initiateAcc(%(CPU_exec_context)s *, Trace::InstRecord *) const;
+}};
+
+
+def template CompleteAccDeclare {{
+    Fault completeAcc(Packet *, %(CPU_exec_context)s *, Trace::InstRecord *) const;
+}};
+
+def template LoadStoreConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s)
+    {
+        %(constructor)s;
+    }
+}};
+
+
+def template EACompExecute {{
+    Fault
+    %(class_name)s::eaComp(CPU_EXEC_CONTEXT *xc,
+                                   Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        if (this->isFloating()) {
+            %(fp_enable_check)s;
+
+            if(fault != NoFault)
+                return fault;
+        }
+
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        // NOTE: Trace Data is written using execute or completeAcc templates
+        if (fault == NoFault) {
+            xc->setEA(EA);
+        }
+
+        return fault;
+    }
+}};
+
+def template LoadExecute {{
+    Fault %(class_name)s::execute(CPU_EXEC_CONTEXT *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        if (this->isFloating()) {
+            %(fp_enable_check)s;
+
+            if(fault != NoFault)
+                return fault;
+        }
+
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (fault == NoFault) {
+            fault = readMemAtomic(xc, traceData, EA, Mem, memAccessFlags);
+            %(memacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            %(op_wb)s;
+        }
+
+        return fault;
+    }
+}};
+
+
+def template LoadInitiateAcc {{
+    Fault %(class_name)s::initiateAcc(CPU_EXEC_CONTEXT *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        if (this->isFloating()) {
+            %(fp_enable_check)s;
+
+            if(fault != NoFault)
+                return fault;
+        }
+
+        %(op_src_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (fault == NoFault) {
+            fault = initiateMemRead(xc, traceData, EA, Mem, memAccessFlags);
+        }
+
+        return fault;
+    }
+}};
+
+def template LoadCompleteAcc {{
+    Fault %(class_name)s::completeAcc(Packet *pkt,
+                                      CPU_EXEC_CONTEXT *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+
+        if (this->isFloating()) {
+            %(fp_enable_check)s;
+
+            if(fault != NoFault)
+                return fault;
+        }
+
+        %(op_decl)s;
+        %(op_rd)s;
+
+        getMem(pkt, Mem, traceData);
+
+        if (fault == NoFault) {
+            %(memacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            %(op_wb)s;
+        }
+
+        return fault;
+    }
+}};
+
+def template StoreExecute {{
+    Fault %(class_name)s::execute(CPU_EXEC_CONTEXT *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(fp_enable_check)s;
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (fault == NoFault) {
+            %(memacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            fault = writeMemAtomic(xc, traceData, Mem, EA, memAccessFlags,
+                    NULL);
+        }
+
+        if (fault == NoFault) {
+            %(postacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            %(op_wb)s;
+        }
+
+        return fault;
+    }
+}};
+
+
+def template StoreFPExecute {{
+    Fault %(class_name)s::execute(CPU_EXEC_CONTEXT *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(fp_enable_check)s;
+        if(fault != NoFault)
+          return fault;
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (fault == NoFault) {
+            %(memacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            fault = writeMemAtomic(xc, traceData, Mem, EA, memAccessFlags,
+                    NULL);
+        }
+
+        if (fault == NoFault) {
+            %(postacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            %(op_wb)s;
+        }
+
+        return fault;
+    }
+}};
+
+def template StoreCondExecute {{
+    Fault %(class_name)s::execute(CPU_EXEC_CONTEXT *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+        uint64_t write_result = 0;
+
+        %(fp_enable_check)s;
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (fault == NoFault) {
+            %(memacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            fault = writeMemAtomic(xc, traceData, Mem, EA, memAccessFlags,
+                    &write_result);
+        }
+
+        if (fault == NoFault) {
+            %(postacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            %(op_wb)s;
+        }
+
+        return fault;
+    }
+}};
+
+def template StoreInitiateAcc {{
+    Fault %(class_name)s::initiateAcc(CPU_EXEC_CONTEXT *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(fp_enable_check)s;
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (fault == NoFault) {
+            %(memacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            fault = writeMemTiming(xc, traceData, Mem, EA, memAccessFlags,
+                    NULL);
+        }
+
+        return fault;
+    }
+}};
+
+
+def template StoreCompleteAcc {{
+    Fault %(class_name)s::completeAcc(Packet *pkt,
+                                      CPU_EXEC_CONTEXT *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        return NoFault;
+    }
+}};
+
+def template StoreCondCompleteAcc {{
+    Fault %(class_name)s::completeAcc(Packet *pkt,
+                                      CPU_EXEC_CONTEXT *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+
+        %(fp_enable_check)s;
+        %(op_dest_decl)s;
+
+        uint64_t write_result = pkt->req->getExtraData();
+
+        if (fault == NoFault) {
+            %(postacc_code)s;
+        }
+
+        if (fault == NoFault) {
+            %(op_wb)s;
+        }
+
+        return fault;
+    }
+}};
+
+def template MiscExecute {{
+    Fault %(class_name)s::execute(CPU_EXEC_CONTEXT *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA M5_VAR_USED = 0;
+        Fault fault = NoFault;
+
+        %(fp_enable_check)s;
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (fault == NoFault) {
+            %(memacc_code)s;
+        }
+
+        return NoFault;
+    }
+}};
+
+def template MiscInitiateAcc {{
+    Fault %(class_name)s::initiateAcc(CPU_EXEC_CONTEXT *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        panic("Misc instruction does not support split access method!");
+        return NoFault;
+    }
+}};
+
+
+def template MiscCompleteAcc {{
+    Fault %(class_name)s::completeAcc(Packet *pkt,
+                                      CPU_EXEC_CONTEXT *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        panic("Misc instruction does not support split access method!");
+
+        return NoFault;
+    }
+}};
+
+def format LoadMemory(memacc_code, ea_code = {{ EA = Rs + disp; }},
+                     mem_flags = [], inst_flags = []) {{
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      decode_template = ImmNopCheckDecode,
+                      exec_template_base = 'Load')
+}};
+
+
+def format StoreMemory(memacc_code, ea_code = {{ EA = Rs + disp; }},
+                     mem_flags = [], inst_flags = []) {{
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      exec_template_base = 'Store')
+}};
+
+def format LoadIndexedMemory(memacc_code, ea_code = {{ EA = Rs + Rt; }},
+                     mem_flags = [], inst_flags = []) {{
+    inst_flags += ['IsIndexed']
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      decode_template = ImmNopCheckDecode,
+                      exec_template_base = 'Load')
+}};
+
+def format StoreIndexedMemory(memacc_code, ea_code = {{ EA = Rs + Rt; }},
+                     mem_flags = [], inst_flags = []) {{
+    inst_flags += ['IsIndexed']
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      exec_template_base = 'Store')
+}};
+
+def format LoadFPIndexedMemory(memacc_code, ea_code = {{ EA = Rs + Rt; }},
+                     mem_flags = [], inst_flags = []) {{
+    inst_flags += ['IsIndexed', 'IsFloating']
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      decode_template = ImmNopCheckDecode,
+                      exec_template_base = 'Load')
+}};
+
+def format StoreFPIndexedMemory(memacc_code, ea_code = {{ EA = Rs + Rt; }},
+                     mem_flags = [], inst_flags = []) {{
+    inst_flags += ['IsIndexed', 'IsFloating']
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      exec_template_base = 'Store')
+}};
+
+
+def format LoadUnalignedMemory(memacc_code, ea_code = {{ EA = (Rs + disp) & ~3; }},
+                     mem_flags = [], inst_flags = []) {{
+    decl_code = '''
+        uint32_t mem_word = Mem_uw;
+        uint32_t unalign_addr = Rs + disp;
+        uint32_t byte_offset = unalign_addr & 3;
+        if (GuestByteOrder == BigEndianByteOrder)
+            byte_offset ^= 3;
+    '''
+
+    memacc_code = decl_code + memacc_code
+
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      decode_template = ImmNopCheckDecode,
+                      exec_template_base = 'Load')
+}};
+
+def format StoreUnalignedMemory(memacc_code, ea_code = {{ EA = (Rs + disp) & ~3; }},
+                     mem_flags = [], inst_flags = []) {{
+    decl_code = '''
+        uint32_t mem_word = 0;
+        uint32_t unaligned_addr = Rs + disp;
+        uint32_t byte_offset = unaligned_addr & 3;
+        if (GuestByteOrder == BigEndianByteOrder)
+            byte_offset ^= 3;
+        fault = readMemAtomic(xc, traceData, EA, mem_word, memAccessFlags);
+    '''
+    memacc_code = decl_code + memacc_code + '\nMem = mem_word;\n'
+
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      exec_template_base = 'Store')
+}};
+
+def format Prefetch(ea_code = {{ EA = Rs + disp; }},
+                          mem_flags = [], pf_flags = [], inst_flags = []) {{
+    pf_mem_flags = mem_flags + pf_flags + ['PREFETCH']
+    pf_inst_flags = inst_flags
+
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code,
+                      'warn_once("Prefetching not implemented for MIPS\\n");',
+                      pf_mem_flags, pf_inst_flags, exec_template_base = 'Misc')
+
+}};
+
+def format StoreCond(memacc_code, postacc_code,
+                     ea_code = {{ EA = Rs + disp; }},
+                     mem_flags = [], inst_flags = []) {{
+    (header_output, decoder_output, decode_block, exec_output) = \
+        LoadStoreBase(name, Name, ea_code, memacc_code, mem_flags, inst_flags,
+                      postacc_code, exec_template_base = 'StoreCond')
+}};

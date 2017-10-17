@@ -1,0 +1,387 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010-2011 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+let {{
+    import math
+
+    header_output = ""
+    decoder_output = ""
+    exec_output = ""
+
+    class StoreInst(LoadStoreInst):
+        execBase = 'Store'
+
+        def __init__(self, mnem, post, add, writeback, size=4,
+                     sign=False, user=False, flavor="normal",
+                     instFlags = []):
+            super(StoreInst, self).__init__()
+
+            self.name = mnem
+            self.post = post
+            self.add = add
+            self.writeback = writeback
+            self.size = size
+            self.sign = sign
+            self.user = user
+            self.flavor = flavor
+            self.instFlags = instFlags
+            if self.add:
+                self.op = " +"
+            else:
+                self.op = " -"
+
+            self.memFlags = ["ArmISA::TLB::MustBeOne"]
+            self.codeBlobs = { "postacc_code" : "" }
+
+        def emitHelper(self, base = 'Memory', wbDecl = None):
+
+            global header_output, decoder_output, exec_output
+
+            codeBlobs = self.codeBlobs
+            codeBlobs["predicate_test"] = pickPredicate(codeBlobs)
+            (newHeader,
+             newDecoder,
+             newExec) = self.fillTemplates(self.name, self.Name, codeBlobs,
+                                           self.memFlags, self.instFlags,
+                                           base, wbDecl, None, False,
+                                           self.size, self.sign)
+
+            header_output += newHeader
+            decoder_output += newDecoder
+            exec_output += newExec
+
+    class SrsInst(LoadStoreInst):
+        execBase = 'Store'
+        decConstBase = 'Srs'
+
+        def __init__(self, mnem, post, add, writeback):
+            super(SrsInst, self).__init__()
+            self.name = mnem
+            self.post = post
+            self.add = add
+            self.writeback = writeback
+
+            self.Name = "SRS_" + storeImmClassName(post, add, writeback, 8)
+
+        def emit(self):
+            offset = 0
+            if self.post != self.add:
+                offset += 4
+            if not self.add:
+                offset -= 8
+
+            eaCode = "EA = SpMode + %d;" % offset
+
+            wbDiff = -8
+            if self.add:
+                wbDiff = 8
+            accCode = '''
+            CPSR cpsr = Cpsr;
+            Mem_ud = (uint64_t)cSwap(LR_uw, cpsr.e) |
+                     ((uint64_t)cSwap(Spsr_uw, cpsr.e) << 32);
+            '''
+
+            global header_output, decoder_output, exec_output
+
+            codeBlobs = { "ea_code": eaCode,
+                          "memacc_code": accCode,
+                          "postacc_code": "" }
+            codeBlobs["predicate_test"] = pickPredicate(codeBlobs)
+
+            wbDecl = None
+            if self.writeback:
+                wbDecl = '''MicroAddiUop(machInst,
+                              intRegInMode((OperatingMode)regMode, INTREG_SP),
+                              intRegInMode((OperatingMode)regMode, INTREG_SP),
+                              %d);''' % wbDiff
+
+            (newHeader,
+             newDecoder,
+             newExec) = self.fillTemplates(self.name, self.Name, codeBlobs,
+                 ["ArmISA::TLB::AlignWord", "ArmISA::TLB::MustBeOne"], [],
+                 'SrsOp', wbDecl)
+
+            header_output += newHeader
+            decoder_output += newDecoder
+            exec_output += newExec
+
+    class StoreImmInst(StoreInst):
+        def __init__(self, *args, **kargs):
+            super(StoreImmInst, self).__init__(*args, **kargs)
+            self.offset = self.op + " imm"
+
+            if self.add:
+                self.wbDecl = "MicroAddiUop(machInst, base, base, imm);"
+            else:
+                self.wbDecl = "MicroSubiUop(machInst, base, base, imm);"
+
+    class StoreRegInst(StoreInst):
+        def __init__(self, *args, **kargs):
+            super(StoreRegInst, self).__init__(*args, **kargs)
+            self.offset = self.op + " shift_rm_imm(Index, shiftAmt," + \
+                                    " shiftType, OptShiftRmCondCodesC)"
+            if self.add:
+                 self.wbDecl = '''
+                     MicroAddUop(machInst, base, base, index, shiftAmt, shiftType);
+                 '''
+            else:
+                 self.wbDecl = '''
+                     MicroSubUop(machInst, base, base, index, shiftAmt, shiftType);
+                 '''
+
+    class StoreSingle(StoreInst):
+        def __init__(self, *args, **kargs):
+            super(StoreSingle, self).__init__(*args, **kargs)
+
+            # Build the default class name
+            self.Name = self.nameFunc(self.post, self.add, self.writeback,
+                                      self.size, self.sign, self.user)
+
+            # Add memory request flags where necessary
+            self.memFlags.append("%d" % int(math.log(self.size, 2)))
+            if self.user:
+                self.memFlags.append("ArmISA::TLB::UserMode")
+
+            if self.flavor == "exclusive":
+                self.memFlags.append("Request::LLSC")
+            elif self.flavor != "fp":
+                self.memFlags.append("ArmISA::TLB::AllowUnaligned")
+
+            # Disambiguate the class name for different flavors of stores
+            if self.flavor != "normal":
+                self.Name = "%s_%s" % (self.name.upper(), self.Name)
+
+        def emit(self):
+            # Address computation
+            eaCode = "EA = Base"
+            if not self.post:
+                eaCode += self.offset
+            eaCode += ";"
+
+            if self.flavor == "fp":
+                eaCode += vfpEnabledCheckCode
+
+            self.codeBlobs["ea_code"] = eaCode
+
+            # Code that actually handles the access
+            if self.flavor == "fp":
+                accCode = 'Mem%(suffix)s = cSwap(FpDest_uw, ((CPSR)Cpsr).e);'
+            else:
+                accCode = \
+                    'Mem%(suffix)s = cSwap(Dest%(suffix)s, ((CPSR)Cpsr).e);'
+            accCode = accCode % \
+                { "suffix" : buildMemSuffix(self.sign, self.size) }
+
+            self.codeBlobs["memacc_code"] = accCode
+
+            # Push it out to the output files
+            base = buildMemBase(self.basePrefix, self.post, self.writeback)
+            wbDecl = None
+            if self.writeback:
+                wbDecl = self.wbDecl
+            self.emitHelper(base, wbDecl)
+
+    def storeImmClassName(post, add, writeback, size=4, sign=False, user=False):
+        return memClassName("STORE_IMM", post, add, writeback, size, sign, user)
+
+    class StoreImmEx(StoreImmInst, StoreSingle):
+        execBase = 'StoreEx'
+        decConstBase = 'StoreExImm'
+        basePrefix = 'MemoryExImm'
+        nameFunc = staticmethod(storeImmClassName)
+
+        def __init__(self, *args, **kargs):
+            super(StoreImmEx, self).__init__(*args, **kargs)
+            self.codeBlobs["postacc_code"] = "Result = !writeResult;"
+
+    class StoreImm(StoreImmInst, StoreSingle):
+        decConstBase = 'LoadStoreImm'
+        basePrefix = 'MemoryImm'
+        nameFunc = staticmethod(storeImmClassName)
+
+    def storeRegClassName(post, add, writeback, size=4, sign=False, user=False):
+        return memClassName("STORE_REG", post, add, writeback, size, sign, user)
+
+    class StoreReg(StoreRegInst, StoreSingle):
+        decConstBase = 'StoreReg'
+        basePrefix = 'MemoryReg'
+        nameFunc = staticmethod(storeRegClassName)
+
+    class StoreDouble(StoreInst):
+        def __init__(self, *args, **kargs):
+            super(StoreDouble, self).__init__(*args, **kargs)
+
+            # Build the default class name
+            self.Name = self.nameFunc(self.post, self.add, self.writeback)
+
+            # Add memory request flags where necessary
+            if self.flavor == "exclusive":
+                self.memFlags.append("Request::LLSC")
+                self.memFlags.append("ArmISA::TLB::AlignDoubleWord")
+            else:
+                self.memFlags.append("ArmISA::TLB::AlignWord")
+
+            # Disambiguate the class name for different flavors of stores
+            if self.flavor != "normal":
+                self.Name = "%s_%s" % (self.name.upper(), self.Name)
+
+        def emit(self):
+            # Address computation code
+            eaCode = "EA = Base"
+            if not self.post:
+                eaCode += self.offset
+            eaCode += ";"
+
+            if self.flavor == "fp":
+                eaCode += vfpEnabledCheckCode
+
+            self.codeBlobs["ea_code"] = eaCode
+
+            # Code that actually handles the access
+            if self.flavor == "fp":
+                accCode = '''
+                uint64_t swappedMem  = (uint64_t)FpDest_uw |
+                                       ((uint64_t)FpDest2_uw << 32);
+                Mem_ud = cSwap(swappedMem, ((CPSR)Cpsr).e);
+                '''
+            else:
+                accCode = '''
+                CPSR cpsr = Cpsr;
+                Mem_ud = (uint64_t)cSwap(Dest_uw, cpsr.e) |
+                         ((uint64_t)cSwap(Dest2_uw, cpsr.e) << 32);
+                '''
+
+            self.codeBlobs["memacc_code"] = accCode
+
+            # Push it out to the output files
+            base = buildMemBase(self.basePrefix, self.post, self.writeback)
+            wbDecl = None
+            if self.writeback:
+                wbDecl = self.wbDecl
+            self.emitHelper(base, wbDecl)
+
+    def storeDoubleImmClassName(post, add, writeback):
+        return memClassName("STORE_IMMD", post, add, writeback, 4, False, False)
+
+    class StoreDoubleImmEx(StoreImmInst, StoreDouble):
+        execBase = 'StoreEx'
+        decConstBase = 'StoreExDImm'
+        basePrefix = 'MemoryExDImm'
+        nameFunc = staticmethod(storeDoubleImmClassName)
+
+        def __init__(self, *args, **kargs):
+            super(StoreDoubleImmEx, self).__init__(*args, **kargs)
+            self.codeBlobs["postacc_code"] = "Result = !writeResult;"
+
+    class StoreDoubleImm(StoreImmInst, StoreDouble):
+        decConstBase = 'LoadStoreDImm'
+        basePrefix = 'MemoryDImm'
+        nameFunc = staticmethod(storeDoubleImmClassName)
+
+    def storeDoubleRegClassName(post, add, writeback):
+        return memClassName("STORE_REGD", post, add, writeback, 4, False, False)
+
+    class StoreDoubleReg(StoreRegInst, StoreDouble):
+        decConstBase = 'StoreDReg'
+        basePrefix = 'MemoryDReg'
+        nameFunc = staticmethod(storeDoubleRegClassName)
+
+    def buildStores(mnem, size=4, sign=False, user=False):
+        StoreImm(mnem, True, True, True, size, sign, user).emit()
+        StoreReg(mnem, True, True, True, size, sign, user).emit()
+        StoreImm(mnem, True, False, True, size, sign, user).emit()
+        StoreReg(mnem, True, False, True, size, sign, user).emit()
+        StoreImm(mnem, False, True, True, size, sign, user).emit()
+        StoreReg(mnem, False, True, True, size, sign, user).emit()
+        StoreImm(mnem, False, False, True, size, sign, user).emit()
+        StoreReg(mnem, False, False, True, size, sign, user).emit()
+        StoreImm(mnem, False, True, False, size, sign, user).emit()
+        StoreReg(mnem, False, True, False, size, sign, user).emit()
+        StoreImm(mnem, False, False, False, size, sign, user).emit()
+        StoreReg(mnem, False, False, False, size, sign, user).emit()
+
+    def buildDoubleStores(mnem):
+        StoreDoubleImm(mnem, True, True, True).emit()
+        StoreDoubleReg(mnem, True, True, True).emit()
+        StoreDoubleImm(mnem, True, False, True).emit()
+        StoreDoubleReg(mnem, True, False, True).emit()
+        StoreDoubleImm(mnem, False, True, True).emit()
+        StoreDoubleReg(mnem, False, True, True).emit()
+        StoreDoubleImm(mnem, False, False, True).emit()
+        StoreDoubleReg(mnem, False, False, True).emit()
+        StoreDoubleImm(mnem, False, True, False).emit()
+        StoreDoubleReg(mnem, False, True, False).emit()
+        StoreDoubleImm(mnem, False, False, False).emit()
+        StoreDoubleReg(mnem, False, False, False).emit()
+
+    def buildSrsStores(mnem):
+        SrsInst(mnem, True, True, True).emit()
+        SrsInst(mnem, True, True, False).emit()
+        SrsInst(mnem, True, False, True).emit()
+        SrsInst(mnem, True, False, False).emit()
+        SrsInst(mnem, False, True, True).emit()
+        SrsInst(mnem, False, True, False).emit()
+        SrsInst(mnem, False, False, True).emit()
+        SrsInst(mnem, False, False, False).emit()
+
+    buildStores("str")
+    buildStores("strt", user=True)
+    buildStores("strb", size=1)
+    buildStores("strbt", size=1, user=True)
+    buildStores("strh", size=2)
+    buildStores("strht", size=2, user=True)
+
+    buildSrsStores("srs")
+
+    buildDoubleStores("strd")
+
+    StoreImmEx("strex", False, True, False, size=4, flavor="exclusive",
+               instFlags = ['IsStoreConditional']).emit()
+    StoreImmEx("strexh", False, True, False, size=2, flavor="exclusive",
+               instFlags = ['IsStoreConditional']).emit()
+    StoreImmEx("strexb", False, True, False, size=1, flavor="exclusive",
+               instFlags = ['IsStoreConditional']).emit()
+    StoreDoubleImmEx("strexd", False, True, False, flavor="exclusive",
+               instFlags = ['IsStoreConditional']).emit()
+
+    StoreImm("vstr", False, True, False, size=4, flavor="fp").emit()
+    StoreImm("vstr", False, False, False, size=4, flavor="fp").emit()
+    StoreDoubleImm("vstr", False, True, False, flavor="fp").emit()
+    StoreDoubleImm("vstr", False, False, False, flavor="fp").emit()
+}};

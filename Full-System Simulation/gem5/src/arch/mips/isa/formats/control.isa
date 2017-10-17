@@ -1,0 +1,254 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2007 MIPS Technologies, Inc.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Korey Sewell
+//          Jaidev Patwardhan
+
+////////////////////////////////////////////////////////////////////
+//
+// Coprocessor instructions
+//
+
+//Outputs to decoder.hh
+output header {{
+
+        class CP0Control : public MipsStaticInst
+        {
+                protected:
+
+                /// Constructor
+                CP0Control(const char *mnem, MachInst _machInst, OpClass __opClass) :
+                           MipsStaticInst(mnem, _machInst, __opClass)
+                {
+                }
+
+                std::string generateDisassembly(Addr pc, const SymbolTable *symtab) const;
+        };
+        class CP0TLB : public MipsStaticInst
+        {
+                protected:
+
+                /// Constructor
+                CP0TLB(const char *mnem, MachInst _machInst, OpClass __opClass) :
+                           MipsStaticInst(mnem, _machInst, __opClass)
+                {
+                }
+
+                std::string generateDisassembly(Addr pc, const SymbolTable *symtab) const;
+        };
+
+
+        class CP1Control : public MipsStaticInst
+        {
+                protected:
+
+                /// Constructor
+                CP1Control(const char *mnem, MachInst _machInst, OpClass __opClass) :
+                           MipsStaticInst(mnem, _machInst, __opClass)
+                {
+                }
+
+                std::string generateDisassembly(Addr pc, const SymbolTable *symtab) const;
+        };
+
+}};
+
+// Basic instruction class execute method template.
+def template CP0Execute {{
+        Fault %(class_name)s::execute(CPU_EXEC_CONTEXT *xc, Trace::InstRecord *traceData) const
+        {
+                Fault fault = NoFault;
+                %(op_decl)s;
+                %(op_rd)s;
+
+                if (isCoprocessorEnabled(xc, 0)) {
+                    %(code)s;
+
+                    if(fault == NoFault)
+                    {
+                        %(op_wb)s;
+                    }
+                } else {
+                    fault = std::make_shared<CoprocessorUnusableFault>(0);
+                }
+                return fault;
+        }
+}};
+
+def template CP1Execute {{
+        Fault %(class_name)s::execute(CPU_EXEC_CONTEXT *xc, Trace::InstRecord *traceData) const
+        {
+                Fault fault = NoFault;
+                %(op_decl)s;
+                %(op_rd)s;
+
+                if (isCoprocessorEnabled(xc, 1)) {
+                    %(code)s;
+                } else {
+                    fault = std::make_shared<CoprocessorUnusableFault>(1);
+                }
+
+                if(fault == NoFault)
+                {
+                    %(op_wb)s;
+                }
+                return fault;
+        }
+}};
+// Basic instruction class execute method template.
+def template ControlTLBExecute {{
+        Fault %(class_name)s::execute(CPU_EXEC_CONTEXT *xc, Trace::InstRecord *traceData) const
+        {
+            Fault fault = NoFault;
+            %(op_decl)s;
+            %(op_rd)s;
+
+            if (FullSystem) {
+                if (isCoprocessor0Enabled(xc)) {
+                    if(isMMUTLB(xc)){
+                        %(code)s;
+                    } else {
+                        fault = std::make_shared<ReservedInstructionFault>();
+                    }
+                } else {
+                    fault = std::make_shared<CoprocessorUnusableFault>(0);
+                }
+            } else { // Syscall Emulation Mode - No TLB Instructions
+                fault = std::make_shared<ReservedInstructionFault>();
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+            return fault;
+        }
+}};
+
+//Outputs to decoder.cc
+output decoder {{
+        std::string CP0Control::generateDisassembly(Addr pc, const SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ccprintf(ss, "%-10s r%d, %d, %d", mnemonic, RT, RD, SEL);
+            return ss.str();
+        }
+        std::string CP0TLB::generateDisassembly(Addr pc, const SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ccprintf(ss, "%-10s r%d, %d, %d", mnemonic, RT, RD, SEL);
+            return ss.str();
+        }
+        std::string CP1Control::generateDisassembly(Addr pc, const SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ccprintf(ss, "%-10s r%d, f%d", mnemonic, RT, FS);
+            return ss.str();
+        }
+
+}};
+
+output header {{
+        bool isCoprocessorEnabled(%(CPU_exec_context)s *xc, unsigned cop_num);
+
+        bool isMMUTLB(%(CPU_exec_context)s *xc);
+
+}};
+
+output exec {{
+        bool
+        isCoprocessorEnabled(CPU_EXEC_CONTEXT *xc, unsigned cop_num)
+        {
+            if (!FullSystem)
+                return true;
+
+            MiscReg Stat = xc->readMiscReg(MISCREG_STATUS);
+            if (cop_num == 0) {
+                MiscReg Dbg = xc->readMiscReg(MISCREG_DEBUG);
+                // In Stat, EXL, ERL or CU0 set, CP0 accessible
+                // In Dbg, DM bit set, CP0 accessible
+                // In Stat, KSU = 0, kernel mode is base mode
+                return (Stat & 0x10000006) ||
+                       (Dbg & 0x40000000) ||
+                       !(Stat & 0x00000018);
+            } else if (cop_num < 4) {
+                return Stat & (0x10000000 << cop_num); // CU is reset
+            } else {
+                panic("Invalid Coprocessor Number Specified");
+            }
+        }
+
+        bool inline
+        isCoprocessor0Enabled(CPU_EXEC_CONTEXT *xc)
+        {
+            if (FullSystem) {
+                MiscReg Stat = xc->readMiscReg(MISCREG_STATUS);
+                MiscReg Dbg = xc->readMiscReg(MISCREG_DEBUG);
+                // In Stat, EXL, ERL or CU0 set, CP0 accessible
+                // In Dbg, DM bit set, CP0 accessible
+                // In Stat KSU = 0, kernel mode is base mode
+                return (Stat & 0x10000006) || (Dbg & 0x40000000) ||
+                    !(Stat & 0x00000018);
+            } else {
+                return true;
+            }
+        }
+
+        bool
+        isMMUTLB(CPU_EXEC_CONTEXT *xc)
+        {
+            MiscReg Config = xc->readMiscReg(MISCREG_CONFIG);
+            return FullSystem && (Config & 0x380) == 0x80;
+        }
+}};
+
+def format CP0Control(code, *flags) {{
+    flags += ('IsNonSpeculative', )
+    iop = InstObjParams(name, Name, 'CP0Control', code, flags)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    decode_block = BasicDecode.subst(iop)
+    exec_output = CP0Execute.subst(iop)
+}};
+def format CP0TLB(code, *flags) {{
+    flags += ('IsNonSpeculative', )
+    iop = InstObjParams(name, Name, 'CP0Control', code, flags)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    decode_block = BasicDecode.subst(iop)
+    exec_output = ControlTLBExecute.subst(iop)
+}};
+def format CP1Control(code, *flags) {{
+    flags += ('IsNonSpeculative', )
+    iop = InstObjParams(name, Name, 'CP1Control', code, flags)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    decode_block = BasicDecode.subst(iop)
+    exec_output = CP1Execute.subst(iop)
+}};
+
+
