@@ -1,0 +1,211 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Copyright (c) 2007-2008 The Florida State University
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Stephen Hines
+
+let {{
+
+     calcCcCode = '''
+        if (%(canOverflow)s){
+           cprintf("canOverflow: %%d\\n", Rd < resTemp);
+           CpsrQ = (Rd < resTemp) ? 1 << 27 : 0;
+        } else {
+            uint16_t _ic, _iv, _iz, _in;
+            _in = (resTemp >> %(negBit)d);
+            _iz = (resTemp == 0);
+            _iv = %(ivValue)s;
+            _ic = %(icValue)s;
+
+            CondCodesNZ =  (_in << 1) | (_iz);
+            CondCodesC  =  _ic;
+            CondCodesV  =  _iv;
+
+            DPRINTF(Arm, "in = %%d\\n", _in);
+            DPRINTF(Arm, "iz = %%d\\n", _iz);
+            DPRINTF(Arm, "ic = %%d\\n", _ic);
+            DPRINTF(Arm, "iv = %%d\\n", _iv);
+        }
+        '''
+}};
+
+let {{
+    def getCcCode(flagtype):
+        icReg = icImm = iv = ''
+        negBit = 31
+        canOverflow = 'false'
+
+        if flagtype == "none":
+            icReg = icImm = 'CondCodesC'
+            iv = 'CondCodesV'
+        elif flagtype == "llbit":
+            icReg = icImm = 'CondCodesC'
+            iv = 'CondCodesV'
+            negBit = 63
+        elif flagtype == "overflow":
+            canOverflow = "true"
+            icReg = icImm = iv = '0'
+        elif flagtype == "add":
+            icReg = icImm = 'findCarry(32, resTemp, Rn, op2)'
+            iv = 'findOverflow(32, resTemp, Rn, op2)'
+        elif flagtype == "sub":
+            icReg = icImm ='findCarry(32, resTemp, Rn, ~op2)'
+            iv = 'findOverflow(32, resTemp, Rn, ~op2)'
+        elif flagtype == "rsb":
+            icReg = icImm = 'findCarry(32, resTemp, op2, ~Rn)'
+            iv = 'findOverflow(32, resTemp, op2, ~Rn)'
+        else:
+            icReg = 'shift_carry_rs(Rm, Rs<7:0>, shift, CondCodesC)'
+            icImm = 'shift_carry_imm(Rm, shift_size, shift, CondCodesC)'
+            iv = 'CondCodesV'
+        return (calcCcCode % {"icValue" : icReg,
+                              "ivValue" : iv,
+                              "negBit" : negBit,
+                              "canOverflow" : canOverflow },
+               calcCcCode % {"icValue" : icImm,
+                              "ivValue" : iv,
+                              "negBit" : negBit,
+                              "canOverflow" : canOverflow })
+
+    def getImmCcCode(flagtype):
+        ivValue = icValue = ''
+        negBit = 31
+        canOverflow = 'false'
+        if flagtype == "none":
+            icValue = 'CondCodesC'
+            ivValue = 'CondCodesV'
+        elif flagtype == "llbit":
+            icValue = 'CondCodesC'
+            ivValue = 'CondCodesV'
+            negBit = 63
+        elif flagtype == "overflow":
+            icVaule = ivValue = '0'
+            canOverflow = "true"
+        elif flagtype == "add":
+            icValue = 'findCarry(32, resTemp, Rn, rotated_imm)'
+            ivValue = 'findOverflow(32, resTemp, Rn, rotated_imm)'
+        elif flagtype == "sub":
+            icValue = 'findCarry(32, resTemp, Rn, ~rotated_imm)'
+            ivValue = 'findOverflow(32, resTemp, Rn, ~rotated_imm)'
+        elif flagtype == "rsb":
+            icValue = 'findCarry(32, resTemp, rotated_imm, ~Rn)'
+            ivValue = 'findOverflow(32, resTemp, rotated_imm, ~Rn)'
+        elif flagtype == "modImm":
+            icValue = 'rotated_carry'
+            ivValue = 'CondCodesV'
+        else:
+            icValue = '(rotate ? rotated_carry:CondCodesC)'
+            ivValue = 'CondCodesV'
+        return calcCcCode % vars()
+}};
+
+def format DataOp(code, flagtype = logic) {{
+    (regCcCode, immCcCode) = getCcCode(flagtype)
+    regCode = '''uint32_t op2 = shift_rm_rs(Rm, Rs<7:0>,
+                                            shift, 0);
+                 op2 = op2;''' + code
+    immCode = '''uint32_t op2 = shift_rm_imm(Rm, shift_size,
+                                             shift, OptShiftRmCondCodesC);
+                 op2 = op2;''' + code
+    regIop = InstObjParams(name, Name, 'PredIntOp',
+                           {"code": regCode,
+                            "predicate_test": pickPredicate(regCode)})
+    immIop = InstObjParams(name, Name + "Imm", 'PredIntOp',
+                           {"code": immCode,
+                            "predicate_test": pickPredicate(imm)})
+    regCcIop = InstObjParams(name, Name + "Cc", 'PredIntOp',
+                         {"code": regCode + regCcCode,
+                          "predicate_test": pickPredicate(regCode + regCcCode)})
+    immCcIop = InstObjParams(name, Name + "ImmCc", 'PredIntOp',
+                         {"code": immCode + immCcCode,
+                          "predicate_test": pickPredicate(immCode + immCcCode)})
+    header_output = BasicDeclare.subst(regIop) + \
+                    BasicDeclare.subst(immIop) + \
+                    BasicDeclare.subst(regCcIop) + \
+                    BasicDeclare.subst(immCcIop)
+    decoder_output = BasicConstructor.subst(regIop) + \
+                     BasicConstructor.subst(immIop) + \
+                     BasicConstructor.subst(regCcIop) + \
+                     BasicConstructor.subst(immCcIop)
+    exec_output = PredOpExecute.subst(regIop) + \
+                  PredOpExecute.subst(immIop) + \
+                  PredOpExecute.subst(regCcIop) + \
+                  PredOpExecute.subst(immCcIop)
+    decode_block = DataDecode.subst(regIop)
+}};
+
+def format DataImmOp(code, flagtype = logic) {{
+    code += "resTemp = resTemp;"
+    iop = InstObjParams(name, Name, 'PredImmOp',
+                        {"code": code,
+                         "predicate_test": pickPredicate(code)})
+    ccIop = InstObjParams(name, Name + "Cc", 'PredImmOp',
+              {"code": code + getImmCcCode(flagtype),
+               "predicate_test": pickPredicate(code + getImmCcCode(flagtype))})
+    header_output = BasicDeclare.subst(iop) + \
+                    BasicDeclare.subst(ccIop)
+    decoder_output = BasicConstructor.subst(iop) + \
+                     BasicConstructor.subst(ccIop)
+    exec_output = PredOpExecute.subst(iop) + \
+                  PredOpExecute.subst(ccIop)
+    decode_block = DataImmDecode.subst(iop)
+}};
+
+def format PredOp(code, *opt_flags) {{
+    iop = InstObjParams(name, Name, 'PredOp',
+                        {"code": code,
+                         "predicate_test": pickPredicate(code)},
+                        opt_flags)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    decode_block = BasicDecode.subst(iop)
+    exec_output = PredOpExecute.subst(iop)
+}};
+
+def format PredImmOp(code, *opt_flags) {{
+    iop = InstObjParams(name, Name, 'PredImmOp',
+                        {"code": code,
+                         "predicate_test": pickPredicate(code)},
+                        opt_flags)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    decode_block = BasicDecode.subst(iop)
+    exec_output = PredOpExecute.subst(iop)
+}};
+

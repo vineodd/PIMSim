@@ -1,0 +1,1242 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010, 2012, 2014, 2016 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Copyright (c) 2007-2008 The Florida State University
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Stephen Hines
+
+
+def template PanicExecute {{
+    Fault %(class_name)s::execute(ExecContext *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        panic("Execute function executed when it shouldn't be!\n");
+        return NoFault;
+    }
+}};
+
+def template PanicInitiateAcc {{
+    Fault %(class_name)s::initiateAcc(ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        panic("InitiateAcc function executed when it shouldn't be!\n");
+        return NoFault;
+    }
+}};
+
+def template PanicCompleteAcc {{
+    Fault %(class_name)s::completeAcc(PacketPtr pkt, ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        panic("CompleteAcc function executed when it shouldn't be!\n");
+        return NoFault;
+    }
+}};
+
+
+def template SwapExecute {{
+    Fault %(class_name)s::execute(ExecContext *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        uint64_t memData = 0;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            %(preacc_code)s;
+
+            if (fault == NoFault) {
+                fault = writeMemAtomic(xc, traceData, Mem, EA, memAccessFlags,
+                        &memData);
+            }
+
+            if (fault == NoFault) {
+                %(postacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template SwapInitiateAcc {{
+    Fault %(class_name)s::initiateAcc(ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        uint64_t memData = 0;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            %(preacc_code)s;
+
+            if (fault == NoFault) {
+                fault = writeMemTiming(xc, traceData, Mem, EA, memAccessFlags,
+                        &memData);
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template SwapCompleteAcc {{
+    Fault %(class_name)s::completeAcc(PacketPtr pkt, ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(op_rd)s;
+
+        if (%(predicate_test)s)
+        {
+            // ARM instructions will not have a pkt if the predicate is false
+            getMem(pkt, Mem, traceData);
+            uint64_t memData = Mem;
+
+            %(postacc_code)s;
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        }
+
+        return fault;
+    }
+}};
+
+def template LoadExecute {{
+    Fault %(class_name)s::execute(ExecContext *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                fault = readMemAtomic(xc, traceData, EA, Mem, memAccessFlags);
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template NeonLoadExecute {{
+    template <class Element>
+    Fault %(class_name)s<Element>::execute(
+            ExecContext *xc, Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(mem_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        MemUnion memUnion;
+        uint8_t *dataPtr = memUnion.bytes;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                fault = xc->readMem(EA, dataPtr, %(size)d, memAccessFlags);
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template StoreExecute {{
+    Fault %(class_name)s::execute(ExecContext *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                fault = writeMemAtomic(xc, traceData, Mem, EA,
+                        memAccessFlags, NULL);
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template NeonStoreExecute {{
+    template <class Element>
+    Fault %(class_name)s<Element>::execute(
+            ExecContext *xc, Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(mem_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        MemUnion memUnion;
+        uint8_t *dataPtr = memUnion.bytes;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                fault = xc->writeMem(dataPtr, %(size)d, EA,
+                                     memAccessFlags, NULL);
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template StoreExExecute {{
+    Fault %(class_name)s::execute(ExecContext *xc,
+                                  Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                %(memacc_code)s;
+            }
+
+            uint64_t writeResult;
+
+            if (fault == NoFault) {
+                fault = writeMemAtomic(xc, traceData, Mem, EA, memAccessFlags,
+                        &writeResult);
+            }
+
+            if (fault == NoFault) {
+                %(postacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template StoreExInitiateAcc {{
+    Fault %(class_name)s::initiateAcc(ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                fault = writeMemTiming(xc, traceData, Mem, EA, memAccessFlags,
+                        NULL);
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template StoreInitiateAcc {{
+    Fault %(class_name)s::initiateAcc(ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                fault = writeMemTiming(xc, traceData, Mem, EA, memAccessFlags,
+                        NULL);
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template NeonStoreInitiateAcc {{
+    template <class Element>
+    Fault %(class_name)s<Element>::initiateAcc(
+            ExecContext *xc, Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(mem_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            MemUnion memUnion;
+            if (fault == NoFault) {
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                fault = xc->writeMem(memUnion.bytes, %(size)d, EA,
+                                     memAccessFlags, NULL);
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template LoadInitiateAcc {{
+    Fault %(class_name)s::initiateAcc(ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_src_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                fault = initiateMemRead(xc, traceData, EA, Mem,
+                                        memAccessFlags);
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template NeonLoadInitiateAcc {{
+    template <class Element>
+    Fault %(class_name)s<Element>::initiateAcc(
+            ExecContext *xc, Trace::InstRecord *traceData) const
+    {
+        Addr EA;
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(mem_decl)s;
+        %(op_rd)s;
+        %(ea_code)s;
+
+        if (%(predicate_test)s)
+        {
+            if (fault == NoFault) {
+                fault = xc->initiateMemRead(EA, %(size)d, memAccessFlags);
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template LoadCompleteAcc {{
+    Fault %(class_name)s::completeAcc(PacketPtr pkt, ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(op_rd)s;
+
+        if (%(predicate_test)s)
+        {
+            // ARM instructions will not have a pkt if the predicate is false
+            getMem(pkt, Mem, traceData);
+
+            if (fault == NoFault) {
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        }
+
+        return fault;
+    }
+}};
+
+def template NeonLoadCompleteAcc {{
+    template <class Element>
+    Fault %(class_name)s<Element>::completeAcc(
+            PacketPtr pkt, ExecContext *xc,
+            Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+
+        %(mem_decl)s;
+        %(op_decl)s;
+        %(op_rd)s;
+
+        if (%(predicate_test)s)
+        {
+            // ARM instructions will not have a pkt if the predicate is false
+            MemUnion &memUnion = *(MemUnion *)pkt->getPtr<uint8_t>();
+
+            if (fault == NoFault) {
+                %(memacc_code)s;
+            }
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        }
+
+        return fault;
+    }
+}};
+
+def template StoreCompleteAcc {{
+    Fault %(class_name)s::completeAcc(PacketPtr pkt, ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        return NoFault;
+    }
+}};
+
+def template NeonStoreCompleteAcc {{
+    template <class Element>
+    Fault %(class_name)s<Element>::completeAcc(
+            PacketPtr pkt, ExecContext *xc, Trace::InstRecord *traceData) const
+    {
+        return NoFault;
+    }
+}};
+
+def template StoreExCompleteAcc {{
+    Fault %(class_name)s::completeAcc(PacketPtr pkt, ExecContext *xc,
+                                      Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+
+        %(op_decl)s;
+        %(op_rd)s;
+
+        if (%(predicate_test)s)
+        {
+            uint64_t writeResult = pkt->req->getExtraData();
+            %(postacc_code)s;
+
+            if (fault == NoFault) {
+                %(op_wb)s;
+            }
+        }
+
+        return fault;
+    }
+}};
+
+def template RfeDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _base, int _mode, bool _wb);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+    };
+}};
+
+def template SrsDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _regMode, int _mode, bool _wb);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+    };
+}};
+
+def template SwapDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _dest, uint32_t _op1, uint32_t _base);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+    };
+}};
+
+def template LoadStoreDImmDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _dest, uint32_t _dest2,
+                uint32_t _base, bool _add, int32_t _imm);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+    };
+}};
+
+def template StoreExDImmDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _result, uint32_t _dest, uint32_t _dest2,
+                uint32_t _base, bool _add, int32_t _imm);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+    };
+}};
+
+def template LoadStoreImmDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _dest, uint32_t _base, bool _add, int32_t _imm);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+
+        void
+        annotateFault(ArmFault *fault) override
+        {
+            %(fa_code)s
+        }
+    };
+}};
+
+def template StoreExImmDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _result, uint32_t _dest, uint32_t _base,
+                bool _add, int32_t _imm);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+    };
+}};
+
+def template StoreDRegDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _dest, uint32_t _dest2,
+                uint32_t _base, bool _add,
+                int32_t _shiftAmt, uint32_t _shiftType,
+                uint32_t _index);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+    };
+}};
+
+def template StoreRegDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _dest, uint32_t _base, bool _add,
+                int32_t _shiftAmt, uint32_t _shiftType,
+                uint32_t _index);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+
+        void
+        annotateFault(ArmFault *fault) override
+        {
+            %(fa_code)s
+        }
+    };
+}};
+
+def template LoadDRegDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _dest, uint32_t _dest2,
+                uint32_t _base, bool _add,
+                int32_t _shiftAmt, uint32_t _shiftType,
+                uint32_t _index);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+    };
+}};
+
+def template LoadRegDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _dest, uint32_t _base, bool _add,
+                int32_t _shiftAmt, uint32_t _shiftType,
+                uint32_t _index);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+
+        void
+        annotateFault(ArmFault *fault) override
+        {
+            %(fa_code)s
+        }
+    };
+}};
+
+def template LoadImmDeclare {{
+    /**
+     * Static instruction class for "%(mnemonic)s".
+     */
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+
+        /// Constructor.
+        %(class_name)s(ExtMachInst machInst,
+                uint32_t _dest, uint32_t _base, bool _add, int32_t _imm);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+        Fault initiateAcc(ExecContext *, Trace::InstRecord *) const override;
+        Fault completeAcc(PacketPtr, ExecContext *,
+                          Trace::InstRecord *) const override;
+
+        void
+        annotateFault(ArmFault *fault) override
+        {
+            %(fa_code)s
+        }
+    };
+}};
+
+def template RfeConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                          uint32_t _base, int _mode, bool _wb)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         (IntRegIndex)_base, (AddrMode)_mode, _wb)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        uops = new StaticInstPtr[1 + %(use_wb)d + %(use_pc)d];
+        int uopIdx = 0;
+        uops[uopIdx] = new %(acc_name)s(machInst, _base, _mode, _wb);
+        uops[uopIdx]->setDelayedCommit();
+#if %(use_wb)d
+        uops[++uopIdx] = new %(wb_decl)s;
+        uops[uopIdx]->setDelayedCommit();
+#endif
+#if %(use_pc)d
+        uops[++uopIdx] = new %(pc_decl)s;
+#endif
+        uops[0]->setFirstMicroop();
+        uops[uopIdx]->setLastMicroop();
+#endif
+    }
+}};
+
+def template SrsConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _regMode, int _mode, bool _wb)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (OperatingMode)_regMode, (AddrMode)_mode, _wb)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        uops[0] = new %(acc_name)s(machInst, _regMode, _mode, _wb);
+        uops[0]->setDelayedCommit();
+        uops[0]->setFirstMicroop();
+        uops[1] = new %(wb_decl)s;
+        uops[1]->setLastMicroop();
+#endif
+    }
+}};
+
+def template SwapConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _dest, uint32_t _op1, uint32_t _base)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_dest, (IntRegIndex)_op1, (IntRegIndex)_base)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+    }
+}};
+
+def template LoadStoreDImmConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _dest, uint32_t _dest2,
+            uint32_t _base, bool _add, int32_t _imm)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_dest, (IntRegIndex)_dest2,
+                 (IntRegIndex)_base, _add, _imm)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        uops[0] = new %(acc_name)s(machInst, _dest, _dest2, _base, _add, _imm);
+        uops[0]->setFirstMicroop();
+        uops[0]->setDelayedCommit();
+        uops[1] = new %(wb_decl)s;
+        uops[1]->setLastMicroop();
+#endif
+    }
+}};
+
+def template StoreExDImmConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _result, uint32_t _dest, uint32_t _dest2,
+            uint32_t _base, bool _add, int32_t _imm)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_result,
+                 (IntRegIndex)_dest, (IntRegIndex)_dest2,
+                 (IntRegIndex)_base, _add, _imm)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        uops[0] = new %(acc_name)s(machInst, _result, _dest, _dest2,
+                                   _base, _add, _imm);
+        uops[0]->setDelayedCommit();
+        uops[0]->setFirstMicroop();
+        uops[1] = new %(wb_decl)s;
+        uops[1]->setLastMicroop();
+#endif
+    }
+}};
+
+def template LoadStoreImmConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _dest, uint32_t _base, bool _add, int32_t _imm)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_dest, (IntRegIndex)_base, _add, _imm)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        uops[0] = new %(acc_name)s(machInst, _dest, _base, _add, _imm);
+        uops[0]->setDelayedCommit();
+        uops[0]->setFirstMicroop();
+        uops[1] = new %(wb_decl)s;
+        uops[1]->setLastMicroop();
+#endif
+    }
+}};
+
+def template StoreExImmConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _result, uint32_t _dest, uint32_t _base,
+            bool _add, int32_t _imm)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_result, (IntRegIndex)_dest,
+                 (IntRegIndex)_base, _add, _imm)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        uops[0] = new %(acc_name)s(machInst, _result, _dest,
+                                   _base, _add, _imm);
+        uops[0]->setDelayedCommit();
+        uops[0]->setFirstMicroop();
+        uops[1] = new %(wb_decl)s;
+        uops[1]->setLastMicroop();
+#endif
+    }
+}};
+
+def template StoreDRegConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _dest, uint32_t _dest2, uint32_t _base, bool _add,
+            int32_t _shiftAmt, uint32_t _shiftType, uint32_t _index)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_dest, (IntRegIndex)_dest2,
+                 (IntRegIndex)_base, _add,
+                 _shiftAmt, (ArmShiftType)_shiftType,
+                 (IntRegIndex)_index)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        uops[0] = new %(acc_name)s(machInst, _dest, _dest2, _base, _add,
+                                   _shiftAmt, _shiftType, _index);
+        uops[0]->setDelayedCommit();
+        uops[0]->setFirstMicroop();
+        uops[1] = new %(wb_decl)s;
+        uops[1]->setLastMicroop();
+#endif
+    }
+}};
+
+def template StoreRegConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _dest, uint32_t _base, bool _add,
+            int32_t _shiftAmt, uint32_t _shiftType, uint32_t _index)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_dest, (IntRegIndex)_base, _add,
+                 _shiftAmt, (ArmShiftType)_shiftType,
+                 (IntRegIndex)_index)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        uops[0] = new %(acc_name)s(machInst, _dest, _base, _add,
+                                   _shiftAmt, _shiftType, _index);
+        uops[0]->setDelayedCommit();
+        uops[0]->setFirstMicroop();
+        uops[1] = new %(wb_decl)s;
+        uops[1]->setLastMicroop();
+#endif
+    }
+}};
+
+def template LoadDRegConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _dest, uint32_t _dest2, uint32_t _base, bool _add,
+            int32_t _shiftAmt, uint32_t _shiftType, uint32_t _index)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_dest, (IntRegIndex)_dest2,
+                 (IntRegIndex)_base, _add,
+                 _shiftAmt, (ArmShiftType)_shiftType,
+                 (IntRegIndex)_index)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        if ((_dest == _index) || (_dest2 == _index)) {
+            IntRegIndex wbIndexReg = INTREG_UREG0;
+            uops[0] = new MicroUopRegMov(machInst, INTREG_UREG0, _index);
+            uops[0]->setDelayedCommit();
+            uops[0]->setFirstMicroop();
+            uops[1] = new %(acc_name)s(machInst, _dest, _dest2, _base, _add,
+                                       _shiftAmt, _shiftType, _index);
+            uops[1]->setDelayedCommit();
+            uops[2] = new %(wb_decl)s;
+            uops[2]->setLastMicroop();
+        } else {
+            IntRegIndex wbIndexReg = index;
+            uops[0] = new %(acc_name)s(machInst, _dest, _dest2, _base, _add,
+                                       _shiftAmt, _shiftType, _index);
+            uops[0]->setDelayedCommit();
+            uops[0]->setFirstMicroop();
+            uops[1] = new %(wb_decl)s;
+            uops[1]->setLastMicroop();
+        }
+#endif
+    }
+}};
+
+def template LoadRegConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _dest, uint32_t _base, bool _add,
+            int32_t _shiftAmt, uint32_t _shiftType, uint32_t _index)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_dest, (IntRegIndex)_base, _add,
+                 _shiftAmt, (ArmShiftType)_shiftType,
+                 (IntRegIndex)_index)
+    {
+        %(constructor)s;
+        bool conditional M5_VAR_USED = false;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            conditional = true;
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        if (_dest == INTREG_PC && !isFloating() && !isVector()) {
+            IntRegIndex wbIndexReg = index;
+            uops[0] = new %(acc_name)s(machInst, INTREG_UREG0, _base, _add,
+                                       _shiftAmt, _shiftType, _index);
+            uops[0]->setDelayedCommit();
+            uops[0]->setFirstMicroop();
+            uops[1] = new %(wb_decl)s;
+            uops[1]->setDelayedCommit();
+            uops[2] = new MicroUopRegMov(machInst, INTREG_PC, INTREG_UREG0);
+            uops[2]->setFlag(StaticInst::IsControl);
+            uops[2]->setFlag(StaticInst::IsIndirectControl);
+            if (conditional)
+                uops[2]->setFlag(StaticInst::IsCondControl);
+            else
+                uops[2]->setFlag(StaticInst::IsUncondControl);
+            uops[2]->setLastMicroop();
+        } else if(_dest == _index) {
+            IntRegIndex wbIndexReg = INTREG_UREG0;
+            uops[0] = new MicroUopRegMov(machInst, INTREG_UREG0, _index);
+            uops[0]->setDelayedCommit();
+            uops[0]->setFirstMicroop();
+            uops[1] = new %(acc_name)s(machInst, _dest, _base, _add,
+                                      _shiftAmt, _shiftType, _index);
+            uops[1]->setDelayedCommit();
+            uops[2] = new %(wb_decl)s;
+            uops[2]->setLastMicroop();
+        } else {
+            IntRegIndex wbIndexReg = index;
+            uops[0] = new %(acc_name)s(machInst, _dest, _base, _add,
+                                      _shiftAmt, _shiftType, _index);
+            uops[0]->setDelayedCommit();
+            uops[0]->setFirstMicroop();
+            uops[1] = new %(wb_decl)s;
+            uops[1]->setLastMicroop();
+
+        }
+#else
+        if (_dest == INTREG_PC && !isFloating() && !isVector()) {
+            flags[IsControl] = true;
+            flags[IsIndirectControl] = true;
+            if (conditional)
+                flags[IsCondControl] = true;
+            else
+                flags[IsUncondControl] = true;
+        }
+#endif
+    }
+}};
+
+def template LoadImmConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+            uint32_t _dest, uint32_t _base, bool _add, int32_t _imm)
+         : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                 (IntRegIndex)_dest, (IntRegIndex)_base, _add, _imm)
+    {
+        %(constructor)s;
+        bool conditional M5_VAR_USED = false;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            conditional = true;
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+#if %(use_uops)d
+        assert(numMicroops >= 2);
+        uops = new StaticInstPtr[numMicroops];
+        if (_dest == INTREG_PC && !isFloating() && !isVector()) {
+            uops[0] = new %(acc_name)s(machInst, INTREG_UREG0, _base, _add,
+                                   _imm);
+            uops[0]->setDelayedCommit();
+            uops[0]->setFirstMicroop();
+            uops[1] = new %(wb_decl)s;
+            uops[1]->setDelayedCommit();
+            uops[2] = new MicroUopRegMov(machInst, INTREG_PC, INTREG_UREG0);
+            uops[2]->setFlag(StaticInst::IsControl);
+            uops[2]->setFlag(StaticInst::IsIndirectControl);
+            /* Also set flags on the macroop so that pre-microop decomposition
+                branch prediction can work */
+            setFlag(StaticInst::IsControl);
+            setFlag(StaticInst::IsIndirectControl);
+            if (conditional) {
+                uops[2]->setFlag(StaticInst::IsCondControl);
+                setFlag(StaticInst::IsCondControl);
+            } else {
+                uops[2]->setFlag(StaticInst::IsUncondControl);
+                setFlag(StaticInst::IsUncondControl);
+            }
+            if (_base == INTREG_SP && _add && _imm == 4 && %(is_ras_pop)s) {
+                uops[2]->setFlag(StaticInst::IsReturn);
+                setFlag(StaticInst::IsReturn);
+            }
+            uops[2]->setLastMicroop();
+        } else {
+            uops[0] = new %(acc_name)s(machInst, _dest, _base, _add, _imm);
+            uops[0]->setDelayedCommit();
+            uops[0]->setFirstMicroop();
+            uops[1] = new %(wb_decl)s;
+            uops[1]->setLastMicroop();
+        }
+#else
+        if (_dest == INTREG_PC && !isFloating() && !isVector()) {
+            flags[IsControl] = true;
+            flags[IsIndirectControl] = true;
+            if (conditional)
+                flags[IsCondControl] = true;
+            else
+                flags[IsUncondControl] = true;
+        }
+#endif
+    }
+}};
+

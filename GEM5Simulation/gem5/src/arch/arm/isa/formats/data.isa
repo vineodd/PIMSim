@@ -1,0 +1,1588 @@
+// Copyright (c) 2010,2017-2018 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+def format ArmMiscMedia() {{
+    decode_block = '''
+    {
+        const uint32_t op1 = bits(machInst, 22, 20);
+        const uint32_t op2 = bits(machInst, 7, 5);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        const IntRegIndex ra = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+        if (op1 == 0 && op2 == 0) {
+            const IntRegIndex rd =
+                (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+            const IntRegIndex rm =
+                (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+            if (ra == 0xf) {
+                return new Usad8(machInst, rd, rn, rm);
+            } else {
+                return new Usada8(machInst, rd, rn, rm, ra);
+            }
+        } else if (bits(op2, 1, 0) == 0x2) {
+            const uint32_t lsb = bits(machInst, 11, 7);
+            const uint32_t msb = lsb + bits(machInst, 20, 16);
+            if (bits(op1, 2, 1) == 0x3) {
+                return new Ubfx(machInst, ra, rn, lsb, msb);
+            } else if (bits(op1, 2, 1) == 0x1) {
+                return new Sbfx(machInst, ra, rn, lsb, msb);
+            }
+        } else if (bits(op2, 1, 0) == 0x0 && bits(op1, 2, 1) == 0x2) {
+            const uint32_t lsb = bits(machInst, 11, 7);
+            const uint32_t msb = bits(machInst, 20, 16);
+            if (rn == 0xf) {
+                return new Bfc(machInst, ra, ra, lsb, msb);
+            } else {
+                return new Bfi(machInst, ra, rn, lsb, msb);
+            }
+        }
+        return new Unknown(machInst);
+    }
+    '''
+}};
+
+def format ArmDataProcReg() {{
+    pclr = '''
+                    if (%(dest)s == INTREG_PC) {
+                        return new %(className)ssRegPclr(machInst, %(dest)s,
+                                                         %(op1)s, rm, imm5,
+                                                         type);
+                    } else
+    '''
+    instDecode = '''
+          case %(opcode)#x:
+            if (immShift) {
+                if (setCc) {
+                    %(pclr)s {
+                        return new %(className)sRegCc(machInst, %(dest)s,
+                                                      %(op1)s, rm, imm5, type);
+                    }
+                } else {
+                    return new %(className)sReg(machInst, %(dest)s, %(op1)s,
+                                                 rm, imm5, type);
+                }
+            } else {
+                if (setCc) {
+                    return new %(className)sRegRegCc(machInst, %(dest)s,
+                                                      %(op1)s, rm, rs, type);
+                } else {
+                    return new %(className)sRegReg(machInst, %(dest)s,
+                                                    %(op1)s, rm, rs, type);
+                }
+            }
+            break;
+    '''
+
+    def instCode(opcode, mnem, useDest = True, useOp1 = True):
+        global pclr
+        if useDest:
+            dest = "rd"
+        else:
+            dest = "INTREG_ZERO"
+        if useOp1:
+            op1 = "rn"
+        else:
+            op1 = "INTREG_ZERO"
+        global instDecode, pclrCode
+        substDict = { "className": mnem.capitalize(),
+                      "opcode": opcode,
+                      "dest": dest,
+                      "op1": op1 }
+        if useDest:
+            substDict["pclr"] = pclr % substDict
+        else:
+            substDict["pclr"] = ""
+        return instDecode % substDict
+
+    decode_block = '''
+    {
+        const bool immShift = (bits(machInst, 4) == 0);
+        const bool setCc = (bits(machInst, 20) == 1);
+        const uint32_t imm5 = bits(machInst, 11, 7);
+        const ArmShiftType type = (ArmShiftType)(uint32_t)bits(machInst, 6, 5);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)RD;
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)RN;
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)RM;
+        const IntRegIndex rs = (IntRegIndex)(uint32_t)RS;
+        switch (OPCODE) {
+    '''
+    decode_block += instCode(0x0, "and")
+    decode_block += instCode(0x1, "eor")
+    decode_block += instCode(0x2, "sub")
+    decode_block += instCode(0x3, "rsb")
+    decode_block += instCode(0x4, "add")
+    decode_block += instCode(0x5, "adc")
+    decode_block += instCode(0x6, "sbc")
+    decode_block += instCode(0x7, "rsc")
+    decode_block += instCode(0x8, "tst", useDest = False)
+    decode_block += instCode(0x9, "teq", useDest = False)
+    decode_block += instCode(0xa, "cmp", useDest = False)
+    decode_block += instCode(0xb, "cmn", useDest = False)
+    decode_block += instCode(0xc, "orr")
+    decode_block += instCode(0xd, "mov", useOp1 = False)
+    decode_block += instCode(0xe, "bic")
+    decode_block += instCode(0xf, "mvn", useOp1 = False)
+    decode_block += '''
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    '''
+}};
+
+def format ArmPackUnpackSatReverse() {{
+    decode_block = '''
+    {
+        const uint32_t op1 = bits(machInst, 22, 20);
+        const uint32_t a = bits(machInst, 19, 16);
+        const uint32_t op2 = bits(machInst, 7, 5);
+        if (bits(op2, 0) == 0) {
+            const IntRegIndex rn =
+                (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+            const IntRegIndex rd =
+                (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+            const uint32_t satImm = bits(machInst, 20, 16);
+            const uint32_t imm = bits(machInst, 11, 7);
+            const ArmShiftType type =
+                (ArmShiftType)(uint32_t)bits(machInst, 6, 5);
+            if (op1 == 0) {
+                if (type) {
+                    return new PkhtbReg(machInst, rd, (IntRegIndex)a,
+                                        rn, imm, type);
+                } else {
+                    return new PkhbtReg(machInst, rd, (IntRegIndex)a,
+                                        rn, imm, type);
+                }
+            } else if (bits(op1, 2, 1) == 1) {
+                return new Ssat(machInst, rd, satImm + 1, rn, imm, type);
+            } else if (bits(op1, 2, 1) == 3) {
+                return new Usat(machInst, rd, satImm, rn, imm, type);
+            }
+            return new Unknown(machInst);
+        }
+        switch (op1) {
+          case 0x0:
+            {
+                const IntRegIndex rn =
+                    (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                if (op2 == 0x3) {
+                    const uint32_t rotation =
+                        (uint32_t)bits(machInst, 11, 10) << 3;
+                    if (a == 0xf) {
+                        return new Sxtb16(machInst, rd, rotation, rm);
+                    } else {
+                        return new Sxtab16(machInst, rd, rn, rm, rotation);
+                    }
+                } else if (op2 == 0x5) {
+                    return new Sel(machInst, rd, rn, rm);
+                }
+            }
+            break;
+          case 0x2:
+            if (op2 == 0x1) {
+                const IntRegIndex rn =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                const uint32_t satImm = bits(machInst, 20, 16);
+                return new Ssat16(machInst, rd, satImm + 1, rn);
+            } else if (op2 == 0x3) {
+                const IntRegIndex rn =
+                    (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                const uint32_t rotation =
+                    (uint32_t)bits(machInst, 11, 10) << 3;
+                if (a == 0xf) {
+                    return new Sxtb(machInst, rd, rotation, rm);
+                } else {
+                    return new Sxtab(machInst, rd, rn, rm, rotation);
+                }
+            }
+            break;
+          case 0x3:
+            if (op2 == 0x1) {
+                IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                return new Rev(machInst, rd, rm);
+            } else if (op2 == 0x3) {
+                const IntRegIndex rn =
+                    (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                const uint32_t rotation =
+                    (uint32_t)bits(machInst, 11, 10) << 3;
+                if (a == 0xf) {
+                    return new Sxth(machInst, rd, rotation, rm);
+                } else {
+                    return new Sxtah(machInst, rd, rn, rm, rotation);
+                }
+            } else if (op2 == 0x5) {
+                IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                return new Rev16(machInst, rd, rm);
+            }
+            break;
+          case 0x4:
+            if (op2 == 0x3) {
+                const IntRegIndex rn =
+                    (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                const uint32_t rotation =
+                    (uint32_t)bits(machInst, 11, 10) << 3;
+                if (a == 0xf) {
+                    return new Uxtb16(machInst, rd, rotation, rm);
+                } else {
+                    return new Uxtab16(machInst, rd, rn, rm, rotation);
+                }
+            }
+            break;
+          case 0x6:
+            if (op2 == 0x1) {
+                const IntRegIndex rn =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                const uint32_t satImm = bits(machInst, 20, 16);
+                return new Usat16(machInst, rd, satImm, rn);
+            } else if (op2 == 0x3) {
+                const IntRegIndex rn =
+                    (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                const uint32_t rotation =
+                    (uint32_t)bits(machInst, 11, 10) << 3;
+                if (a == 0xf) {
+                    return new Uxtb(machInst, rd, rotation, rm);
+                } else {
+                    return new Uxtab(machInst, rd, rn, rm, rotation);
+                }
+            }
+            break;
+          case 0x7:
+            {
+                const IntRegIndex rn =
+                    (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                if (op2 == 0x1) {
+                    return new Rbit(machInst, rd, rm);
+                } else if (op2 == 0x3) {
+                    const uint32_t rotation =
+                        (uint32_t)bits(machInst, 11, 10) << 3;
+                    if (a == 0xf) {
+                        return new Uxth(machInst, rd, rotation, rm);
+                    } else {
+                        return new Uxtah(machInst, rd, rn, rm, rotation);
+                    }
+                } else if (op2 == 0x5) {
+                    return new Revsh(machInst, rd, rm);
+                }
+            }
+            break;
+        }
+        return new Unknown(machInst);
+    }
+    '''
+}};
+
+def format ArmParallelAddSubtract() {{
+    decode_block='''
+    {
+        const uint32_t op1 = bits(machInst, 21, 20);
+        const uint32_t op2 = bits(machInst, 7, 5);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        if (bits(machInst, 22) == 0) {
+            switch (op1) {
+              case 0x1:
+                switch (op2) {
+                  case 0x0:
+                    return new Sadd16RegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x1:
+                    return new SasxRegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x2:
+                    return new SsaxRegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x3:
+                    return new Ssub16RegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x4:
+                    return new Sadd8RegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x7:
+                    return new Ssub8RegCc(machInst, rd, rn, rm, 0, LSL);
+                }
+                break;
+              case 0x2:
+                switch (op2) {
+                  case 0x0:
+                    return new Qadd16Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x1:
+                    return new QasxReg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x2:
+                    return new QsaxReg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x3:
+                    return new Qsub16Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x4:
+                    return new Qadd8Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x7:
+                    return new Qsub8Reg(machInst, rd, rn, rm, 0, LSL);
+                }
+                break;
+              case 0x3:
+                switch (op2) {
+                  case 0x0:
+                    return new Shadd16Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x1:
+                    return new ShasxReg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x2:
+                    return new ShsaxReg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x3:
+                    return new Shsub16Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x4:
+                    return new Shadd8Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x7:
+                    return new Shsub8Reg(machInst, rd, rn, rm, 0, LSL);
+                }
+                break;
+            }
+        } else {
+            switch (op1) {
+              case 0x1:
+                switch (op2) {
+                  case 0x0:
+                    return new Uadd16RegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x1:
+                    return new UasxRegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x2:
+                    return new UsaxRegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x3:
+                    return new Usub16RegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x4:
+                    return new Uadd8RegCc(machInst, rd, rn, rm, 0, LSL);
+                  case 0x7:
+                    return new Usub8RegCc(machInst, rd, rn, rm, 0, LSL);
+                }
+                break;
+              case 0x2:
+                switch (op2) {
+                  case 0x0:
+                    return new Uqadd16Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x1:
+                    return new UqasxReg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x2:
+                    return new UqsaxReg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x3:
+                    return new Uqsub16Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x4:
+                    return new Uqadd8Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x7:
+                    return new Uqsub8Reg(machInst, rd, rn, rm, 0, LSL);
+                }
+                break;
+              case 0x3:
+                switch (op2) {
+                  case 0x0:
+                    return new Uhadd16Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x1:
+                    return new UhasxReg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x2:
+                    return new UhsaxReg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x3:
+                    return new Uhsub16Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x4:
+                    return new Uhadd8Reg(machInst, rd, rn, rm, 0, LSL);
+                  case 0x7:
+                    return new Uhsub8Reg(machInst, rd, rn, rm, 0, LSL);
+                }
+                break;
+            }
+        }
+        return new Unknown(machInst);
+    }
+    '''
+}};
+
+def format ArmDataProcImm() {{
+    pclr = '''
+                if (%(dest)s == INTREG_PC) {
+                    return new %(className)ssImmPclr(machInst, %(dest)s,
+                                                     %(op1)s, imm, false);
+                } else
+    '''
+    adr = '''
+                if (%(op1)s == INTREG_PC) {
+                    return new AdrImm(machInst, %(dest)s, %(add)s,
+                                      imm, false);
+                } else
+    '''
+    instDecode = '''
+          case %(opcode)#x:
+            if (setCc) {
+                %(pclr)s {
+                    return new %(className)sImmCc(machInst, %(dest)s, %(op1)s,
+                                                   imm, rotC);
+                }
+            } else {
+                %(adr)s {
+                    return new %(className)sImm(machInst, %(dest)s, %(op1)s,
+                                                 imm, rotC);
+                }
+            }
+            break;
+    '''
+
+    def instCode(opcode, mnem, useDest = True, useOp1 = True):
+        global instDecode, pclr, adr
+        if useDest:
+            dest = "rd"
+        else:
+            dest = "INTREG_ZERO"
+        if useOp1:
+            op1 = "rn"
+        else:
+            op1 = "INTREG_ZERO"
+        substDict = { "className": mnem.capitalize(),
+                      "opcode": opcode,
+                      "dest": dest,
+                      "op1": op1,
+                      "adr": "" }
+        if useDest:
+            substDict["pclr"] = pclr % substDict
+        else:
+            substDict["pclr"] = ""
+        return instDecode % substDict
+
+    def adrCode(opcode, mnem, add="1"):
+        global instDecode, pclr, adr
+        substDict = { "className": mnem.capitalize(),
+                      "opcode": opcode,
+                      "dest": "rd",
+                      "op1": "rn",
+                      "add": add }
+        substDict["pclr"] = pclr % substDict
+        substDict["adr"] = adr % substDict
+        return instDecode % substDict
+
+    decode_block = '''
+    {
+        const bool setCc = (bits(machInst, 20) == 1);
+        const uint32_t unrotated = bits(machInst, 7, 0);
+        const uint32_t rotation = (bits(machInst, 11, 8) << 1);
+        const bool rotC = (rotation != 0);
+        const uint32_t imm = rotate_imm(unrotated, rotation);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)RD;
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)RN;
+        switch (OPCODE) {
+    '''
+    decode_block += instCode(0x0, "and")
+    decode_block += instCode(0x1, "eor")
+    decode_block += adrCode(0x2, "sub", add="(IntRegIndex)0")
+    decode_block += instCode(0x3, "rsb")
+    decode_block += adrCode(0x4, "add", add="(IntRegIndex)1")
+    decode_block += instCode(0x5, "adc")
+    decode_block += instCode(0x6, "sbc")
+    decode_block += instCode(0x7, "rsc")
+    decode_block += instCode(0x8, "tst", useDest = False)
+    decode_block += instCode(0x9, "teq", useDest = False)
+    decode_block += instCode(0xa, "cmp", useDest = False)
+    decode_block += instCode(0xb, "cmn", useDest = False)
+    decode_block += instCode(0xc, "orr")
+    decode_block += instCode(0xd, "mov", useOp1 = False)
+    decode_block += instCode(0xe, "bic")
+    decode_block += instCode(0xf, "mvn", useOp1 = False)
+    decode_block += '''
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    '''
+}};
+
+def format ArmSatAddSub() {{
+    decode_block = '''
+    {
+        IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 15, 12);
+        IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        switch (OPCODE) {
+          case 0x8:
+            return new QaddRegCc(machInst, rd, rm, rn, 0, LSL);
+          case 0x9:
+            return new QsubRegCc(machInst, rd, rm, rn, 0, LSL);
+          case 0xa:
+            return new QdaddRegCc(machInst, rd, rm, rn, 0, LSL);
+          case 0xb:
+            return new QdsubRegCc(machInst, rd, rm, rn, 0, LSL);
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    '''
+}};
+
+def format Thumb32DataProcReg() {{
+    decode_block = '''
+    {
+        const uint32_t op1 = bits(machInst, 23, 20);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const uint32_t op2 = bits(machInst, 7, 4);
+        if (bits(machInst, 15, 12) != 0xf) {
+            return new Unknown(machInst);
+        }
+        if (bits(op1, 3) != 1) {
+            if (op2 == 0) {
+                IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+                IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                switch (bits(op1, 2, 0)) {
+                  case 0x0:
+                    return new MovRegReg(machInst, rd,
+                            INTREG_ZERO, rn, rm, LSL);
+                  case 0x1:
+                    return new MovRegRegCc(machInst, rd,
+                            INTREG_ZERO, rn, rm, LSL);
+                  case 0x2:
+                    return new MovRegReg(machInst, rd,
+                            INTREG_ZERO, rn, rm, LSR);
+                  case 0x3:
+                    return new MovRegRegCc(machInst, rd,
+                            INTREG_ZERO, rn, rm, LSR);
+                  case 0x4:
+                    return new MovRegReg(machInst, rd,
+                            INTREG_ZERO, rn, rm, ASR);
+                  case 0x5:
+                    return new MovRegRegCc(machInst, rd,
+                            INTREG_ZERO, rn, rm, ASR);
+                  case 0x6:
+                    return new MovRegReg(machInst, rd,
+                            INTREG_ZERO, rn, rm, ROR);
+                  case 0x7:
+                    return new MovRegRegCc(machInst, rd,
+                            INTREG_ZERO, rn, rm, ROR);
+                  default:
+                    M5_UNREACHABLE;
+                }
+            } else if (bits(op2, 3) == 0) {
+                return new Unknown(machInst);
+            } else {
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                const uint32_t rotation =
+                    (uint32_t)bits(machInst, 5, 4) << 3;
+                switch (bits(op1, 2, 0)) {
+                  case 0x0:
+                    if (rn == 0xf) {
+                        return new Sxth(machInst, rd, rotation, rm);
+                    } else {
+                        return new Sxtah(machInst, rd, rn, rm, rotation);
+                    }
+                  case 0x1:
+                    if (rn == 0xf) {
+                        return new Uxth(machInst, rd, rotation, rm);
+                    } else {
+                        return new Uxtah(machInst, rd, rn, rm, rotation);
+                    }
+                  case 0x2:
+                    if (rn == 0xf) {
+                        return new Sxtb16(machInst, rd, rotation, rm);
+                    } else {
+                        return new Sxtab16(machInst, rd, rn, rm, rotation);
+                    }
+                  case 0x3:
+                    if (rn == 0xf) {
+                        return new Uxtb16(machInst, rd, rotation, rm);
+                    } else {
+                        return new Uxtab16(machInst, rd, rn, rm, rotation);
+                    }
+                  case 0x4:
+                    if (rn == 0xf) {
+                        return new Sxtb(machInst, rd, rotation, rm);
+                    } else {
+                        return new Sxtab(machInst, rd, rn, rm, rotation);
+                    }
+                  case 0x5:
+                    if (rn == 0xf) {
+                        return new Uxtb(machInst, rd, rotation, rm);
+                    } else {
+                        return new Uxtab(machInst, rd, rn, rm, rotation);
+                    }
+                  default:
+                    return new Unknown(machInst);
+                }
+            }
+        } else {
+            if (bits(op2, 3) == 0) {
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                if (bits(op2, 2) == 0x0) {
+                    const uint32_t op1 = bits(machInst, 22, 20);
+                    const uint32_t op2 = bits(machInst, 5, 4);
+                    switch (op2) {
+                      case 0x0:
+                        switch (op1) {
+                          case 0x1:
+                            return new Sadd16RegCc(machInst, rd,
+                                                   rn, rm, 0, LSL);
+                          case 0x2:
+                            return new SasxRegCc(machInst, rd,
+                                                 rn, rm, 0, LSL);
+                          case 0x6:
+                            return new SsaxRegCc(machInst, rd,
+                                                 rn, rm, 0, LSL);
+                          case 0x5:
+                            return new Ssub16RegCc(machInst, rd,
+                                                   rn, rm, 0, LSL);
+                          case 0x0:
+                            return new Sadd8RegCc(machInst, rd,
+                                                  rn, rm, 0, LSL);
+                          case 0x4:
+                            return new Ssub8RegCc(machInst, rd,
+                                                  rn, rm, 0, LSL);
+                        }
+                        break;
+                      case 0x1:
+                        switch (op1) {
+                          case 0x1:
+                            return new Qadd16Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x2:
+                            return new QasxReg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x6:
+                            return new QsaxReg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x5:
+                            return new Qsub16Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x0:
+                            return new Qadd8Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x4:
+                            return new Qsub8Reg(machInst, rd, rn, rm, 0, LSL);
+                        }
+                        break;
+                      case 0x2:
+                        switch (op1) {
+                          case 0x1:
+                            return new Shadd16Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x2:
+                            return new ShasxReg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x6:
+                            return new ShsaxReg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x5:
+                            return new Shsub16Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x0:
+                            return new Shadd8Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x4:
+                            return new Shsub8Reg(machInst, rd, rn, rm, 0, LSL);
+                        }
+                        break;
+                    }
+                } else {
+                    const uint32_t op1 = bits(machInst, 22, 20);
+                    const uint32_t op2 = bits(machInst, 5, 4);
+                    switch (op2) {
+                      case 0x0:
+                        switch (op1) {
+                          case 0x1:
+                            return new Uadd16RegCc(machInst, rd,
+                                                   rn, rm, 0, LSL);
+                          case 0x2:
+                            return new UasxRegCc(machInst, rd,
+                                                 rn, rm, 0, LSL);
+                          case 0x6:
+                            return new UsaxRegCc(machInst, rd,
+                                                 rn, rm, 0, LSL);
+                          case 0x5:
+                            return new Usub16RegCc(machInst, rd,
+                                                   rn, rm, 0, LSL);
+                          case 0x0:
+                            return new Uadd8RegCc(machInst, rd,
+                                                  rn, rm, 0, LSL);
+                          case 0x4:
+                            return new Usub8RegCc(machInst, rd,
+                                                  rn, rm, 0, LSL);
+                        }
+                        break;
+                      case 0x1:
+                        switch (op1) {
+                          case 0x1:
+                            return new Uqadd16Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x2:
+                            return new UqasxReg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x6:
+                            return new UqsaxReg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x5:
+                            return new Uqsub16Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x0:
+                            return new Uqadd8Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x4:
+                            return new Uqsub8Reg(machInst, rd, rn, rm, 0, LSL);
+                        }
+                        break;
+                      case 0x2:
+                        switch (op1) {
+                          case 0x1:
+                            return new Uhadd16Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x2:
+                            return new UhasxReg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x6:
+                            return new UhsaxReg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x5:
+                            return new Uhsub16Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x0:
+                            return new Uhadd8Reg(machInst, rd, rn, rm, 0, LSL);
+                          case 0x4:
+                            return new Uhsub8Reg(machInst, rd, rn, rm, 0, LSL);
+                        }
+                        break;
+                    }
+                }
+            } else if (bits(op1, 3, 2) == 0x2 && bits(op2, 3, 2) == 0x2) {
+                const uint32_t op1 = bits(machInst, 22, 20);
+                const uint32_t op2 = bits(machInst, 5, 4);
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                switch (op1) {
+                  case 0x0:
+                    switch (op2) {
+                      case 0x0:
+                        return new QaddRegCc(machInst, rd,
+                                             rm, rn, 0, LSL);
+                      case 0x1:
+                        return new QdaddRegCc(machInst, rd,
+                                              rm, rn, 0, LSL);
+                      case 0x2:
+                        return new QsubRegCc(machInst, rd,
+                                             rm, rn, 0, LSL);
+                      case 0x3:
+                        return new QdsubRegCc(machInst, rd,
+                                              rm, rn, 0, LSL);
+                    }
+                    break;
+                  case 0x1:
+                    switch (op2) {
+                      case 0x0:
+                        return new Rev(machInst, rd, rn);
+                      case 0x1:
+                        return new Rev16(machInst, rd, rn);
+                      case 0x2:
+                        return new Rbit(machInst, rd, rm);
+                      case 0x3:
+                        return new Revsh(machInst, rd, rn);
+                    }
+                    break;
+                  case 0x2:
+                    if (op2 == 0) {
+                        return new Sel(machInst, rd, rn, rm);
+                    }
+                    break;
+                  case 0x3:
+                    if (op2 == 0) {
+                        return new Clz(machInst, rd, rm);
+                    }
+                    break;
+                  case 0x4:
+                    switch (op2) {
+                      case 0x0:
+                        return new Crc32b(machInst, rd, rn, rm);
+                      case 0x1:
+                        return new Crc32h(machInst, rd, rn, rm);
+                      case 0x2:
+                        return new Crc32w(machInst, rd, rn, rm);
+                    }
+                    break;
+                  case 0x5:
+                    switch (op2) {
+                      case 0x0:
+                        return new Crc32cb(machInst, rd, rn, rm);
+                      case 0x1:
+                        return new Crc32ch(machInst, rd, rn, rm);
+                      case 0x2:
+                        return new Crc32cw(machInst, rd, rn, rm);
+                    }
+                    break;
+                }
+            }
+            return new Unknown(machInst);
+        }
+    }
+    '''
+}};
+
+def format Thumb16ShiftAddSubMoveCmp() {{
+    decode_block = '''
+    {
+        const uint32_t imm5 = bits(machInst, 10, 6);
+        const uint32_t imm3 = bits(machInst, 8, 6);
+        const uint32_t imm8 = bits(machInst, 7, 0);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 2, 0);
+        const IntRegIndex rd8 = (IntRegIndex)(uint32_t)bits(machInst, 10, 8);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 5, 3);
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 8, 6);
+        switch (bits(machInst, 13, 11)) {
+          case 0x0: // lsl
+            if (machInst.itstateMask) {
+                return new MovReg(machInst, rd, INTREG_ZERO, rn, imm5, LSL);
+            } else {
+                return new MovRegCc(machInst, rd, INTREG_ZERO, rn, imm5, LSL);
+            }
+          case 0x1: // lsr
+            if (machInst.itstateMask) {
+                return new MovReg(machInst, rd, INTREG_ZERO, rn, imm5, LSR);
+            } else {
+                return new MovRegCc(machInst, rd, INTREG_ZERO, rn, imm5, LSR);
+            }
+          case 0x2: // asr
+            if (machInst.itstateMask) {
+                return new MovReg(machInst, rd, INTREG_ZERO, rn, imm5, ASR);
+            } else {
+                return new MovRegCc(machInst, rd, INTREG_ZERO, rn, imm5, ASR);
+            }
+          case 0x3:
+            switch (bits(machInst, 10, 9)) {
+              case 0x0:
+                if (machInst.itstateMask) {
+                    return new AddReg(machInst, rd, rn, rm, 0, LSL);
+                } else {
+                    return new AddRegCc(machInst, rd, rn, rm, 0, LSL);
+                }
+              case 0x1:
+                if (machInst.itstateMask) {
+                    return new SubReg(machInst, rd, rn, rm, 0, LSL);
+                } else {
+                    return new SubRegCc(machInst, rd, rn, rm, 0, LSL);
+                }
+              case 0x2:
+                if (machInst.itstateMask) {
+                    return new AddImm(machInst, rd, rn, imm3, true);
+                } else {
+                    return new AddImmCc(machInst, rd, rn, imm3, true);
+                }
+              case 0x3:
+                if (machInst.itstateMask) {
+                    return new SubImm(machInst, rd, rn, imm3, true);
+                } else {
+                    return new SubImmCc(machInst, rd, rn, imm3, true);
+                }
+              default:
+                M5_UNREACHABLE;
+            }
+          case 0x4:
+            if (machInst.itstateMask) {
+                return new MovImm(machInst, rd8, INTREG_ZERO, imm8, false);
+            } else {
+                return new MovImmCc(machInst, rd8, INTREG_ZERO, imm8, false);
+            }
+          case 0x5:
+            return new CmpImmCc(machInst, INTREG_ZERO, rd8, imm8, true);
+          case 0x6:
+            if (machInst.itstateMask) {
+                return new AddImm(machInst, rd8, rd8, imm8, true);
+            } else {
+                return new AddImmCc(machInst, rd8, rd8, imm8, true);
+            }
+          case 0x7:
+            if (machInst.itstateMask) {
+                return new SubImm(machInst, rd8, rd8, imm8, true);
+            } else {
+                return new SubImmCc(machInst, rd8, rd8, imm8, true);
+            }
+          default:
+            M5_UNREACHABLE;
+        }
+    }
+    '''
+}};
+
+def format Thumb16DataProcessing() {{
+    decode_block = '''
+    {
+        const IntRegIndex rdn = (IntRegIndex)(uint32_t)bits(machInst, 2, 0);
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 5, 3);
+        switch (bits(machInst, 9, 6)) {
+          case 0x0:
+            if (machInst.itstateMask) {
+                return new AndReg(machInst, rdn, rdn, rm, 0, LSL);
+            } else {
+                return new AndRegCc(machInst, rdn, rdn, rm, 0, LSL);
+            }
+          case 0x1:
+            if (machInst.itstateMask) {
+                return new EorReg(machInst, rdn, rdn, rm, 0, LSL);
+            } else {
+                return new EorRegCc(machInst, rdn, rdn, rm, 0, LSL);
+            }
+          case 0x2: //lsl
+            if (machInst.itstateMask) {
+                return new MovRegReg(machInst, rdn,
+                        INTREG_ZERO, rdn, rm, LSL);
+            } else {
+                return new MovRegRegCc(machInst, rdn,
+                        INTREG_ZERO, rdn, rm, LSL);
+            }
+          case 0x3: //lsr
+            if (machInst.itstateMask) {
+                return new MovRegReg(machInst, rdn,
+                        INTREG_ZERO, rdn, rm, LSR);
+            } else {
+                return new MovRegRegCc(machInst, rdn,
+                        INTREG_ZERO, rdn, rm, LSR);
+            }
+          case 0x4: //asr
+            if (machInst.itstateMask) {
+                return new MovRegReg(machInst, rdn,
+                        INTREG_ZERO, rdn, rm, ASR);
+            } else {
+                return new MovRegRegCc(machInst, rdn,
+                        INTREG_ZERO, rdn, rm, ASR);
+            }
+          case 0x5:
+            if (machInst.itstateMask) {
+                return new AdcReg(machInst, rdn, rdn, rm, 0, LSL);
+            } else {
+                return new AdcRegCc(machInst, rdn, rdn, rm, 0, LSL);
+            }
+          case 0x6:
+            if (machInst.itstateMask) {
+                return new SbcReg(machInst, rdn, rdn, rm, 0, LSL);
+            } else {
+                return new SbcRegCc(machInst, rdn, rdn, rm, 0, LSL);
+            }
+          case 0x7: // ror
+            if (machInst.itstateMask) {
+                return new MovRegReg(machInst, rdn,
+                        INTREG_ZERO, rdn, rm, ROR);
+            } else {
+                return new MovRegRegCc(machInst, rdn,
+                        INTREG_ZERO, rdn, rm, ROR);
+            }
+          case 0x8:
+            return new TstRegCc(machInst, INTREG_ZERO, rdn, rm, 0, LSL);
+          case 0x9:
+            if (machInst.itstateMask) {
+                return new RsbImm(machInst, rdn, rm, 0, true);
+            } else {
+                return new RsbImmCc(machInst, rdn, rm, 0, true);
+            }
+          case 0xa:
+            return new CmpRegCc(machInst, INTREG_ZERO, rdn, rm, 0, LSL);
+          case 0xb:
+            return new CmnRegCc(machInst, INTREG_ZERO, rdn, rm, 0, LSL);
+          case 0xc:
+            if (machInst.itstateMask) {
+                return new OrrReg(machInst, rdn, rdn, rm, 0, LSL);
+            } else {
+                return new OrrRegCc(machInst, rdn, rdn, rm, 0, LSL);
+            }
+          case 0xd:
+            if (machInst.itstateMask) {
+                return new Mul(machInst, rdn, rm, rdn);
+            } else {
+                return new MulCc(machInst, rdn, rm, rdn);
+            }
+          case 0xe:
+            if (machInst.itstateMask) {
+                return new BicReg(machInst, rdn, rdn, rm, 0, LSL);
+            } else {
+                return new BicRegCc(machInst, rdn, rdn, rm, 0, LSL);
+            }
+          case 0xf:
+            if (machInst.itstateMask) {
+                return new MvnReg(machInst, rdn, INTREG_ZERO, rm, 0, LSL);
+            } else {
+                return new MvnRegCc(machInst, rdn, INTREG_ZERO, rm, 0, LSL);
+            }
+          default:
+            M5_UNREACHABLE;
+        }
+    }
+    '''
+}};
+
+def format Thumb16SpecDataAndBx() {{
+    decode_block = '''
+    {
+        const IntRegIndex rdn =
+            (IntRegIndex)(uint32_t)(bits(machInst, 2, 0) |
+                                    (bits(machInst, 7) << 3));
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 6, 3);
+        switch (bits(machInst, 9, 8)) {
+          case 0x0:
+            return new AddReg(machInst, rdn, rdn, rm, 0, LSL);
+          case 0x1:
+            return new CmpRegCc(machInst, INTREG_ZERO, rdn, rm, 0, LSL);
+          case 0x2:
+            return new MovReg(machInst, rdn, INTREG_ZERO, rm, 0, LSL);
+          case 0x3:
+            if (bits(machInst, 7) == 0) {
+                return new BxReg(machInst,
+                                 (IntRegIndex)(uint32_t)bits(machInst, 6, 3),
+                                 COND_UC);
+            } else {
+                return new BlxReg(machInst,
+                                  (IntRegIndex)(uint32_t)bits(machInst, 6, 3),
+                                  COND_UC);
+            }
+          default:
+            M5_UNREACHABLE;
+        }
+    }
+    '''
+}};
+
+def format Thumb16Adr() {{
+    decode_block = '''
+    {
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 10, 8);
+        const uint32_t imm8 = bits(machInst, 7, 0) << 2;
+        return new AdrImm(machInst, rd, (IntRegIndex)1, imm8, false);
+    }
+    '''
+}};
+
+def format Thumb16AddSp() {{
+    decode_block = '''
+    {
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 10, 8);
+        const uint32_t imm8 = bits(machInst, 7, 0) << 2;
+        return new AddImm(machInst, rd, INTREG_SP, imm8, true);
+    }
+    '''
+}};
+
+def format ArmMisc() {{
+    decode_block = '''
+    {
+        const uint32_t unrotated = bits(machInst, 7, 0);
+        const uint32_t rotation = (bits(machInst, 11, 8) << 1);
+        const uint32_t imm = rotate_imm(unrotated, rotation);
+        const uint8_t byteMask = bits(machInst, 19, 16);
+        switch (OPCODE) {
+          case 0x8:
+            return new MovImm(machInst, (IntRegIndex)(uint32_t)RD,
+                    (IntRegIndex)INTREG_ZERO,
+                    bits(machInst, 11, 0) | (bits(machInst, 19, 16) << 12),
+                    false);
+          case 0x9:
+            if (RN == 0) {
+                if ((IMM & 0xf0) == 0xf0) {
+                    return new Dbg(machInst);
+                } else {
+                    switch (IMM) {
+                      case 0x0:
+                        return new NopInst(machInst);
+                      case 0x1:
+                        return new YieldInst(machInst);
+                      case 0x2:
+                        return new WfeInst(machInst);
+                      case 0x3:
+                        return new WfiInst(machInst);
+                      case 0x4:
+                        return new SevInst(machInst);
+                      case 0x5:
+                        return new WarnUnimplemented(
+                                "sevl", machInst);
+                      case 0x10:
+                        return new WarnUnimplemented(
+                                "esb", machInst);
+                      case 0x12:
+                        return new WarnUnimplemented(
+                                "tsb csync", machInst);
+                      case 0x14:
+                        return new WarnUnimplemented(
+                                "csdb", machInst);
+                      default:
+                        return new WarnUnimplemented(
+                                "unallocated_hint", machInst);
+                    }
+                }
+            } else {
+                return new MsrCpsrImm(machInst, imm, byteMask);
+            }
+          case 0xa:
+            {
+                const uint32_t timm = (bits(machInst, 19, 16) << 12) |
+                                       bits(machInst, 11, 0);
+                return new MovtImm(machInst, (IntRegIndex)(uint32_t)RD,
+                                   (IntRegIndex)(uint32_t)RD, timm, true);
+            }
+          case 0xb:
+            return new MsrSpsrImm(machInst, imm, byteMask);
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    '''
+}};
+
+def format Thumb16Misc() {{
+    decode_block = '''
+    {
+        switch (bits(machInst, 11, 8)) {
+          case 0x0:
+            if (bits(machInst, 7)) {
+                return new SubImm(machInst, INTREG_SP, INTREG_SP,
+                                   bits(machInst, 6, 0) << 2, true);
+            } else {
+                return new AddImm(machInst, INTREG_SP, INTREG_SP,
+                                   bits(machInst, 6, 0) << 2, true);
+            }
+          case 0x2:
+            {
+                const IntRegIndex rd =
+                    (IntRegIndex)(uint32_t)bits(machInst, 2, 0);
+                const IntRegIndex rm =
+                    (IntRegIndex)(uint32_t)bits(machInst, 5, 3);
+                switch (bits(machInst, 7, 6)) {
+                  case 0x0:
+                    return new Sxth(machInst, rd, 0, rm);
+                  case 0x1:
+                    return new Sxtb(machInst, rd, 0, rm);
+                  case 0x2:
+                    return new Uxth(machInst, rd, 0, rm);
+                  case 0x3:
+                    return new Uxtb(machInst, rd, 0, rm);
+                  default:
+                    M5_UNREACHABLE;
+                }
+            }
+          case 0x1:
+          case 0x3:
+            return new Cbz(machInst,
+                           (bits(machInst, 9) << 6) |
+                           (bits(machInst, 7, 3) << 1),
+                           (IntRegIndex)(uint32_t)bits(machInst, 2, 0));
+          case 0x4:
+          case 0x5:
+            {
+                const uint32_t m = bits(machInst, 8);
+                const uint32_t regList = bits(machInst, 7, 0) | (m << 14);
+                return new LdmStm(machInst, INTREG_SP, false, false, false,
+                                  true, false, regList);
+            }
+          case 0x6:
+            {
+                const uint32_t opBits = bits(machInst, 7, 5);
+                if (opBits == 2) {
+                    return new Setend(machInst, bits(machInst, 3));
+                } else if (opBits == 3) {
+                    const bool enable = (bits(machInst, 4) == 0);
+                    const uint32_t mods = (bits(machInst, 2, 0) << 5) |
+                                          ((enable ? 1 : 0) << 9);
+                    return new Cps(machInst, mods);
+                }
+                return new Unknown(machInst);
+            }
+          case 0xa:
+            {
+                const uint8_t op1 = bits(machInst, 7, 6);
+                if (op1 == 0x2) {
+                    return new Hlt(machInst, bits(machInst, 5, 0));
+                } else {
+                    IntRegIndex rd =
+                        (IntRegIndex)(uint32_t)bits(machInst, 2, 0);
+                    IntRegIndex rm =
+                        (IntRegIndex)(uint32_t)bits(machInst, 5, 3);
+
+                    switch (op1) {
+                      case 0x0:
+                        return new Rev(machInst, rd, rm);
+                      case 0x1:
+                        return new Rev16(machInst, rd, rm);
+                      case 0x3:
+                        return new Revsh(machInst, rd, rm);
+                      default:
+                        break;
+                    }
+                }
+            }
+            break;
+          case 0x9:
+          case 0xb:
+            return new Cbnz(machInst,
+                            (bits(machInst, 9) << 6) |
+                            (bits(machInst, 7, 3) << 1),
+                            (IntRegIndex)(uint32_t)bits(machInst, 2, 0));
+          case 0xc:
+          case 0xd:
+            {
+                const uint32_t p = bits(machInst, 8);
+                const uint32_t regList = bits(machInst, 7, 0) | (p << 15);
+                return new LdmStm(machInst, INTREG_SP, true, true, false,
+                                  true, true, regList);
+            }
+          case 0xe:
+            return new BkptInst(machInst);
+          case 0xf:
+            if (bits(machInst, 3, 0) != 0)
+                return new ItInst(machInst);
+            switch (bits(machInst, 7, 4)) {
+              case 0x0:
+                return new NopInst(machInst);
+              case 0x1:
+                return new YieldInst(machInst);
+              case 0x2:
+                return new WfeInst(machInst);
+              case 0x3:
+                return new WfiInst(machInst);
+              case 0x4:
+                return new SevInst(machInst);
+              default:
+                return new WarnUnimplemented("unallocated_hint", machInst);
+            }
+          default:
+            break;
+        }
+        return new Unknown(machInst);
+    }
+    '''
+}};
+
+def format Thumb32DataProcModImm() {{
+
+    def decInst(mnem, dest="rd", op1="rn"):
+        return '''
+            if (s) {
+                return new %(mnem)sImmCc(machInst, %(dest)s,
+                                          %(op1)s, imm, rotC);
+            } else {
+                return new %(mnem)sImm(machInst, %(dest)s,
+                                        %(op1)s, imm, rotC);
+            }
+        ''' % {"mnem" : mnem, "dest" : dest, "op1" : op1}
+
+    decode_block = '''
+    {
+        const uint32_t op = bits(machInst, 24, 21);
+        const bool s = (bits(machInst, 20) == 1);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+        const uint32_t ctrlImm = bits(machInst.instBits, 26) << 3 |
+                                 bits(machInst, 14, 12);
+        const bool rotC = ctrlImm > 3;
+        const uint32_t dataImm = bits(machInst, 7, 0);
+        const uint32_t imm = modified_imm(ctrlImm, dataImm);
+        switch (op) {
+          case 0x0:
+            if (rd == INTREG_PC) {
+                %(tst)s
+            } else {
+                %(and)s
+            }
+          case 0x1:
+            %(bic)s
+          case 0x2:
+            if (rn == INTREG_PC) {
+                %(mov)s
+            } else {
+                %(orr)s
+            }
+          case 0x3:
+            if (rn == INTREG_PC) {
+                %(mvn)s
+            } else {
+                %(orn)s
+            }
+          case 0x4:
+            if (rd == INTREG_PC) {
+                %(teq)s
+            } else {
+                %(eor)s
+            }
+          case 0x8:
+            if (rd == INTREG_PC) {
+                %(cmn)s
+            } else {
+                %(add)s
+            }
+          case 0xa:
+            %(adc)s
+          case 0xb:
+            %(sbc)s
+          case 0xd:
+            if (rd == INTREG_PC) {
+                %(cmp)s
+            } else {
+                %(sub)s
+            }
+          case 0xe:
+            %(rsb)s
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    ''' % {
+        "tst" : decInst("Tst", "INTREG_ZERO"),
+        "and" : decInst("And"),
+        "bic" : decInst("Bic"),
+        "mov" : decInst("Mov", op1="INTREG_ZERO"),
+        "orr" : decInst("Orr"),
+        "mvn" : decInst("Mvn", op1="INTREG_ZERO"),
+        "orn" : decInst("Orn"),
+        "teq" : decInst("Teq", dest="INTREG_ZERO"),
+        "eor" : decInst("Eor"),
+        "cmn" : decInst("Cmn", dest="INTREG_ZERO"),
+        "add" : decInst("Add"),
+        "adc" : decInst("Adc"),
+        "sbc" : decInst("Sbc"),
+        "cmp" : decInst("Cmp", dest="INTREG_ZERO"),
+        "sub" : decInst("Sub"),
+        "rsb" : decInst("Rsb")
+    }
+}};
+
+def format Thumb32DataProcPlainBin() {{
+    decode_block = '''
+    {
+        const uint32_t op = bits(machInst, 24, 20);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+        switch (op) {
+          case 0x0:
+            {
+                const uint32_t imm = bits(machInst, 7, 0) |
+                                     (bits(machInst, 14, 12) << 8) |
+                                     (bits(machInst, 26) << 11);
+                if (rn == 0xf) {
+                    return new AdrImm(machInst, rd, (IntRegIndex)1,
+                                      imm, false);
+                } else {
+                    return new AddImm(machInst, rd, rn, imm, true);
+                }
+            }
+          case 0x4:
+            {
+                const uint32_t imm = bits(machInst, 7, 0) |
+                                     (bits(machInst, 14, 12) << 8) |
+                                     (bits(machInst, 26) << 11) |
+                                     (bits(machInst, 19, 16) << 12);
+                return new MovImm(machInst, rd, INTREG_ZERO, imm, true);
+            }
+          case 0xa:
+            {
+                const uint32_t imm = bits(machInst, 7, 0) |
+                                     (bits(machInst, 14, 12) << 8) |
+                                     (bits(machInst, 26) << 11);
+                if (rn == 0xf) {
+                    return new AdrImm(machInst, rd, (IntRegIndex)0,
+                                      imm, false);
+                } else {
+                    return new SubImm(machInst, rd, rn, imm, true);
+                }
+            }
+          case 0xc:
+            {
+                const uint32_t imm = bits(machInst, 7, 0) |
+                                     (bits(machInst, 14, 12) << 8) |
+                                     (bits(machInst, 26) << 11) |
+                                     (bits(machInst, 19, 16) << 12);
+                return new MovtImm(machInst, rd, rd, imm, true);
+            }
+          case 0x12:
+            if (!(bits(machInst, 14, 12) || bits(machInst, 7, 6))) {
+                const uint32_t satImm = bits(machInst, 4, 0);
+                return new Ssat16(machInst, rd, satImm + 1, rn);
+            }
+            M5_FALLTHROUGH;
+          case 0x10:
+            {
+                const uint32_t satImm = bits(machInst, 4, 0);
+                const uint32_t imm = bits(machInst, 7, 6) |
+                                     (bits(machInst, 14, 12) << 2);
+                const ArmShiftType type =
+                    (ArmShiftType)(uint32_t)bits(machInst, 21, 20);
+                return new Ssat(machInst, rd, satImm + 1, rn, imm, type);
+            }
+          case 0x14:
+            {
+                const uint32_t lsb = bits(machInst, 7, 6) |
+                                     (bits(machInst, 14, 12) << 2);
+                const uint32_t msb = lsb + bits(machInst, 4, 0);
+                return new Sbfx(machInst, rd, rn, lsb, msb);
+            }
+          case 0x16:
+            {
+                const uint32_t lsb = bits(machInst, 7, 6) |
+                                     (bits(machInst, 14, 12) << 2);
+                const uint32_t msb = bits(machInst, 4, 0);
+                if (rn == 0xf) {
+                    return new Bfc(machInst, rd, rd, lsb, msb);
+                } else {
+                    return new Bfi(machInst, rd, rn, lsb, msb);
+                }
+            }
+          case 0x1a:
+            if (!(bits(machInst, 14, 12) || bits(machInst, 7, 6))) {
+                const uint32_t satImm = bits(machInst, 4, 0);
+                return new Usat16(machInst, rd, satImm, rn);
+            }
+            M5_FALLTHROUGH;
+          case 0x18:
+            {
+                const uint32_t satImm = bits(machInst, 4, 0);
+                const uint32_t imm = bits(machInst, 7, 6) |
+                                     (bits(machInst, 14, 12) << 2);
+                const ArmShiftType type =
+                    (ArmShiftType)(uint32_t)bits(machInst, 21, 20);
+                return new Usat(machInst, rd, satImm, rn, imm, type);
+            }
+          case 0x1c:
+            {
+                const uint32_t lsb = bits(machInst, 7, 6) |
+                                     (bits(machInst, 14, 12) << 2);
+                const uint32_t msb = lsb + bits(machInst, 4, 0);
+                return new Ubfx(machInst, rd, rn, lsb, msb);
+            }
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    '''
+}};
+
+def format Thumb32DataProcShiftReg() {{
+
+    def decInst(mnem, dest="rd", op1="rn"):
+        return '''
+            if (s) {
+                return new %(mnem)sRegCc(machInst, %(dest)s,
+                                          %(op1)s, rm, amt, type);
+            } else {
+                return new %(mnem)sReg(machInst, %(dest)s,
+                                        %(op1)s, rm, amt, type);
+            }
+        ''' % {"mnem" : mnem, "dest" : dest, "op1" : op1}
+
+    decode_block = '''
+    {
+        const uint32_t op = bits(machInst, 24, 21);
+        const bool s = (bits(machInst, 20) == 1);
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const IntRegIndex rd = (IntRegIndex)(uint32_t)bits(machInst, 11, 8);
+        const IntRegIndex rm = (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+        const uint32_t amt = (bits(machInst, 14, 12) << 2) |
+                              bits(machInst, 7, 6);
+        const ArmShiftType type = (ArmShiftType)(uint32_t)bits(machInst, 5, 4);
+        switch (op) {
+          case 0x0:
+            if (rd == INTREG_PC) {
+                %(tst)s
+            } else {
+                %(and)s
+            }
+          case 0x1:
+            %(bic)s
+          case 0x2:
+            if (rn == INTREG_PC) {
+                %(mov)s
+            } else {
+                %(orr)s
+            }
+          case 0x3:
+            if (rn == INTREG_PC) {
+                %(mvn)s
+            } else {
+                %(orn)s
+            }
+          case 0x4:
+            if (rd == INTREG_PC) {
+                %(teq)s
+            } else {
+                %(eor)s
+            }
+          case 0x6:
+            if (type) {
+                return new PkhtbReg(machInst, rd, rn, rm, amt, type);
+            } else {
+                return new PkhbtReg(machInst, rd, rn, rm, amt, type);
+            }
+          case 0x8:
+            if (rd == INTREG_PC) {
+                %(cmn)s
+            } else {
+                %(add)s
+            }
+          case 0xa:
+            %(adc)s
+          case 0xb:
+            %(sbc)s
+          case 0xd:
+            if (rd == INTREG_PC) {
+                %(cmp)s
+            } else {
+                %(sub)s
+            }
+          case 0xe:
+            %(rsb)s
+          default:
+            return new Unknown(machInst);
+        }
+    }
+    ''' % {
+        "tst" : decInst("Tst", "INTREG_ZERO"),
+        "and" : decInst("And"),
+        "bic" : decInst("Bic"),
+        "mov" : decInst("Mov", op1="INTREG_ZERO"),
+        "orr" : decInst("Orr"),
+        "mvn" : decInst("Mvn", op1="INTREG_ZERO"),
+        "orn" : decInst("Orn"),
+        "teq" : decInst("Teq", "INTREG_ZERO"),
+        "eor" : decInst("Eor"),
+        "cmn" : decInst("Cmn", "INTREG_ZERO"),
+        "add" : decInst("Add"),
+        "adc" : decInst("Adc"),
+        "sbc" : decInst("Sbc"),
+        "cmp" : decInst("Cmp", "INTREG_ZERO"),
+        "sub" : decInst("Sub"),
+        "rsb" : decInst("Rsb")
+    }
+}};

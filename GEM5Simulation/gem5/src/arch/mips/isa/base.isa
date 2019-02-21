@@ -1,0 +1,125 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2007 MIPS Technologies, Inc.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Korey Sewell
+
+////////////////////////////////////////////////////////////////////
+//
+// Base class for MIPS instructions, and some support functions
+//
+
+//Outputs to decoder.hh
+output header {{
+
+    using namespace MipsISA;
+
+    /**
+     * Base class for all MIPS static instructions.
+     */
+    class MipsStaticInst : public StaticInst
+    {
+      protected:
+
+        // Constructor
+        MipsStaticInst(const char *mnem, MachInst _machInst, OpClass __opClass)
+            : StaticInst(mnem, _machInst, __opClass)
+        {
+        }
+
+        /// Print a register name for disassembly given the unique
+        /// dependence tag number (FP or int).
+        void printReg(std::ostream &os, RegId reg) const;
+
+        std::string generateDisassembly(
+                Addr pc, const SymbolTable *symtab) const override;
+
+      public:
+        void
+        advancePC(MipsISA::PCState &pc) const override
+        {
+            pc.advance();
+        }
+
+        size_t
+        asBytes(void *buf, size_t max_size) override
+        {
+            return simpleAsBytes(buf, max_size, machInst);
+        }
+    };
+
+}};
+
+//Ouputs to decoder.cc
+output decoder {{
+
+    void MipsStaticInst::printReg(std::ostream &os, RegId reg) const
+    {
+        if (reg.isIntReg()) {
+            ccprintf(os, "r%d", reg.index());
+        }
+        else {
+            ccprintf(os, "f%d", reg.index());
+        }
+    }
+
+    std::string MipsStaticInst::generateDisassembly(Addr pc, const SymbolTable *symtab) const
+    {
+        std::stringstream ss;
+
+        ccprintf(ss, "%-10s ", mnemonic);
+
+        // Need to find standard way to not print
+        // this info. Maybe add bool variable to
+        // class?
+        if (strcmp(mnemonic, "syscall") != 0) {
+            if(_numDestRegs > 0){
+                printReg(ss, _destRegIdx[0]);
+            }
+
+            if(_numSrcRegs > 0) {
+                ss << ", ";
+                printReg(ss, _srcRegIdx[0]);
+            }
+
+            if(_numSrcRegs > 1) {
+                ss << ", ";
+                printReg(ss, _srcRegIdx[1]);
+            }
+        }
+
+        // Should we define a separate inst. class
+        // just for two insts?
+        if (strcmp(mnemonic, "sll") == 0 || strcmp(mnemonic, "sra") == 0) {
+            ccprintf(ss,", %d",SA);
+        }
+
+        return ss.str();
+    }
+
+}};
+

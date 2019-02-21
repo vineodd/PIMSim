@@ -1,0 +1,264 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010, 2016 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Copyright (c) 2007-2008 The Florida State University
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Stephen Hines
+
+////////////////////////////////////////////////////////////////////
+//
+// Predicated Instruction Execution
+//
+
+let {{
+    predicateTest = 'testPredicate(OptCondCodesNZ, OptCondCodesC, OptCondCodesV, condCode)'
+    condPredicateTest = 'testPredicate(CondCodesNZ, CondCodesC, CondCodesV, condCode)'
+}};
+
+def template DataImmDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+    public:
+        // Constructor
+        %(class_name)s(ExtMachInst machInst, IntRegIndex _dest,
+                IntRegIndex _op1, uint32_t _imm, bool _rotC=true);
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+};
+}};
+
+def template DataImmConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                          IntRegIndex _dest,
+                                          IntRegIndex _op1,
+                                          uint32_t _imm,
+                                          bool _rotC)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _dest, _op1, _imm, _rotC)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+
+        if (%(is_branch)s && !isFloating() && !isVector()){
+            flags[IsControl] = true;
+            flags[IsIndirectControl] = true;
+            if (condCode == COND_AL || condCode == COND_UC)
+                flags[IsUncondControl] = true;
+            else
+                flags[IsCondControl] = true;
+        }
+    }
+}};
+
+def template DataRegDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+    public:
+        // Constructor
+        %(class_name)s(ExtMachInst machInst, IntRegIndex _dest,
+                IntRegIndex _op1, IntRegIndex _op2,
+                int32_t _shiftAmt, ArmShiftType _shiftType);
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+};
+}};
+
+def template DataRegConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                          IntRegIndex _dest,
+                                          IntRegIndex _op1,
+                                          IntRegIndex _op2,
+                                          int32_t _shiftAmt,
+                                          ArmShiftType _shiftType)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _dest, _op1, _op2, _shiftAmt, _shiftType)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+
+        if (%(is_branch)s && !isFloating() && !isVector()){
+            flags[IsControl] = true;
+            flags[IsIndirectControl] = true;
+            if (condCode == COND_AL || condCode == COND_UC)
+                flags[IsUncondControl] = true;
+            else
+                flags[IsCondControl] = true;
+
+            if (%(is_ras_pop)s) {
+                flags[IsReturn] = true;
+            }
+        }
+
+    }
+}};
+
+def template DataRegRegDeclare {{
+class %(class_name)s : public %(base_class)s
+{
+    public:
+        // Constructor
+        %(class_name)s(ExtMachInst machInst, IntRegIndex _dest,
+                IntRegIndex _op1, IntRegIndex _op2, IntRegIndex _shift,
+                ArmShiftType _shiftType);
+        Fault execute(ExecContext *, Trace::InstRecord *) const override;
+};
+}};
+
+def template DataRegRegConstructor {{
+    %(class_name)s::%(class_name)s(ExtMachInst machInst,
+                                          IntRegIndex _dest,
+                                          IntRegIndex _op1,
+                                          IntRegIndex _op2,
+                                          IntRegIndex _shift,
+                                          ArmShiftType _shiftType)
+        : %(base_class)s("%(mnemonic)s", machInst, %(op_class)s,
+                         _dest, _op1, _op2, _shift, _shiftType)
+    {
+        %(constructor)s;
+        if (!(condCode == COND_AL || condCode == COND_UC)) {
+            for (int x = 0; x < _numDestRegs; x++) {
+                _srcRegIdx[_numSrcRegs++] = _destRegIdx[x];
+            }
+        }
+    }
+}};
+
+def template PredOpExecute {{
+    Fault %(class_name)s::execute(
+        ExecContext *xc, Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+        uint64_t resTemp = 0;
+        resTemp = resTemp;
+        %(op_decl)s;
+        %(op_rd)s;
+
+        if (%(predicate_test)s)
+        {
+            %(code)s;
+            if (fault == NoFault)
+            {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+        }
+
+        return fault;
+    }
+}};
+
+def template QuiescePredOpExecute {{
+    Fault %(class_name)s::execute(
+        ExecContext *xc, Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+        uint64_t resTemp = 0;
+        resTemp = resTemp;
+        %(op_decl)s;
+        %(op_rd)s;
+
+        if (%(predicate_test)s)
+        {
+            %(code)s;
+            if (fault == NoFault)
+            {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+            PseudoInst::quiesceSkip(xc->tcBase());
+        }
+
+        return fault;
+    }
+}};
+
+def template QuiescePredOpExecuteWithFixup {{
+    Fault %(class_name)s::execute(
+        ExecContext *xc, Trace::InstRecord *traceData) const
+    {
+        Fault fault = NoFault;
+        uint64_t resTemp = 0;
+        resTemp = resTemp;
+        %(op_decl)s;
+        %(op_rd)s;
+
+        if (%(predicate_test)s)
+        {
+            %(code)s;
+            if (fault == NoFault)
+            {
+                %(op_wb)s;
+            }
+        } else {
+            xc->setPredicate(false);
+            %(pred_fixup)s;
+            PseudoInst::quiesceSkip(xc->tcBase());
+        }
+
+        return fault;
+    }
+}};
+
+def template DataDecode {{
+    if (machInst.opcode4 == 0) {
+        if (machInst.sField == 0)
+            return new %(class_name)sImm(machInst);
+        else
+            return new %(class_name)sImmCc(machInst);
+    } else {
+        if (machInst.sField == 0)
+            return new %(class_name)s(machInst);
+        else
+            return new %(class_name)sCc(machInst);
+    }
+}};
+
+def template DataImmDecode {{
+    if (machInst.sField == 0)
+        return new %(class_name)s(machInst);
+    else
+        return new %(class_name)sCc(machInst);
+}};

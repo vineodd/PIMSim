@@ -1,0 +1,107 @@
+#!/bin/bash
+
+
+#
+# Copyright (c) 2015 ARM Limited
+# All rights reserved
+#
+# The license below extends only to copyright in the software and shall
+# not be construed as granting a license to any other intellectual
+# property including but not limited to intellectual property relating
+# to a hardware implementation of the functionality of the software
+# licensed hereunder.  You may use the software subject to the license
+# terms below provided that you ensure that this notice is replicated
+# unmodified and in its entirety in all distributions of the software,
+# modified or unmodified, in source code or in binary form.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met: redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer;
+# redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in the
+# documentation and/or other materials provided with the distribution;
+# neither the name of the copyright holders nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Authors: Gabor Dozsa
+#
+#
+# This is an example boot script to use for dist-gem5 runs. The important
+# task here is to extract the rank and size information through the m5
+# initparam utility and use those to configure MAC/IP addresses and hostname.
+#
+# You are expected to customize this scipt for your needs (e.g. change
+# the command at the end of the scipt to run your tests/workloads.
+
+source /root/.bashrc
+echo "bootscript.rcS is running"
+
+# Retrieve dist-gem5 rank and size parameters using the 'm5' utility
+MY_RANK=$(/sbin/m5 initparam dist-rank)
+[ $? = 0 ] || { echo "m5 initparam failed"; exit -1; }
+MY_SIZE=$(/sbin/m5 initparam dist-size)
+[ $? = 0 ] || { echo "m5 initparam failed"; exit -1; }
+
+/bin/hostname node${MY_RANK}
+
+# Keep MAC address assignment simple for now ...
+(($MY_RANK > 97)) && { echo "(E) Rank must be less than 98"; /sbin/m5 abort; }
+((MY_ADDR = MY_RANK + 2))
+if (($MY_ADDR < 10))
+then
+    MY_ADDR_PADDED=0${MY_ADDR}
+else
+    MY_ADDR_PADDED=${MY_ADDR}
+fi
+
+/sbin/ifconfig eth0 hw ether 00:90:00:00:00:${MY_ADDR_PADDED}
+/sbin/ifconfig eth0 192.168.0.${MY_ADDR} netmask 255.255.255.0 up
+
+/sbin/ifconfig -a
+
+echo "Hello from $MY_RANK of $MY_SIZE"
+
+# Now that our network interface is configured we can use the usual commands to
+# contact the other systems, e.g. let's try to ping a "neighbour" system
+if ((MY_RANK < MY_SIZE - 1))
+then
+    ping -c 1 192.168.0.$((MY_ADDR + 1))
+else
+    ping -c 1 192.168.0.2
+fi
+
+
+if [ "$MY_RANK" == "0" ]
+then
+    # Trigger an immediate checkpoint at the next sync (by passing a non-zero
+    # delay param to m5 ckpt)
+    /sbin/m5 checkpoint 1
+    echo "A real multi node workload might start here ..."
+    # Trigger an immediate exit at the next sync (by passing a non-zero delay
+    # param to m5 exit)
+    /sbin/m5 exit 1
+else
+    # This is to avoid other (rank!=0) gem5 processes exiting
+    # before the test (started by rank 0) completes. When rank 0 completes the
+    # test it will exit and that will trigger a notification to all the peer
+    # gem5 processes to stop the simulation.
+    echo "sleep forever..."
+    while /bin/true
+    do
+	sleep 5
+    done
+fi

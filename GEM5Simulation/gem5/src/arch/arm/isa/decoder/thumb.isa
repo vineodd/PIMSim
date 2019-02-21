@@ -1,0 +1,177 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010-2012 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Copyright (c) 2009 The Regents of The University of Michigan
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+decode BIGTHUMB {
+    // 16 bit thumb instructions.
+    0: decode TOPCODE_15_13 {
+        0x0, 0x1: Thumb16ShiftAddSubMoveCmp::thumb16ShiftAddMoveCmp();
+        0x2: decode TOPCODE_12_10 {
+            0x0: Thumb16DataProcessing::thumb16DataProcessing();
+            0x1: Thumb16SpecDataAndBx::thumb16SpecDataAndBx();
+            0x2, 0x3: Thumb16MemLit::thumb16MemLit();
+            default: Thumb16MemReg::thumb16MemReg();
+        }
+        0x3, 0x4: Thumb16MemImm::thumb16MemImm();
+        0x5: decode TOPCODE_12_11 {
+            0x0: Thumb16Adr::thumb16Adr();
+            0x1: Thumb16AddSp::thumb16AddSp(); //sp, immediate
+            0x2, 0x3: Thumb16Misc::thumb16Misc();
+        }
+        0x6: decode TOPCODE_12_11 {
+            0x0, 0x1: Thumb16MacroMem::thumb16MacroMem();
+            0x2, 0x3: Thumb16CondBranchAndSvc::thumb16CondBranchAndSvc();
+        }
+        0x7: decode TOPCODE_12_11 {
+            0x0: Thumb16UncondBranch::thumb16UncondBranch();
+        }
+    }
+
+    // 32 bit thumb instructions.
+    1: decode HTOPCODE_12_11 {
+        0x1: decode HTOPCODE_10_9 {
+            0x0: decode HTOPCODE_6 {
+                0x0: decode HTOPCODE_8_7 {
+                    0x0, 0x3: Thumb32SrsRfe::thumb32SrsRfe();
+                    // This uses the same encoding as regular ARM.
+                    default: ArmMacroMem::armMacroMem();
+                }
+                0x1: Thumb32LdrStrDExTbh::thumb32LdrStrDExTbh();
+            }
+            0x1: Thumb32DataProcShiftReg::thumb32DataProcShiftReg();
+            default: decode HTOPCODE_9_8 {
+                0x2: decode LTOPCODE_4 {
+                    0x0: decode LTCOPROC {
+                        0xa, 0xb: VfpData::vfpData();
+                        default: WarnUnimpl::cdp(); // cdp2
+                    }
+                    0x1: decode LTCOPROC {
+                        0x1: M5ops::m5ops();
+                        0xa, 0xb: ShortFpTransfer::shortFpTransfer();
+                        0xe: McrMrc14::mcrMrc14();
+                        0xf: McrMrc15::mcrMrc15();
+                    }
+                }
+                0x3: ThumbNeonData::ThumbNeonData();
+                default: decode LTCOPROC {
+                    0xa, 0xb: ExtensionRegLoadStore::extensionRegLoadStre();
+                    0xf: decode HTOPCODE_9_4 {
+                        0x00: Unknown::undefined();
+                        0x04: decode LTCOPROC {
+                            0xf: Mcrr15::Mcrr15();
+                            default: WarnUnimpl::mcrr(); // mcrr2
+                        }
+                        0x05: decode LTCOPROC {
+                            0xf: Mrrc15::Mrrc15();
+                            default: WarnUnimpl::mrrc(); // mrrc2
+                        }
+                        0x02, 0x06, 0x08, 0x0a, 0x0c, 0x0e, 0x10,
+                        0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e:
+                            WarnUnimpl::stc(); // stc2
+                        0x03, 0x07, 0x09, 0x0b, 0x0d, 0x0f, 0x11,
+                        0x13, 0x15, 0x17, 0x19, 0x1b, 0x1d, 0x1f:
+                            decode HTRN {
+                                0xf: WarnUnimpl::ldc(); // ldc2 (literal)
+                                default: WarnUnimpl::ldc(); // ldc2 (immediate)
+                            }
+                    }
+                }
+            }
+        }
+        0x2: decode LTOPCODE_15 {
+            0x0: decode HTOPCODE_9 {
+                0x0: Thumb32DataProcModImm::thumb32DataProcModImm();
+                0x1: Thumb32DataProcPlainBin::thumb32DataProcPlainBin();
+            }
+            0x1: Thumb32BranchesAndMiscCtrl::thumb32BranchesAndMiscCtrl();
+        }
+        0x3: decode HTOPCODE_10_9 {
+            0x0: decode HTOPCODE_4 {
+                0x0: decode HTOPCODE_8 {
+                    0x0: Thumb32StoreSingle::thumb32StoreSingle();
+                    0x1: ThumbNeonMem::thumbNeonMem();
+                }
+                0x1: decode HTOPCODE_6_5 {
+                    0x0: LoadByteMemoryHints::loadByteMemoryHints();
+                    0x1: LoadHalfwordMemoryHints::loadHalfwordMemoryHints();
+                    0x2: Thumb32LoadWord::thumb32LoadWord();
+                }
+            }
+            0x1: decode HTOPCODE_8_7 {
+                0x2: Thumb32MulMulAccAndAbsDiff::thumb32MulMulAccAndAbsDiff();
+                0x3: Thumb32LongMulMulAccAndDiv::thumb32LongMulMulAccAndDiv();
+                default: Thumb32DataProcReg::thumb32DataProcReg();
+            }
+            default: decode HTOPCODE_9_8 {
+                0x2: decode LTOPCODE_4 {
+                    0x0: decode LTCOPROC {
+                        0xa, 0xb: VfpData::vfpData();
+                        default: WarnUnimpl::cdp(); // cdp2
+                    }
+                    0x1: decode LTCOPROC {
+                        0x1: M5ops::m5ops();
+                        0xa, 0xb: ShortFpTransfer::shortFpTransfer();
+                        0xe: McrMrc14::mcrMrc14();
+                        0xf: McrMrc15::mcrMrc15();
+                    }
+                }
+                0x3: ThumbNeonData::thumbNeonData();
+                default: decode LTCOPROC {
+                    0xa, 0xb: ExtensionRegLoadStore::extensionRegLoadStre();
+                    0xf: decode HTOPCODE_9_4 {
+                        0x00: Unknown::undefined();
+                        0x04: WarnUnimpl::mcrr(); // mcrr2
+                        0x05: WarnUnimpl::mrrc(); // mrrc2
+                        0x02, 0x06, 0x08, 0x0a, 0x0c, 0x0e, 0x10,
+                        0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e:
+                            WarnUnimpl::stc(); // stc2
+                        0x03, 0x07, 0x09, 0x0b, 0x0d, 0x0f, 0x11,
+                        0x13, 0x15, 0x17, 0x19, 0x1b, 0x1d, 0x1f:
+                            decode HTRN {
+                                0xf: WarnUnimpl::ldc(); // ldc2 (literal)
+                                default: WarnUnimpl::ldc(); // ldc2 (immediate)
+                            }
+                    }
+                }
+            }
+        }
+    }
+}

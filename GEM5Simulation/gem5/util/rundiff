@@ -1,0 +1,321 @@
+#! /usr/bin/env perl
+
+# Copyright (c) 2003 The Regents of The University of Michigan
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met: redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer;
+# redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in the
+# documentation and/or other materials provided with the distribution;
+# neither the name of the copyright holders nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Authors: Nathan Binkert
+#          Steve Reinhardt
+
+# Diff two streams.
+#
+# Unlike regular diff, this script does not read in the entire input
+# before doing a diff, so it can be used on lengthy outputs piped from
+# other programs (e.g., M5 traces).  The best way to do this is to
+# take advantage of the power of Perl's open function, which will
+# automatically fork a subprocess if the last character in the
+# "filename" is a pipe (|).  Thus to compare the instruction traces
+# from two versions of m5 (m5a and m5b), you can do this:
+#
+# rundiff 'm5a --traceflags=InstExec |' 'm5b --traceflags=InstExec |'
+#
+
+use strict;
+use FileHandle;
+use Getopt::Std;
+
+#
+# Options:
+#  -c <n> : print n lines of context before & after changes
+#  -l <n> : use n lines of lookahead
+#  -x     : use "complex" diff from Algorithm::Diff (see below)
+#
+our ($opt_c, $opt_l, $opt_x);
+getopts('c:l:x');
+
+#
+# For the highest-quality (minimal) diffs, we can use the
+# Algorithm::Diff package.  By default, a built-in, simple, and
+# generally quite adequate algorithm will be used.  If you have
+# Algorithm::Diff installed on your system, and don't mind having the
+# script go slower (like 3-4x slower, based on informal observation),
+# then specify '-x' on the command line to use it.
+my $use_complexdiff = defined($opt_x);
+
+if ($use_complexdiff) {
+    # Don't use 'use', as that's a compile-time option and will fail
+    # on systems that don't have Algorithm::Diff installed even if
+    # $use_complexdiff is false.  'require' is evaluated at runtime,
+    # so it's OK.
+    require Algorithm::Diff;
+    import Algorithm::Diff qw(traverse_sequences);
+};
+
+my $lookahead_lines = $opt_l || 200;
+
+# in theory you could have different amounts of context before and
+# after a diff, but until someone needs that there's only one arg to
+# set both.
+my $precontext_lines = $opt_c || 3;
+my $postcontext_lines = $precontext_lines;
+
+my $file1 = $ARGV[0];
+my $file2 = $ARGV[1];
+
+die "Need two args." if (!(defined($file1) && defined($file2)));
+
+my ($fh1, $fh2);
+open($fh1, $file1) or die "Can't open $file1";
+open($fh2, $file2) or die "Can't open $file2";
+
+# print files to output so we know which is which
+print "-$file1\n";
+print "+$file2\n";
+
+# buffer of matching lines for pre-diff context
+my @precontext = ();
+# number of post-diff matching lines remaining to print
+my $postcontext = 0;
+
+# lookahead buffers for $file1 and $file2 respectively
+my @lines1 = ();
+my @lines2 = ();
+
+# Next line number available to print from each file.  Generally this
+# corresponds to the oldest line in @precontext, or the oldest line in
+# @lines1 and @lines2 if @precontext is empty.
+my $lineno1 = 1;
+my $lineno2 = 1;
+
+# Fill a lookahead buffer to $lookahead_lines lines (or until EOF).
+sub fill
+{
+    my ($fh, $array) = @_;
+
+    while (@$array < $lookahead_lines) {
+	my $line = <$fh>;
+	last if (!defined($line));
+	push @$array, $line;
+    }
+}
+
+# Print and delete n lines from front of given array with given prefix.
+sub printlines
+{
+    my ($array, $n, $prefix) = @_;
+
+    while ($n--) {
+	my $line = shift @$array;
+	last if (!defined($line));
+	print $prefix, $line;
+    }
+}
+
+# Print a difference region where n1 lines of file1 were replaced by
+# n2 lines of file2 (where either n1 or n2 could be zero).
+sub printdiff
+{
+    my ($n1, $n2)= @_;
+
+    # If the precontext buffer is full or we're at the beginning of a
+    # file, then this is a new diff region, so we should print a
+    # header indicating the current line numbers.  If we're past the
+    # beginning and the precontext buffer isn't full, then whatever
+    # we're about to print is contiguous with the end of the last
+    # region we printed, so we just concatenate them on the output.
+    if (@precontext == $precontext_lines || ($lineno1 == 0 && $lineno2 == 0)) {
+	print "@@ -$lineno1 +$lineno2 @@\n";
+    }
+
+    # Print and clear the precontext buffer.
+    if (@precontext) {
+	print ' ', join(' ', @precontext);
+	$lineno1 += scalar(@precontext);
+	$lineno2 += scalar(@precontext);
+	@precontext = ();
+    }
+
+    # Print the differing lines.
+    printlines(\@lines1, $n1, '-');
+    printlines(\@lines2, $n2, '+');
+    $lineno1 += $n1;
+    $lineno2 += $n2;
+
+    # Set $postcontext to print the next $postcontext_lines matching lines.
+    $postcontext = $postcontext_lines;
+
+    # Normally we flush after the postcontext lines are printed, but if
+    # the user has decreed that there aren't any we need to flush now
+    if ($postcontext == 0) {
+        STDOUT->flush();
+    }
+}
+
+
+########################
+#
+# Complex diff algorithm
+#
+########################
+
+{
+    my $match_found;
+    my $discard_lines1;
+    my $discard_lines2;
+
+    sub match { $match_found = 1; }
+    sub discard1 { $discard_lines1++ unless $match_found; }
+    sub discard2 { $discard_lines2++ unless $match_found; }
+
+    sub complex_diff
+    {
+	$match_found = 0;
+	$discard_lines1 = 0;
+	$discard_lines2 = 0;
+
+	# See Diff.pm.  Note that even though this call generates a
+	# complete diff of both lookahead buffers, all we use it for
+	# is to figure out how many lines to discard off the front of
+	# each buffer to resync the streams.
+	traverse_sequences( \@lines1, \@lines2,
+			    { MATCH => \&match,
+			      DISCARD_A => \&discard1,
+			      DISCARD_B => \&discard2 });
+
+	if (!$match_found) {
+	    printdiff(scalar(@lines1), scalar(@lines2));
+	    die "Lost sync!";
+	}
+
+	# Since we shouldn't get here unless the first lines of the
+	# buffers are different, then we must discard some lines off
+	# at least one of the buffers.
+	die if ($discard_lines1 == 0 && $discard_lines2 == 0);
+
+	printdiff($discard_lines1, $discard_lines2);
+    }
+}
+
+#######################
+#
+# Simple diff algorithm
+#
+#######################
+
+# Check for a pair of matching lines; if found, generate appropriate
+# diff output.
+sub checkmatch
+{
+    my ($n1, $n2) = @_;
+
+    # Check if two adjacent lines match, to reduce false resyncs
+    # (particularly on unrelated blank lines).  This generates
+    # larger-than-necessary diffs when a single line really should be
+    # treated as common; if that bugs you, use Algorithm::Diff.
+    if ($lines1[$n1] eq $lines2[$n2] && $lines1[$n1+1] eq $lines2[$n2+1]) {
+	printdiff($n1, $n2);
+	return 1;
+    }
+
+    return 0;
+}
+
+sub simple_diff
+{
+    # Look for differences of $cnt lines to resync,
+    # increasing $cnt from 1 to $lookahead_lines until we find
+    # something.
+    for (my $cnt = 1; $cnt < $lookahead_lines-1; ++$cnt) {
+	# Check for n lines in one file being replaced by
+	# n lines in the other.
+	return if checkmatch($cnt, $cnt);
+	# Find differences where n lines in one file were
+	# replaced by m lines in the other.  We let m = $cnt
+	# and iterate for n = 0 to $cnt-1.
+	for (my $n = 0; $n < $cnt; ++$n) {
+	    return if checkmatch($n, $cnt);
+	    return if checkmatch($cnt, $n);
+	}
+    }
+
+    printdiff(scalar(@lines1), scalar(@lines2));
+    die "Lost sync!";
+}
+
+# Set the pointer to the appropriate diff function.
+#
+# Note that in either case the function determines how many lines to
+# discard from the front of each lookahead buffer to resync the
+# streams, then prints the appropriate diff output and discards them.
+# After the function returns, it should always be the case that
+# $lines1[0] eq $lines2[0].
+my $find_diff = $use_complexdiff ? \&complex_diff : \&simple_diff;
+
+# The main loop.
+while (1) {
+    # keep lookahead buffers topped up
+    fill($fh1, \@lines1);
+    fill($fh2, \@lines2);
+
+    # peek at first line in each buffer
+    my $l1 = $lines1[0];
+    my $l2 = $lines2[0];
+
+    if (!defined($l1) && !defined($l2)) {
+	# reached EOF on both streams: exit
+	exit(1);
+    }
+
+    if ($l1 eq $l2) {
+	# matching lines: delete from lookahead buffer
+	shift @lines1;
+	shift @lines2;
+	# figure out what to do with this line
+	if ($postcontext > 0) {
+	    # we're in the post-context of a diff: print it
+	    print ' ', $l1;
+	    $lineno1++;
+	    $lineno2++;
+            if (--$postcontext == 0) {
+                STDOUT->flush();
+            }
+	}
+	else {
+	    # we're in the middle of a matching region... save this
+	    # line for precontext in case we run into a difference.
+	    push @precontext, $l1;
+	    # don't let precontext buffer get bigger than needed
+	    while (@precontext > $precontext_lines) {
+		shift @precontext;
+		$lineno1++;
+		$lineno2++;
+	    }
+	}
+    }
+    else {
+	# Mismatch.  Deal with it.
+	&$find_diff();
+    }
+}

@@ -1,0 +1,176 @@
+// Copyright (c) 2006-2007 The Regents of The University of Michigan
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Ali Saidi
+//          Gabe Black
+//          Steve Reinhardt
+
+////////////////////////////////////////////////////////////////////
+//
+// Integer operate instructions
+//
+
+def template SetHiDecode {{
+    {
+        if (RD == 0 && IMM22 == 0)
+            return (SparcStaticInst *)(new Nop("nop", machInst, No_OpClass));
+        else
+            return (SparcStaticInst *)(new %(class_name)s(machInst));
+    }
+}};
+
+def template IntOpExecute {{
+        Fault %(class_name)s::execute(ExecContext *xc,
+                Trace::InstRecord *traceData) const
+        {
+            Fault fault = NoFault;
+
+            %(op_decl)s;
+            %(op_rd)s;
+            %(code)s;
+
+            // Write the resulting state to the execution context
+            if (fault == NoFault) {
+                %(cc_code)s;
+                %(op_wb)s;
+            }
+            return fault;
+        }
+}};
+
+let {{
+    def doIntFormat(code, ccCode, name, Name, opt_flags):
+        (usesImm, code, immCode,
+         rString, iString) = splitOutImm(code)
+        iop = InstObjParams(name, Name, 'IntOp',
+                {"code": code, "cc_code": ccCode},
+                opt_flags)
+        header_output = BasicDeclare.subst(iop)
+        decoder_output = BasicConstructor.subst(iop)
+        exec_output = IntOpExecute.subst(iop)
+        if usesImm:
+            imm_iop = InstObjParams(name, Name + 'Imm', 'IntOpImm' + iString,
+                    {"code": immCode, "cc_code": ccCode}, opt_flags)
+            header_output += BasicDeclare.subst(imm_iop)
+            decoder_output += BasicConstructor.subst(imm_iop)
+            exec_output += IntOpExecute.subst(imm_iop)
+            decode_block = ROrImmDecode.subst(iop)
+        else:
+            decode_block = BasicDecode.subst(iop)
+        return (header_output, decoder_output, exec_output, decode_block)
+
+    calcCcCode = '''
+        uint16_t _ic, _iv, _iz, _in, _xc, _xv, _xz, _xn;
+
+        _in = (Rd >> 31) & 1;
+        _iz = ((Rd & 0xFFFFFFFF) == 0);
+        _xn = (Rd >> 63) & 1;
+        _xz = (Rd == 0);
+        _iv = %(iv)s & 1;
+        _ic = %(ic)s & 1;
+        _xv = %(xv)s & 1;
+        _xc = %(xc)s & 1;
+
+        Ccr =  _ic << 0 | _iv << 1 | _iz << 2 | _in << 3 |
+               _xc << 4 | _xv << 5 | _xz << 6 | _xn << 7;
+
+
+        DPRINTF(Sparc, "in = %%d\\n", _in);
+        DPRINTF(Sparc, "iz = %%d\\n", _iz);
+        DPRINTF(Sparc, "xn = %%d\\n", _xn);
+        DPRINTF(Sparc, "xz = %%d\\n", _xz);
+        DPRINTF(Sparc, "iv = %%d\\n", _iv);
+        DPRINTF(Sparc, "ic = %%d\\n", _ic);
+        DPRINTF(Sparc, "xv = %%d\\n", _xv);
+        DPRINTF(Sparc, "xc = %%d\\n", _xc);
+        '''
+
+    default_ic = "findCarry(32, res, op1, op2)"
+    default_iv = "findOverflow(32, res, op1, op2)"
+    default_xc = "findCarry(64, res, op1, op2)"
+    default_xv = "findOverflow(64, res, op1, op2)"
+    default_sub_ic = "!findCarry(32, res, op1, ~op2)"
+    default_sub_iv = "findOverflow(32, res, op1, ~op2)"
+    default_sub_xc = "!findCarry(64, res, op1, ~op2)"
+    default_sub_xv = "findOverflow(64, res, op1, ~op2)"
+}};
+
+// Primary format for integer operate instructions:
+def format IntOp(code, *opt_flags) {{
+    ccCode = ''
+    (header_output,
+     decoder_output,
+     exec_output,
+     decode_block) = doIntFormat(code, ccCode,
+                                 name, Name, opt_flags)
+}};
+
+// Primary format for integer operate instructions:
+def format IntOpCc(code, ic=default_ic, iv=default_iv,
+                         xc=default_xc, xv=default_xv,
+                         sub=False, *opt_flags) {{
+
+    if sub == "False":
+        (def_ic, def_iv, def_xc, def_xv) = \
+            (default_ic, default_iv, default_xc, default_xv)
+    else:
+        (def_ic, def_iv, def_xc, def_xv) = \
+            (default_sub_ic, default_sub_iv, default_sub_xc, default_sub_xv)
+    if ic == "default_ic":
+        ic = def_ic
+    if iv == "default_iv":
+        iv = def_iv
+    if xc == "default_xc":
+        xc = def_xc
+    if xv == "default_xv":
+        xv = def_xv
+    ccCode = calcCcCode % vars()
+    (header_output,
+     decoder_output,
+     exec_output,
+     decode_block) = doIntFormat(code, ccCode,
+                                 name, Name, opt_flags)
+}};
+
+// Primary format for integer operate instructions:
+def format IntOpCcRes(code, ic=0, iv=0, xc=0, xv=0, *opt_flags) {{
+    ccCode = calcCcCode % {"ic" : ic, "iv" : iv, "xc" : xc, "xv" : xv}
+    (header_output,
+     decoder_output,
+     exec_output,
+     decode_block) = doIntFormat(code, ccCode,
+                                 name, Name, opt_flags)
+}};
+
+def format SetHi(code, *opt_flags) {{
+    iop = InstObjParams(name, Name, 'SetHi',
+            {"code": code, "cc_code": ''}, opt_flags)
+    header_output = BasicDeclare.subst(iop)
+    decoder_output = BasicConstructor.subst(iop)
+    exec_output = IntOpExecute.subst(iop)
+    decode_block = SetHiDecode.subst(iop)
+}};
+

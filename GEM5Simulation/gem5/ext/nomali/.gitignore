@@ -1,0 +1,8 @@
+/docs
+/tests/nomali_test*
+!/tests/nomali_test*.*
+*~
+*.o
+*.d
+*.so
+*.a

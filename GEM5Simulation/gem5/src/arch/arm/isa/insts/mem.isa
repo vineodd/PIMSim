@@ -1,0 +1,231 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010-2012 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+let {{
+
+    class LoadStoreInst(object):
+        def __init__(self):
+            self.fullExecTemplate = eval(self.execBase + 'Execute')
+            self.initiateAccTemplate = eval(self.execBase + 'InitiateAcc')
+            self.completeAccTemplate = eval(self.execBase + 'CompleteAcc')
+            self.declareTemplate = eval(self.decConstBase + 'Declare')
+            self.constructTemplate = eval(self.decConstBase + 'Constructor')
+
+        def fillTemplates(self, name, Name, codeBlobs, memFlags, instFlags,
+                          base='Memory', wbDecl=None, pcDecl=None,
+                          rasPop=False, size=4, sign=False, faCode=None):
+            # Make sure flags are in lists (convert to lists if not).
+            memFlags = makeList(memFlags)
+            instFlags = makeList(instFlags)
+
+            eaCode = codeBlobs["ea_code"]
+
+            # This shouldn't be part of the eaCode, but until the exec templates
+            # are converted over it's the easiest place to put it.
+            eaCode += '\n    unsigned memAccessFlags = '
+            eaCode += (string.join(memFlags, '|') + ';')
+
+            codeBlobs["ea_code"] = eaCode
+
+            if faCode:
+                # For AArch64 the fa_code snippet comes already assembled here
+                codeBlobs["fa_code"] = faCode
+            elif wbDecl == None:
+                codeBlobs["fa_code"] = '''
+                    if (dest != INTREG_PC) {
+                        fault->annotate(ArmFault::SAS, %s);
+                        fault->annotate(ArmFault::SSE, %s);
+                        fault->annotate(ArmFault::SRT, dest);
+                    }
+                ''' %("0"    if size == 1 else
+                      "1"    if size == 2 else "2",
+                      "true" if sign      else "false")
+            else:
+                codeBlobs["fa_code"] = ''
+
+            macroName = Name
+            instFlagsCopy = list(instFlags)
+            codeBlobsCopy = dict(codeBlobs)
+
+            use_uops = 0
+            if wbDecl is not None or pcDecl is not None:
+                instFlagsCopy.append('IsMicroop')
+                Name = Name + 'Acc'
+                use_uops = 1
+
+            use_wb = 0
+            use_pc = 0
+            if wbDecl is not None:
+                use_wb = 1
+            if pcDecl is not None:
+                use_pc = 1
+
+            codeBlobsCopy['acc_name'] = Name
+            codeBlobsCopy['wb_decl'] = wbDecl
+            codeBlobsCopy['pc_decl'] = pcDecl
+            codeBlobsCopy['use_uops'] = 0
+            codeBlobsCopy['use_wb'] = 0
+            codeBlobsCopy['use_pc'] = 0
+            is_ras_pop = "0"
+            if rasPop:
+                is_ras_pop = "1"
+            codeBlobsCopy['is_ras_pop'] = is_ras_pop
+
+            iop = InstObjParams(name, Name, base,
+                                codeBlobsCopy, instFlagsCopy)
+
+            header_output = self.declareTemplate.subst(iop)
+            decoder_output = self.constructTemplate.subst(iop)
+            exec_output = self.fullExecTemplate.subst(iop) + \
+                          self.initiateAccTemplate.subst(iop) + \
+                          self.completeAccTemplate.subst(iop)
+
+            if wbDecl is not None or pcDecl is not None:
+                iop = InstObjParams(name, macroName, base,
+                                    { "wb_decl" : wbDecl,
+                                      "pc_decl" : pcDecl,
+                                      "acc_name" : Name,
+                                      "use_uops" : use_uops,
+                                      "use_pc" : use_pc,
+                                      "use_wb" : use_wb,
+                                      "fa_code" : '',
+                                      "is_ras_pop" : is_ras_pop },
+                                    ['IsMacroop'])
+                header_output += self.declareTemplate.subst(iop)
+                decoder_output += self.constructTemplate.subst(iop)
+                exec_output += PanicExecute.subst(iop) + \
+                               PanicInitiateAcc.subst(iop) + \
+                               PanicCompleteAcc.subst(iop)
+
+            return (header_output, decoder_output, exec_output)
+
+    def pickPredicate(blobs):
+        opt_nz = True
+        opt_c = 'opt'
+        opt_v = True
+
+        if not isinstance(blobs, dict):
+            vals = [blobs]
+        else:
+            vals = blobs.values()
+        for val in vals:
+            if re.search('(?<!Opt)CondCodesNZ(?!.*=)', val):
+                opt_nz = False
+            if re.search('OptShiftRmCondCodesC(?!.*=)', val):
+                opt_c = 'opt_shift_rm'
+            elif re.search('(?<!Opt)CondCodesC(?!.*=)', val):
+                opt_c = 'none'
+            if re.search('(?<!Opt)CondCodesV(?!.*=)', val):
+                opt_v = False
+
+        # Build up the predicate piece by piece depending on which
+        # flags the instruction needs
+        predicate = 'testPredicate('
+        if opt_nz:
+            predicate += 'OptCondCodesNZ, '
+        else:
+            predicate += 'CondCodesNZ, '
+        if opt_c == 'opt':
+            predicate += 'OptCondCodesC, '
+        elif opt_c == 'opt_shift_rm':
+            predicate += 'OptShiftRmCondCodesC, '
+        else:
+            predicate += 'CondCodesC, '
+        if opt_v:
+            predicate += 'OptCondCodesV, '
+        else:
+            predicate += 'CondCodesV, '
+        predicate += 'condCode)'
+        predicate += '/*auto*/'
+        return predicate
+
+    def memClassName(base, post, add, writeback, \
+                     size=4, sign=False, user=False):
+        Name = base
+
+        parts = { "P" : post, "A" : add, "W" : writeback,
+                  "S" : sign, "U" : user }
+
+        for (letter, val) in parts.items():
+            if val:
+                Name += "_%sY" % letter
+            else:
+                Name += "_%sN" % letter
+
+        Name += ('_SZ%d' % size)
+
+        return Name
+
+    def buildMemSuffix(sign, size):
+        if size == 16:
+            memSuffix = '_tud'
+        elif size == 8:
+            memSuffix = '_ud'
+        elif size == 4:
+            if sign:
+                memSuffix = '_sw'
+            else:
+                memSuffix = '_uw'
+        elif size == 2:
+            if sign:
+                memSuffix = '_sh'
+            else:
+                memSuffix = '_uh'
+        elif size == 1:
+            if sign:
+                memSuffix = '_sb'
+            else:
+                memSuffix = '_ub'
+        else:
+            raise Exception, "Unrecognized size for access %d" % size
+
+        return memSuffix
+
+    def buildMemBase(base, post, writeback):
+        if post and writeback:
+            base = "MemoryPostIndex<%s>" % base
+        elif not post and writeback:
+            base = "MemoryPreIndex<%s>" % base
+        elif not post and not writeback:
+            base = "MemoryOffset<%s>" % base
+        else:
+            raise Exception, "Illegal combination of post and writeback"
+        return base
+}};
+

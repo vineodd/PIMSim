@@ -1,0 +1,1280 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2010-2013,2017-2018 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+let {{
+
+    svcCode = '''
+    ThreadContext *tc = xc->tcBase();
+
+    const auto semihost_imm = Thumb? 0xAB : 0x123456;
+
+    if (ArmSystem::haveSemihosting(tc) && imm == semihost_imm) {
+        R0 = ArmSystem::callSemihosting32(tc, R0, R1);
+    } else {
+        fault = std::make_shared<SupervisorCall>(machInst, imm);
+    }
+    '''
+
+    svcIop = InstObjParams("svc", "Svc", "ImmOp",
+                           { "code": svcCode,
+                             "predicate_test": predicateTest,
+                             "thumb_semihost": '0xAB',
+                             "arm_semihost": '0x123456' },
+                           ["IsSyscall", "IsNonSpeculative",
+                            "IsSerializeAfter"])
+    header_output = ImmOpDeclare.subst(svcIop)
+    decoder_output = SemihostConstructor.subst(svcIop)
+    exec_output = PredOpExecute.subst(svcIop)
+
+    hltCode = '''
+    ThreadContext *tc = xc->tcBase();
+
+    const auto semihost_imm = Thumb? 0x3C : 0xF000;
+
+    if (ArmSystem::haveSemihosting(tc) && imm == semihost_imm) {
+        R0 = ArmSystem::callSemihosting32(tc, R0, R1);
+    } else {
+        // HLT instructions aren't implemented, so treat them as undefined
+        // instructions.
+        fault = std::make_shared<UndefinedInstruction>(
+            machInst, false, mnemonic);
+    }
+    '''
+
+    hltIop = InstObjParams("hlt", "Hlt", "ImmOp",
+                           { "code": hltCode,
+                             "predicate_test": predicateTest,
+                             "thumb_semihost": '0x3C',
+                             "arm_semihost": '0xF000' },
+                           ["IsNonSpeculative"])
+    header_output += ImmOpDeclare.subst(hltIop)
+    decoder_output += SemihostConstructor.subst(hltIop)
+    exec_output += PredOpExecute.subst(hltIop)
+
+    smcCode = '''
+    HCR  hcr  = Hcr;
+    CPSR cpsr = Cpsr;
+    SCR  scr  = Scr;
+
+    if ((cpsr.mode != MODE_USER) && FullSystem) {
+        if (ArmSystem::haveVirtualization(xc->tcBase()) &&
+            !inSecureState(scr, cpsr) && (cpsr.mode != MODE_HYP) && hcr.tsc) {
+            fault = std::make_shared<HypervisorTrap>(machInst, 0,
+                                                     EC_SMC_TO_HYP);
+        } else {
+            if (scr.scd) {
+                fault = disabledFault();
+            } else {
+                fault = std::make_shared<SecureMonitorCall>(machInst);
+            }
+        }
+    } else {
+        fault = disabledFault();
+    }
+    '''
+
+    smcIop = InstObjParams("smc", "Smc", "PredOp",
+                           { "code": smcCode,
+                             "predicate_test": predicateTest },
+                           ["IsNonSpeculative", "IsSerializeAfter"])
+    header_output += BasicDeclare.subst(smcIop)
+    decoder_output += BasicConstructor.subst(smcIop)
+    exec_output += PredOpExecute.subst(smcIop)
+
+    hvcCode = '''
+    CPSR cpsr = Cpsr;
+    SCR  scr  = Scr;
+
+    // Filter out the various cases where this instruction isn't defined
+    if (!FullSystem || !ArmSystem::haveVirtualization(xc->tcBase()) ||
+        (cpsr.mode == MODE_USER) ||
+        (ArmSystem::haveSecurity(xc->tcBase()) && (!scr.ns || !scr.hce))) {
+        fault = disabledFault();
+    } else {
+        fault = std::make_shared<HypervisorCall>(machInst, imm);
+    }
+    '''
+
+    hvcIop = InstObjParams("hvc", "Hvc", "ImmOp",
+                           { "code": hvcCode,
+                             "predicate_test": predicateTest },
+                           ["IsNonSpeculative", "IsSerializeAfter"])
+    header_output += ImmOpDeclare.subst(hvcIop)
+    decoder_output += ImmOpConstructor.subst(hvcIop)
+    exec_output += PredOpExecute.subst(hvcIop)
+
+    eretCode = '''
+        SCTLR sctlr   = Sctlr;
+        CPSR old_cpsr = Cpsr;
+        old_cpsr.nz   = CondCodesNZ;
+        old_cpsr.c    = CondCodesC;
+        old_cpsr.v    = CondCodesV;
+        old_cpsr.ge   = CondCodesGE;
+
+        CPSR new_cpsr = cpsrWriteByInstr(old_cpsr, Spsr, Scr, Nsacr, 0xF,
+                            true, sctlr.nmfi, xc->tcBase());
+        Cpsr        = ~CondCodesMask & new_cpsr;
+        CondCodesNZ = new_cpsr.nz;
+        CondCodesC  = new_cpsr.c;
+        CondCodesV  = new_cpsr.v;
+        CondCodesGE = new_cpsr.ge;
+
+        NextThumb = (new_cpsr).t;
+                    NextJazelle = (new_cpsr).j;
+                    NextItState = (((new_cpsr).it2 << 2) & 0xFC)
+                        | ((new_cpsr).it1 & 0x3);
+
+        NPC = (old_cpsr.mode == MODE_HYP) ? ElrHyp : LR;
+    '''
+
+    eretIop = InstObjParams("eret", "Eret", "PredOp",
+                           { "code": eretCode,
+                             "predicate_test": predicateTest },
+                           ["IsNonSpeculative", "IsSerializeAfter",
+                            "IsSquashAfter"])
+    header_output += BasicDeclare.subst(eretIop)
+    decoder_output += BasicConstructor.subst(eretIop)
+    exec_output += PredOpExecute.subst(eretIop)
+
+    crcCode = '''
+    constexpr uint8_t size_bytes = %(sz)d;
+    constexpr uint32_t poly = %(polynom)s;
+
+    uint32_t data = htole(Op2);
+    auto data_buffer = reinterpret_cast<uint8_t*>(&data);
+
+    Dest = crc32<poly>(
+        data_buffer,   /* Message Register */
+        Op1,           /* Initial Value  of the CRC */
+        size_bytes     /* Size of the original Message */
+    );
+    '''
+
+    def crc32Emit(mnem, implCode, castagnoli, size):
+        global header_output, decoder_output, exec_output
+
+        if castagnoli:
+            # crc32c instructions
+            poly = "0x1EDC6F41"
+        else:
+            # crc32 instructions
+            poly = "0x04C11DB7"
+
+        data = {'sz' : size, 'polynom': poly}
+
+        instCode = implCode % data
+
+        crcIop = InstObjParams(mnem, mnem.capitalize(), "RegRegRegOp",
+                               { "code": instCode,
+                                 "predicate_test": predicateTest }, [])
+        header_output += RegRegRegOpDeclare.subst(crcIop)
+        decoder_output += RegRegRegOpConstructor.subst(crcIop)
+        exec_output += PredOpExecute.subst(crcIop)
+
+    crc32Emit("crc32b", crcCode, False, 1);
+    crc32Emit("crc32h", crcCode, False, 2);
+    crc32Emit("crc32w", crcCode, False, 4);
+    crc32Emit("crc32cb", crcCode, True, 1);
+    crc32Emit("crc32ch", crcCode, True, 2);
+    crc32Emit("crc32cw", crcCode, True, 4);
+
+}};
+
+let {{
+
+    header_output = decoder_output = exec_output = ""
+
+    mrsCpsrCode = '''
+        CPSR cpsr = Cpsr;
+        cpsr.nz = CondCodesNZ;
+        cpsr.c = CondCodesC;
+        cpsr.v = CondCodesV;
+        cpsr.ge = CondCodesGE;
+        Dest = cpsr & (cpsr.mode == MODE_USER ? ApsrMask : CpsrMask);
+    '''
+
+    mrsCpsrIop = InstObjParams("mrs", "MrsCpsr", "MrsOp",
+                               { "code": mrsCpsrCode,
+                                 "predicate_test": condPredicateTest },
+                               ["IsSerializeBefore"])
+    header_output += MrsDeclare.subst(mrsCpsrIop)
+    decoder_output += MrsConstructor.subst(mrsCpsrIop)
+    exec_output += PredOpExecute.subst(mrsCpsrIop)
+
+    mrsSpsrCode = "Dest = Spsr"
+    mrsSpsrIop = InstObjParams("mrs", "MrsSpsr", "MrsOp",
+                               { "code": mrsSpsrCode,
+                                 "predicate_test": predicateTest },
+                               ["IsSerializeBefore"])
+    header_output += MrsDeclare.subst(mrsSpsrIop)
+    decoder_output += MrsConstructor.subst(mrsSpsrIop)
+    exec_output += PredOpExecute.subst(mrsSpsrIop)
+
+    mrsBankedRegCode = '''
+        bool isIntReg;
+        int  regIdx;
+
+        if (decodeMrsMsrBankedReg(byteMask, r, isIntReg, regIdx, Cpsr, Scr, Nsacr)) {
+            if (isIntReg) {
+                Dest = DecodedBankedIntReg;
+            } else {
+                Dest = xc->readMiscReg(regIdx);
+            }
+        } else {
+            return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                          mnemonic);
+        }
+    '''
+    mrsBankedRegIop = InstObjParams("mrs", "MrsBankedReg", "MrsOp",
+                                    { "code": mrsBankedRegCode,
+                                      "predicate_test": predicateTest },
+                                    ["IsSerializeBefore"])
+    header_output += MrsBankedRegDeclare.subst(mrsBankedRegIop)
+    decoder_output += MrsBankedRegConstructor.subst(mrsBankedRegIop)
+    exec_output += PredOpExecute.subst(mrsBankedRegIop)
+
+    msrBankedRegCode = '''
+        bool isIntReg;
+        int  regIdx;
+
+        if (decodeMrsMsrBankedReg(byteMask, r, isIntReg, regIdx, Cpsr, Scr, Nsacr)) {
+            if (isIntReg) {
+                // This is a bit nasty, you would have thought that
+                // DecodedBankedIntReg wouldn't be written to unless the
+                // conditions on the IF statements above are met, however if
+                // you look at the generated C code you'll find that they are.
+                // However this is safe as DecodedBankedIntReg (which is used
+                // in operands.isa to get the index of DecodedBankedIntReg)
+                // will return INTREG_DUMMY if its not a valid integer
+                // register, so redirecting the write to somewhere we don't
+                // care about.
+                DecodedBankedIntReg = Op1;
+            } else {
+                xc->setMiscReg(regIdx, Op1);
+            }
+        } else {
+            return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                          mnemonic);
+        }
+    '''
+    msrBankedRegIop = InstObjParams("msr", "MsrBankedReg", "MsrRegOp",
+                                    { "code": msrBankedRegCode,
+                                      "predicate_test": predicateTest },
+                                    ["IsSerializeAfter", "IsNonSpeculative"])
+    header_output += MsrBankedRegDeclare.subst(msrBankedRegIop)
+    decoder_output += MsrBankedRegConstructor.subst(msrBankedRegIop)
+    exec_output += PredOpExecute.subst(msrBankedRegIop)
+
+    msrCpsrRegCode = '''
+        SCTLR sctlr = Sctlr;
+        CPSR old_cpsr = Cpsr;
+        old_cpsr.nz = CondCodesNZ;
+        old_cpsr.c = CondCodesC;
+        old_cpsr.v = CondCodesV;
+        old_cpsr.ge = CondCodesGE;
+
+        CPSR new_cpsr =
+            cpsrWriteByInstr(old_cpsr, Op1, Scr, Nsacr, byteMask, false,
+                             sctlr.nmfi, xc->tcBase());
+        Cpsr = ~CondCodesMask & new_cpsr;
+        CondCodesNZ = new_cpsr.nz;
+        CondCodesC = new_cpsr.c;
+        CondCodesV = new_cpsr.v;
+        CondCodesGE = new_cpsr.ge;
+    '''
+    msrCpsrRegIop = InstObjParams("msr", "MsrCpsrReg", "MsrRegOp",
+                                  { "code": msrCpsrRegCode,
+                                    "predicate_test": condPredicateTest },
+                                  ["IsSerializeAfter","IsNonSpeculative"])
+    header_output += MsrRegDeclare.subst(msrCpsrRegIop)
+    decoder_output += MsrRegConstructor.subst(msrCpsrRegIop)
+    exec_output += PredOpExecute.subst(msrCpsrRegIop)
+
+    msrSpsrRegCode = "Spsr = spsrWriteByInstr(Spsr, Op1, byteMask, false);"
+    msrSpsrRegIop = InstObjParams("msr", "MsrSpsrReg", "MsrRegOp",
+                                  { "code": msrSpsrRegCode,
+                                    "predicate_test": predicateTest },
+                                  ["IsSerializeAfter","IsNonSpeculative"])
+    header_output += MsrRegDeclare.subst(msrSpsrRegIop)
+    decoder_output += MsrRegConstructor.subst(msrSpsrRegIop)
+    exec_output += PredOpExecute.subst(msrSpsrRegIop)
+
+    msrCpsrImmCode = '''
+        SCTLR sctlr = Sctlr;
+        CPSR old_cpsr = Cpsr;
+        old_cpsr.nz = CondCodesNZ;
+        old_cpsr.c = CondCodesC;
+        old_cpsr.v = CondCodesV;
+        old_cpsr.ge = CondCodesGE;
+        CPSR new_cpsr =
+            cpsrWriteByInstr(old_cpsr, imm, Scr, Nsacr, byteMask, false,
+                             sctlr.nmfi, xc->tcBase());
+        Cpsr = ~CondCodesMask & new_cpsr;
+        CondCodesNZ = new_cpsr.nz;
+        CondCodesC = new_cpsr.c;
+        CondCodesV = new_cpsr.v;
+        CondCodesGE = new_cpsr.ge;
+    '''
+    msrCpsrImmIop = InstObjParams("msr", "MsrCpsrImm", "MsrImmOp",
+                                  { "code": msrCpsrImmCode,
+                                    "predicate_test": condPredicateTest },
+                                  ["IsSerializeAfter","IsNonSpeculative"])
+    header_output += MsrImmDeclare.subst(msrCpsrImmIop)
+    decoder_output += MsrImmConstructor.subst(msrCpsrImmIop)
+    exec_output += PredOpExecute.subst(msrCpsrImmIop)
+
+    msrSpsrImmCode = "Spsr = spsrWriteByInstr(Spsr, imm, byteMask, false);"
+    msrSpsrImmIop = InstObjParams("msr", "MsrSpsrImm", "MsrImmOp",
+                                  { "code": msrSpsrImmCode,
+                                    "predicate_test": predicateTest },
+                                  ["IsSerializeAfter","IsNonSpeculative"])
+    header_output += MsrImmDeclare.subst(msrSpsrImmIop)
+    decoder_output += MsrImmConstructor.subst(msrSpsrImmIop)
+    exec_output += PredOpExecute.subst(msrSpsrImmIop)
+
+    revCode = '''
+    uint32_t val = Op1;
+    Dest = swap_byte(val);
+    '''
+    revIop = InstObjParams("rev", "Rev", "RegRegOp",
+                           { "code": revCode,
+                             "predicate_test": predicateTest }, [])
+    header_output += RegRegOpDeclare.subst(revIop)
+    decoder_output += RegRegOpConstructor.subst(revIop)
+    exec_output += PredOpExecute.subst(revIop)
+
+    rev16Code = '''
+    uint32_t val = Op1;
+    Dest = (bits(val, 15, 8) << 0) |
+           (bits(val, 7, 0) << 8) |
+           (bits(val, 31, 24) << 16) |
+           (bits(val, 23, 16) << 24);
+    '''
+    rev16Iop = InstObjParams("rev16", "Rev16", "RegRegOp",
+                             { "code": rev16Code,
+                               "predicate_test": predicateTest }, [])
+    header_output += RegRegOpDeclare.subst(rev16Iop)
+    decoder_output += RegRegOpConstructor.subst(rev16Iop)
+    exec_output += PredOpExecute.subst(rev16Iop)
+
+    revshCode = '''
+    uint16_t val = Op1;
+    Dest = sext<16>(swap_byte(val));
+    '''
+    revshIop = InstObjParams("revsh", "Revsh", "RegRegOp",
+                             { "code": revshCode,
+                               "predicate_test": predicateTest }, [])
+    header_output += RegRegOpDeclare.subst(revshIop)
+    decoder_output += RegRegOpConstructor.subst(revshIop)
+    exec_output += PredOpExecute.subst(revshIop)
+
+    rbitCode = '''
+    Dest = reverseBits(Op1);
+    '''
+    rbitIop = InstObjParams("rbit", "Rbit", "RegRegOp",
+                            { "code": rbitCode,
+                              "predicate_test": predicateTest }, [])
+    header_output += RegRegOpDeclare.subst(rbitIop)
+    decoder_output += RegRegOpConstructor.subst(rbitIop)
+    exec_output += PredOpExecute.subst(rbitIop)
+
+    clzCode = '''
+        Dest = (Op1 == 0) ? 32 : (31 - findMsbSet(Op1));
+    '''
+    clzIop = InstObjParams("clz", "Clz", "RegRegOp",
+                           { "code": clzCode,
+                             "predicate_test": predicateTest }, [])
+    header_output += RegRegOpDeclare.subst(clzIop)
+    decoder_output += RegRegOpConstructor.subst(clzIop)
+    exec_output += PredOpExecute.subst(clzIop)
+
+    ssatCode = '''
+        int32_t operand = shift_rm_imm(Op1, shiftAmt, shiftType, 0);
+        int32_t res;
+        if (satInt(res, operand, imm))
+            CpsrQ = 1 << 27;
+        Dest = res;
+    '''
+    ssatIop = InstObjParams("ssat", "Ssat", "RegImmRegShiftOp",
+                            { "code": ssatCode,
+                              "predicate_test": pickPredicate(ssatCode) }, [])
+    header_output += RegImmRegShiftOpDeclare.subst(ssatIop)
+    decoder_output += RegImmRegShiftOpConstructor.subst(ssatIop)
+    exec_output += PredOpExecute.subst(ssatIop)
+
+    usatCode = '''
+        int32_t operand = shift_rm_imm(Op1, shiftAmt, shiftType, 0);
+        int32_t res;
+        if (uSatInt(res, operand, imm))
+            CpsrQ = 1 << 27;
+        Dest = res;
+    '''
+    usatIop = InstObjParams("usat", "Usat", "RegImmRegShiftOp",
+                            { "code": usatCode,
+                              "predicate_test": pickPredicate(usatCode) }, [])
+    header_output += RegImmRegShiftOpDeclare.subst(usatIop)
+    decoder_output += RegImmRegShiftOpConstructor.subst(usatIop)
+    exec_output += PredOpExecute.subst(usatIop)
+
+    ssat16Code = '''
+        int32_t res;
+        uint32_t resTemp = 0;
+        int32_t argLow = sext<16>(bits(Op1, 15, 0));
+        int32_t argHigh = sext<16>(bits(Op1, 31, 16));
+        if (satInt(res, argLow, imm))
+            CpsrQ = 1 << 27;
+        replaceBits(resTemp, 15, 0, res);
+        if (satInt(res, argHigh, imm))
+            CpsrQ = 1 << 27;
+        replaceBits(resTemp, 31, 16, res);
+        Dest = resTemp;
+    '''
+    ssat16Iop = InstObjParams("ssat16", "Ssat16", "RegImmRegOp",
+                              { "code": ssat16Code,
+                                "predicate_test": pickPredicate(ssat16Code) }, [])
+    header_output += RegImmRegOpDeclare.subst(ssat16Iop)
+    decoder_output += RegImmRegOpConstructor.subst(ssat16Iop)
+    exec_output += PredOpExecute.subst(ssat16Iop)
+
+    usat16Code = '''
+        int32_t res;
+        uint32_t resTemp = 0;
+        int32_t argLow = sext<16>(bits(Op1, 15, 0));
+        int32_t argHigh = sext<16>(bits(Op1, 31, 16));
+        if (uSatInt(res, argLow, imm))
+            CpsrQ = 1 << 27;
+        replaceBits(resTemp, 15, 0, res);
+        if (uSatInt(res, argHigh, imm))
+            CpsrQ = 1 << 27;
+        replaceBits(resTemp, 31, 16, res);
+        Dest = resTemp;
+    '''
+    usat16Iop = InstObjParams("usat16", "Usat16", "RegImmRegOp",
+                              { "code": usat16Code,
+                                "predicate_test": pickPredicate(usat16Code) }, [])
+    header_output += RegImmRegOpDeclare.subst(usat16Iop)
+    decoder_output += RegImmRegOpConstructor.subst(usat16Iop)
+    exec_output += PredOpExecute.subst(usat16Iop)
+
+    sxtbIop = InstObjParams("sxtb", "Sxtb", "RegImmRegOp",
+                            { "code":
+                              "Dest = sext<8>((uint8_t)(Op1_ud >> imm));",
+                              "predicate_test": predicateTest }, [])
+    header_output += RegImmRegOpDeclare.subst(sxtbIop)
+    decoder_output += RegImmRegOpConstructor.subst(sxtbIop)
+    exec_output += PredOpExecute.subst(sxtbIop)
+
+    sxtabIop = InstObjParams("sxtab", "Sxtab", "RegRegRegImmOp",
+                             { "code":
+                               '''
+                                   Dest = sext<8>((uint8_t)(Op2_ud >> imm)) +
+                                          Op1;
+                               ''',
+                               "predicate_test": predicateTest }, [])
+    header_output += RegRegRegImmOpDeclare.subst(sxtabIop)
+    decoder_output += RegRegRegImmOpConstructor.subst(sxtabIop)
+    exec_output += PredOpExecute.subst(sxtabIop)
+
+    sxtb16Code = '''
+    uint32_t resTemp = 0;
+    replaceBits(resTemp, 15, 0, sext<8>(bits(Op1, imm + 7, imm)));
+    replaceBits(resTemp, 31, 16,
+                sext<8>(bits(Op1, (imm + 23) % 32, (imm + 16) % 32)));
+    Dest = resTemp;
+    '''
+    sxtb16Iop = InstObjParams("sxtb16", "Sxtb16", "RegImmRegOp",
+                              { "code": sxtb16Code,
+                                "predicate_test": predicateTest }, [])
+    header_output += RegImmRegOpDeclare.subst(sxtb16Iop)
+    decoder_output += RegImmRegOpConstructor.subst(sxtb16Iop)
+    exec_output += PredOpExecute.subst(sxtb16Iop)
+
+    sxtab16Code = '''
+    uint32_t resTemp = 0;
+    replaceBits(resTemp, 15, 0, sext<8>(bits(Op2, imm + 7, imm)) +
+                                        bits(Op1, 15, 0));
+    replaceBits(resTemp, 31, 16,
+                sext<8>(bits(Op2, (imm + 23) % 32, (imm + 16) % 32)) +
+                bits(Op1, 31, 16));
+    Dest = resTemp;
+    '''
+    sxtab16Iop = InstObjParams("sxtab16", "Sxtab16", "RegRegRegImmOp",
+                               { "code": sxtab16Code,
+                                 "predicate_test": predicateTest }, [])
+    header_output += RegRegRegImmOpDeclare.subst(sxtab16Iop)
+    decoder_output += RegRegRegImmOpConstructor.subst(sxtab16Iop)
+    exec_output += PredOpExecute.subst(sxtab16Iop)
+
+    sxthCode = '''
+    uint64_t rotated = (uint32_t)Op1;
+    rotated = (rotated | (rotated << 32)) >> imm;
+    Dest = sext<16>((uint16_t)rotated);
+    '''
+    sxthIop = InstObjParams("sxth", "Sxth", "RegImmRegOp",
+                              { "code": sxthCode,
+                                "predicate_test": predicateTest }, [])
+    header_output += RegImmRegOpDeclare.subst(sxthIop)
+    decoder_output += RegImmRegOpConstructor.subst(sxthIop)
+    exec_output += PredOpExecute.subst(sxthIop)
+
+    sxtahCode = '''
+    uint64_t rotated = (uint32_t)Op2;
+    rotated = (rotated | (rotated << 32)) >> imm;
+    Dest = sext<16>((uint16_t)rotated) + Op1;
+    '''
+    sxtahIop = InstObjParams("sxtah", "Sxtah", "RegRegRegImmOp",
+                             { "code": sxtahCode,
+                               "predicate_test": predicateTest }, [])
+    header_output += RegRegRegImmOpDeclare.subst(sxtahIop)
+    decoder_output += RegRegRegImmOpConstructor.subst(sxtahIop)
+    exec_output += PredOpExecute.subst(sxtahIop)
+
+    uxtbIop = InstObjParams("uxtb", "Uxtb", "RegImmRegOp",
+                            { "code": "Dest = (uint8_t)(Op1_ud >> imm);",
+                              "predicate_test": predicateTest }, [])
+    header_output += RegImmRegOpDeclare.subst(uxtbIop)
+    decoder_output += RegImmRegOpConstructor.subst(uxtbIop)
+    exec_output += PredOpExecute.subst(uxtbIop)
+
+    uxtabIop = InstObjParams("uxtab", "Uxtab", "RegRegRegImmOp",
+                             { "code":
+                               "Dest = (uint8_t)(Op2_ud >> imm) + Op1;",
+                               "predicate_test": predicateTest }, [])
+    header_output += RegRegRegImmOpDeclare.subst(uxtabIop)
+    decoder_output += RegRegRegImmOpConstructor.subst(uxtabIop)
+    exec_output += PredOpExecute.subst(uxtabIop)
+
+    uxtb16Code = '''
+    uint32_t resTemp = 0;
+    replaceBits(resTemp, 15, 0, (uint8_t)(bits(Op1, imm + 7, imm)));
+    replaceBits(resTemp, 31, 16,
+                (uint8_t)(bits(Op1, (imm + 23) % 32, (imm + 16) % 32)));
+    Dest = resTemp;
+    '''
+    uxtb16Iop = InstObjParams("uxtb16", "Uxtb16", "RegImmRegOp",
+                              { "code": uxtb16Code,
+                                "predicate_test": predicateTest }, [])
+    header_output += RegImmRegOpDeclare.subst(uxtb16Iop)
+    decoder_output += RegImmRegOpConstructor.subst(uxtb16Iop)
+    exec_output += PredOpExecute.subst(uxtb16Iop)
+
+    uxtab16Code = '''
+    uint32_t resTemp = 0;
+    replaceBits(resTemp, 15, 0, (uint8_t)(bits(Op2, imm + 7, imm)) +
+                                        bits(Op1, 15, 0));
+    replaceBits(resTemp, 31, 16,
+                (uint8_t)(bits(Op2, (imm + 23) % 32, (imm + 16) % 32)) +
+                bits(Op1, 31, 16));
+    Dest = resTemp;
+    '''
+    uxtab16Iop = InstObjParams("uxtab16", "Uxtab16", "RegRegRegImmOp",
+                               { "code": uxtab16Code,
+                                 "predicate_test": predicateTest }, [])
+    header_output += RegRegRegImmOpDeclare.subst(uxtab16Iop)
+    decoder_output += RegRegRegImmOpConstructor.subst(uxtab16Iop)
+    exec_output += PredOpExecute.subst(uxtab16Iop)
+
+    uxthCode = '''
+    uint64_t rotated = (uint32_t)Op1;
+    rotated = (rotated | (rotated << 32)) >> imm;
+    Dest = (uint16_t)rotated;
+    '''
+    uxthIop = InstObjParams("uxth", "Uxth", "RegImmRegOp",
+                              { "code": uxthCode,
+                                "predicate_test": predicateTest }, [])
+    header_output += RegImmRegOpDeclare.subst(uxthIop)
+    decoder_output += RegImmRegOpConstructor.subst(uxthIop)
+    exec_output += PredOpExecute.subst(uxthIop)
+
+    uxtahCode = '''
+    uint64_t rotated = (uint32_t)Op2;
+    rotated = (rotated | (rotated << 32)) >> imm;
+    Dest = (uint16_t)rotated + Op1;
+    '''
+    uxtahIop = InstObjParams("uxtah", "Uxtah", "RegRegRegImmOp",
+                             { "code": uxtahCode,
+                               "predicate_test": predicateTest }, [])
+    header_output += RegRegRegImmOpDeclare.subst(uxtahIop)
+    decoder_output += RegRegRegImmOpConstructor.subst(uxtahIop)
+    exec_output += PredOpExecute.subst(uxtahIop)
+
+    selCode = '''
+        uint32_t resTemp = 0;
+        for (unsigned i = 0; i < 4; i++) {
+            int low = i * 8;
+            int high = low + 7;
+            replaceBits(resTemp, high, low,
+                        bits(CondCodesGE, i) ?
+                            bits(Op1, high, low) : bits(Op2, high, low));
+        }
+        Dest = resTemp;
+    '''
+    selIop = InstObjParams("sel", "Sel", "RegRegRegOp",
+                           { "code": selCode,
+                             "predicate_test": predicateTest }, [])
+    header_output += RegRegRegOpDeclare.subst(selIop)
+    decoder_output += RegRegRegOpConstructor.subst(selIop)
+    exec_output += PredOpExecute.subst(selIop)
+
+    usad8Code = '''
+        uint32_t resTemp = 0;
+        for (unsigned i = 0; i < 4; i++) {
+            int low = i * 8;
+            int high = low + 7;
+            int32_t diff = bits(Op1, high, low) -
+                           bits(Op2, high, low);
+            resTemp += ((diff < 0) ? -diff : diff);
+        }
+        Dest = resTemp;
+    '''
+    usad8Iop = InstObjParams("usad8", "Usad8", "RegRegRegOp",
+                             { "code": usad8Code,
+                               "predicate_test": predicateTest }, [])
+    header_output += RegRegRegOpDeclare.subst(usad8Iop)
+    decoder_output += RegRegRegOpConstructor.subst(usad8Iop)
+    exec_output += PredOpExecute.subst(usad8Iop)
+
+    usada8Code = '''
+        uint32_t resTemp = 0;
+        for (unsigned i = 0; i < 4; i++) {
+            int low = i * 8;
+            int high = low + 7;
+            int32_t diff = bits(Op1, high, low) -
+                           bits(Op2, high, low);
+            resTemp += ((diff < 0) ? -diff : diff);
+        }
+        Dest = Op3 + resTemp;
+    '''
+    usada8Iop = InstObjParams("usada8", "Usada8", "RegRegRegRegOp",
+                              { "code": usada8Code,
+                                "predicate_test": predicateTest }, [])
+    header_output += RegRegRegRegOpDeclare.subst(usada8Iop)
+    decoder_output += RegRegRegRegOpConstructor.subst(usada8Iop)
+    exec_output += PredOpExecute.subst(usada8Iop)
+
+    bkptCode = '''
+        uint16_t imm16;
+        if (!machInst.thumb)
+            imm16 = ((bits(machInst, 19, 8) << 4) | bits(machInst, 3, 0));
+        else
+            imm16 = bits(machInst, 7, 0);
+
+        return softwareBreakpoint32(xc, imm16);
+    '''
+    bkptIop = InstObjParams("bkpt", "BkptInst", "PredOp", bkptCode)
+    header_output += BasicDeclare.subst(bkptIop)
+    decoder_output += BasicConstructor.subst(bkptIop)
+    exec_output += BasicExecute.subst(bkptIop)
+
+    nopIop = InstObjParams("nop", "NopInst", "ArmStaticInst", "", ['IsNop'])
+    header_output += BasicDeclare.subst(nopIop)
+    decoder_output += BasicConstructor64.subst(nopIop)
+    exec_output += BasicExecute.subst(nopIop)
+
+    yieldIop = InstObjParams("yield", "YieldInst", "PredOp", \
+            { "code" : "", "predicate_test" : predicateTest })
+    header_output += BasicDeclare.subst(yieldIop)
+    decoder_output += BasicConstructor.subst(yieldIop)
+    exec_output += PredOpExecute.subst(yieldIop)
+
+    wfeCode = '''
+    CPSR cpsr = Cpsr;
+    SCR  scr  = Scr64;
+
+    // WFE Sleeps if SevMailbox==0 and no unmasked interrupts are pending,
+    ThreadContext *tc = xc->tcBase();
+    if (SevMailbox == 1) {
+        SevMailbox = 0;
+        PseudoInst::quiesceSkip(tc);
+    } else if (tc->getCpuPtr()->getInterruptController(
+                tc->threadId())->checkInterrupts(tc)) {
+        PseudoInst::quiesceSkip(tc);
+    } else {
+        fault = trapWFx(tc, cpsr, scr, true);
+        if (fault == NoFault) {
+            PseudoInst::quiesce(tc);
+        } else {
+            PseudoInst::quiesceSkip(tc);
+        }
+    }
+    '''
+    wfePredFixUpCode = '''
+    // WFE is predicated false, reset SevMailbox to reduce spurious sleeps
+    // and SEV interrupts
+    SevMailbox = 1;
+    '''
+    wfeIop = InstObjParams("wfe", "WfeInst", "PredOp", \
+            { "code" : wfeCode,
+              "pred_fixup" : wfePredFixUpCode,
+              "predicate_test" : predicateTest },
+            ["IsNonSpeculative", "IsQuiesce",
+             "IsSerializeAfter", "IsUnverifiable"])
+    header_output += BasicDeclare.subst(wfeIop)
+    decoder_output += BasicConstructor.subst(wfeIop)
+    exec_output += QuiescePredOpExecuteWithFixup.subst(wfeIop)
+
+    wfiCode = '''
+    HCR  hcr  = Hcr;
+    CPSR cpsr = Cpsr;
+    SCR  scr  = Scr64;
+
+    // WFI doesn't sleep if interrupts are pending (masked or not)
+    ThreadContext *tc = xc->tcBase();
+    if (tc->getCpuPtr()->getInterruptController(
+                tc->threadId())->checkWfiWake(hcr, cpsr, scr)) {
+        PseudoInst::quiesceSkip(tc);
+    } else {
+        fault = trapWFx(tc, cpsr, scr, false);
+        if (fault == NoFault) {
+            PseudoInst::quiesce(tc);
+        } else {
+            PseudoInst::quiesceSkip(tc);
+        }
+    }
+    tc->getCpuPtr()->clearInterrupt(tc->threadId(), INT_ABT, 0);
+    '''
+    wfiIop = InstObjParams("wfi", "WfiInst", "PredOp", \
+            { "code" : wfiCode, "predicate_test" : predicateTest },
+            ["IsNonSpeculative", "IsQuiesce",
+             "IsSerializeAfter", "IsUnverifiable"])
+    header_output += BasicDeclare.subst(wfiIop)
+    decoder_output += BasicConstructor.subst(wfiIop)
+    exec_output += QuiescePredOpExecute.subst(wfiIop)
+
+    sevCode = '''
+    SevMailbox = 1;
+    System *sys = xc->tcBase()->getSystemPtr();
+    for (int x = 0; x < sys->numContexts(); x++) {
+        ThreadContext *oc = sys->getThreadContext(x);
+        if (oc == xc->tcBase())
+            continue;
+        // Wake CPU with interrupt if they were sleeping
+        if (oc->readMiscReg(MISCREG_SEV_MAILBOX) == 0) {
+            // Post Interrupt and wake cpu if needed
+            oc->getCpuPtr()->postInterrupt(oc->threadId(), INT_SEV, 0);
+        }
+    }
+    '''
+    sevIop = InstObjParams("sev", "SevInst", "PredOp", \
+            { "code" : sevCode, "predicate_test" : predicateTest },
+            ["IsNonSpeculative", "IsSquashAfter", "IsUnverifiable"])
+    header_output += BasicDeclare.subst(sevIop)
+    decoder_output += BasicConstructor.subst(sevIop)
+    exec_output += PredOpExecute.subst(sevIop)
+
+    sevlCode = '''
+    SevMailbox = 1;
+    '''
+    sevlIop = InstObjParams("sevl", "SevlInst", "PredOp", \
+            { "code" : sevlCode, "predicate_test" : predicateTest },
+            ["IsNonSpeculative", "IsSquashAfter", "IsUnverifiable"])
+    header_output += BasicDeclare.subst(sevlIop)
+    decoder_output += BasicConstructor.subst(sevlIop)
+    exec_output += BasicExecute.subst(sevlIop)
+
+    itIop = InstObjParams("it", "ItInst", "PredOp", \
+            { "code" : ";",
+              "predicate_test" : predicateTest }, [])
+    header_output += BasicDeclare.subst(itIop)
+    decoder_output += BasicConstructor.subst(itIop)
+    exec_output += PredOpExecute.subst(itIop)
+    unknownCode = '''
+        return std::make_shared<UndefinedInstruction>(machInst, true);
+    '''
+    unknownIop = InstObjParams("unknown", "Unknown", "UnknownOp", \
+                               { "code": unknownCode,
+                                 "predicate_test": predicateTest })
+    header_output += BasicDeclare.subst(unknownIop)
+    decoder_output += BasicConstructor.subst(unknownIop)
+    exec_output += PredOpExecute.subst(unknownIop)
+
+    ubfxCode = '''
+        Dest = bits(Op1, imm2, imm1);
+    '''
+    ubfxIop = InstObjParams("ubfx", "Ubfx", "RegRegImmImmOp",
+                            { "code": ubfxCode,
+                              "predicate_test": predicateTest }, [])
+    header_output += RegRegImmImmOpDeclare.subst(ubfxIop)
+    decoder_output += RegRegImmImmOpConstructor.subst(ubfxIop)
+    exec_output += PredOpExecute.subst(ubfxIop)
+
+    sbfxCode = '''
+        int32_t resTemp = bits(Op1, imm2, imm1);
+        Dest = resTemp | -(resTemp & (1 << (imm2 - imm1)));
+    '''
+    sbfxIop = InstObjParams("sbfx", "Sbfx", "RegRegImmImmOp",
+                            { "code": sbfxCode,
+                              "predicate_test": predicateTest }, [])
+    header_output += RegRegImmImmOpDeclare.subst(sbfxIop)
+    decoder_output += RegRegImmImmOpConstructor.subst(sbfxIop)
+    exec_output += PredOpExecute.subst(sbfxIop)
+
+    bfcCode = '''
+        Dest = Op1 & ~(mask(imm2 - imm1 + 1) << imm1);
+    '''
+    bfcIop = InstObjParams("bfc", "Bfc", "RegRegImmImmOp",
+                           { "code": bfcCode,
+                             "predicate_test": predicateTest }, [])
+    header_output += RegRegImmImmOpDeclare.subst(bfcIop)
+    decoder_output += RegRegImmImmOpConstructor.subst(bfcIop)
+    exec_output += PredOpExecute.subst(bfcIop)
+
+    bfiCode = '''
+        uint32_t bitMask = (mask(imm2 - imm1 + 1) << imm1);
+        Dest = ((Op1 << imm1) & bitMask) | (Dest & ~bitMask);
+    '''
+    bfiIop = InstObjParams("bfi", "Bfi", "RegRegImmImmOp",
+                           { "code": bfiCode,
+                             "predicate_test": predicateTest }, [])
+    header_output += RegRegImmImmOpDeclare.subst(bfiIop)
+    decoder_output += RegRegImmImmOpConstructor.subst(bfiIop)
+    exec_output += PredOpExecute.subst(bfiIop)
+
+    mrc14code = '''
+    MiscRegIndex miscReg = (MiscRegIndex) xc->tcBase()->flattenRegId(
+                               RegId(MiscRegClass, op1)).index();
+    bool can_read, undefined;
+    std::tie(can_read, undefined) = canReadCoprocReg(miscReg, Scr, Cpsr);
+    if (!can_read || undefined) {
+        return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                      mnemonic);
+    }
+    if (mcrMrc14TrapToHyp((MiscRegIndex) op1, Hcr, Cpsr, Scr, Hdcr,
+                          Hstr, Hcptr, imm)) {
+        return std::make_shared<HypervisorTrap>(machInst, imm,
+                                                EC_TRAPPED_CP14_MCR_MRC);
+    }
+    Dest = MiscOp1;
+    '''
+
+    mrc14Iop = InstObjParams("mrc", "Mrc14", "RegMiscRegImmOp",
+                             { "code": mrc14code,
+                               "predicate_test": predicateTest }, [])
+    header_output += RegMiscRegImmOpDeclare.subst(mrc14Iop)
+    decoder_output += RegMiscRegImmOpConstructor.subst(mrc14Iop)
+    exec_output += PredOpExecute.subst(mrc14Iop)
+
+
+    mcr14code = '''
+    MiscRegIndex miscReg = (MiscRegIndex) xc->tcBase()->flattenRegId(
+                               RegId(MiscRegClass, dest)).index();
+    bool can_write, undefined;
+    std::tie(can_write, undefined) = canWriteCoprocReg(miscReg, Scr, Cpsr);
+    if (undefined || !can_write) {
+        return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                      mnemonic);
+    }
+    if (mcrMrc14TrapToHyp(miscReg, Hcr, Cpsr, Scr, Hdcr,
+                          Hstr, Hcptr, imm)) {
+        return std::make_shared<HypervisorTrap>(machInst, imm,
+                                                EC_TRAPPED_CP14_MCR_MRC);
+    }
+    MiscDest = Op1;
+    '''
+    mcr14Iop = InstObjParams("mcr", "Mcr14", "MiscRegRegImmOp",
+                             { "code": mcr14code,
+                               "predicate_test": predicateTest },
+                               ["IsSerializeAfter","IsNonSpeculative"])
+    header_output += MiscRegRegImmOpDeclare.subst(mcr14Iop)
+    decoder_output += MiscRegRegImmOpConstructor.subst(mcr14Iop)
+    exec_output += PredOpExecute.subst(mcr14Iop)
+
+    mrc15code = '''
+    int preFlatOp1 = snsBankedIndex(op1, xc->tcBase());
+    MiscRegIndex miscReg = (MiscRegIndex)
+                           xc->tcBase()->flattenRegId(RegId(MiscRegClass,
+                                                      preFlatOp1)).index();
+    bool hypTrap = mcrMrc15TrapToHyp(miscReg, Hcr, Cpsr, Scr, Hdcr, Hstr,
+                                     Hcptr, imm);
+    bool can_read, undefined;
+    std::tie(can_read, undefined) = canReadCoprocReg(miscReg, Scr, Cpsr);
+    // if we're in non secure PL1 mode then we can trap regargless of whether
+    // the register is accessable, in other modes we trap if only if the register
+    // IS accessable.
+    if (undefined || (!can_read && !(hypTrap && !inUserMode(Cpsr) &&
+                                    !inSecureState(Scr, Cpsr)))) {
+        return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                      mnemonic);
+    }
+    if (hypTrap) {
+        return std::make_shared<HypervisorTrap>(machInst, imm,
+                                                EC_TRAPPED_CP15_MCR_MRC);
+    }
+    Dest = MiscNsBankedOp1;
+    '''
+
+    mrc15Iop = InstObjParams("mrc", "Mrc15", "RegMiscRegImmOp",
+                             { "code": mrc15code,
+                               "predicate_test": predicateTest }, [])
+    header_output += RegMiscRegImmOpDeclare.subst(mrc15Iop)
+    decoder_output += RegMiscRegImmOpConstructor.subst(mrc15Iop)
+    exec_output += PredOpExecute.subst(mrc15Iop)
+
+
+    mcr15code = '''
+    int preFlatDest = snsBankedIndex(dest, xc->tcBase());
+    MiscRegIndex miscReg = (MiscRegIndex)
+                       xc->tcBase()->flattenRegId(RegId(MiscRegClass,
+                                                  preFlatDest)).index();
+    bool hypTrap  = mcrMrc15TrapToHyp(miscReg, Hcr, Cpsr, Scr, Hdcr, Hstr,
+                                      Hcptr, imm);
+    bool can_write, undefined;
+    std::tie(can_write, undefined) = canWriteCoprocReg(miscReg, Scr, Cpsr);
+
+    // if we're in non secure PL1 mode then we can trap regargless of whether
+    // the register is accessable, in other modes we trap if only if the register
+    // IS accessable.
+    if (undefined || (!can_write && !(hypTrap && !inUserMode(Cpsr) &&
+                                      !inSecureState(Scr, Cpsr)))) {
+        return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                      mnemonic);
+    }
+    if (hypTrap) {
+        return std::make_shared<HypervisorTrap>(machInst, imm,
+                                                EC_TRAPPED_CP15_MCR_MRC);
+    }
+    MiscNsBankedDest = Op1;
+    '''
+    mcr15Iop = InstObjParams("mcr", "Mcr15", "MiscRegRegImmOp",
+                             { "code": mcr15code,
+                               "predicate_test": predicateTest },
+                               ["IsSerializeAfter","IsNonSpeculative"])
+    header_output += MiscRegRegImmOpDeclare.subst(mcr15Iop)
+    decoder_output += MiscRegRegImmOpConstructor.subst(mcr15Iop)
+    exec_output += PredOpExecute.subst(mcr15Iop)
+
+
+    mrrc15code = '''
+    int preFlatOp1 = snsBankedIndex(op1, xc->tcBase());
+    MiscRegIndex miscReg = (MiscRegIndex)
+                           xc->tcBase()->flattenRegId(RegId(MiscRegClass,
+                                                      preFlatOp1)).index();
+    bool hypTrap = mcrrMrrc15TrapToHyp(miscReg, Cpsr, Scr, Hstr, Hcr, imm);
+    bool can_read, undefined;
+    std::tie(can_read, undefined) = canReadCoprocReg(miscReg, Scr, Cpsr);
+    // if we're in non secure PL1 mode then we can trap regargless of whether
+    // the register is accessable, in other modes we trap if only if the register
+    // IS accessable.
+    if (undefined || (!can_read && !(hypTrap && !inUserMode(Cpsr) &&
+                                     !inSecureState(Scr, Cpsr)))) {
+        return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                      mnemonic);
+    }
+    if (hypTrap) {
+        return std::make_shared<HypervisorTrap>(machInst, imm,
+                                                EC_TRAPPED_CP15_MCRR_MRRC);
+    }
+    Dest = bits(MiscNsBankedOp164, 63, 32);
+    Dest2 = bits(MiscNsBankedOp164, 31, 0);
+    '''
+    mrrc15Iop = InstObjParams("mrrc", "Mrrc15", "MrrcOp",
+                              { "code": mrrc15code,
+                                "predicate_test": predicateTest }, [])
+    header_output += MrrcOpDeclare.subst(mrrc15Iop)
+    decoder_output += MrrcOpConstructor.subst(mrrc15Iop)
+    exec_output += PredOpExecute.subst(mrrc15Iop)
+
+
+    mcrr15code = '''
+    int preFlatDest = snsBankedIndex(dest, xc->tcBase());
+    MiscRegIndex miscReg = (MiscRegIndex)
+                           xc->tcBase()->flattenRegId(RegId(MiscRegClass,
+                                                      preFlatDest)).index();
+    bool hypTrap  = mcrrMrrc15TrapToHyp(miscReg, Cpsr, Scr, Hstr, Hcr, imm);
+    bool can_write, undefined;
+    std::tie(can_write, undefined) = canWriteCoprocReg(miscReg, Scr, Cpsr);
+
+    // if we're in non secure PL1 mode then we can trap regargless of whether
+    // the register is accessable, in other modes we trap if only if the register
+    // IS accessable.
+    if (undefined || (!can_write && !(hypTrap && !inUserMode(Cpsr) &&
+                                     !inSecureState(Scr, Cpsr)))) {
+        return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                      mnemonic);
+    }
+    if (hypTrap) {
+        return std::make_shared<HypervisorTrap>(machInst, imm,
+                                                EC_TRAPPED_CP15_MCRR_MRRC);
+    }
+    MiscNsBankedDest64 = ((uint64_t) Op1 << 32) | Op2;
+    '''
+    mcrr15Iop = InstObjParams("mcrr", "Mcrr15", "McrrOp",
+                              { "code": mcrr15code,
+                                "predicate_test": predicateTest }, [])
+    header_output += McrrOpDeclare.subst(mcrr15Iop)
+    decoder_output += McrrOpConstructor.subst(mcrr15Iop)
+    exec_output += PredOpExecute.subst(mcrr15Iop)
+
+
+    enterxCode = '''
+        NextThumb = true;
+        NextJazelle = true;
+    '''
+    enterxIop = InstObjParams("enterx", "Enterx", "PredOp",
+                              { "code": enterxCode,
+                                "predicate_test": predicateTest }, [])
+    header_output += BasicDeclare.subst(enterxIop)
+    decoder_output += BasicConstructor.subst(enterxIop)
+    exec_output += PredOpExecute.subst(enterxIop)
+
+    leavexCode = '''
+        NextThumb = true;
+        NextJazelle = false;
+    '''
+    leavexIop = InstObjParams("leavex", "Leavex", "PredOp",
+                              { "code": leavexCode,
+                                "predicate_test": predicateTest }, [])
+    header_output += BasicDeclare.subst(leavexIop)
+    decoder_output += BasicConstructor.subst(leavexIop)
+    exec_output += PredOpExecute.subst(leavexIop)
+
+    setendCode = '''
+        CPSR cpsr = Cpsr;
+        cpsr.e = imm;
+        Cpsr = cpsr;
+        fault = checkSETENDEnabled(xc->tcBase(), cpsr);
+    '''
+    setendIop = InstObjParams("setend", "Setend", "ImmOp",
+                              { "code": setendCode,
+                                "predicate_test": predicateTest },
+                              ["IsSerializeAfter","IsNonSpeculative"])
+    header_output += ImmOpDeclare.subst(setendIop)
+    decoder_output += ImmOpConstructor.subst(setendIop)
+    exec_output += PredOpExecute.subst(setendIop)
+
+    clrexCode = '''
+        LLSCLock = 0;
+    '''
+    clrexIop = InstObjParams("clrex", "Clrex","PredOp",
+                             { "code": clrexCode,
+                               "predicate_test": predicateTest },[])
+    header_output += BasicDeclare.subst(clrexIop)
+    decoder_output += BasicConstructor.subst(clrexIop)
+    exec_output += PredOpExecute.subst(clrexIop)
+
+    McrDcCheckCode = '''
+        int preFlatDest = snsBankedIndex(dest, xc->tcBase());
+        MiscRegIndex miscReg = (MiscRegIndex) xc->tcBase()->flattenRegId(
+            RegId(MiscRegClass, preFlatDest)).index();
+        bool hypTrap  = mcrMrc15TrapToHyp(miscReg, Hcr, Cpsr, Scr, Hdcr, Hstr,
+                                          Hcptr, imm);
+        bool can_write, undefined;
+        std::tie(can_write, undefined) = canWriteCoprocReg(miscReg, Scr, Cpsr);
+
+        // if we're in non secure PL1 mode then we can trap regardless
+        // of whether the register is accessible, in other modes we
+        // trap if only if the register IS accessible.
+        if (undefined || (!can_write & !(hypTrap & !inUserMode(Cpsr) &
+                                         !inSecureState(Scr, Cpsr)))) {
+            return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                          mnemonic);
+        }
+        if (hypTrap) {
+            return std::make_shared<HypervisorTrap>(machInst, imm,
+                                                    EC_TRAPPED_CP15_MCR_MRC);
+        }
+    '''
+
+    McrDcimvacCode = '''
+        const Request::Flags memAccessFlags(ArmISA::TLB::MustBeOne |
+                                            Request::INVALIDATE |
+                                            Request::DST_POC);
+        EA = Op1;
+    '''
+    McrDcimvacIop = InstObjParams("mcr", "McrDcimvac",
+                                  "MiscRegRegImmOp",
+                                  {"memacc_code": McrDcCheckCode,
+                                   "postacc_code": "",
+                                   "ea_code": McrDcimvacCode,
+                                   "predicate_test": predicateTest},
+                                ['IsMemRef', 'IsStore'])
+    header_output += MiscRegRegImmMemOpDeclare.subst(McrDcimvacIop)
+    decoder_output += MiscRegRegImmOpConstructor.subst(McrDcimvacIop)
+    exec_output += Mcr15Execute.subst(McrDcimvacIop) + \
+                   Mcr15InitiateAcc.subst(McrDcimvacIop) + \
+                   Mcr15CompleteAcc.subst(McrDcimvacIop)
+
+    McrDccmvacCode = '''
+        const Request::Flags memAccessFlags(ArmISA::TLB::MustBeOne |
+                                            Request::CLEAN |
+                                            Request::DST_POC);
+        EA = Op1;
+    '''
+    McrDccmvacIop = InstObjParams("mcr", "McrDccmvac",
+                                  "MiscRegRegImmOp",
+                                  {"memacc_code": McrDcCheckCode,
+                                   "postacc_code": "",
+                                   "ea_code": McrDccmvacCode,
+                                   "predicate_test": predicateTest},
+                                ['IsMemRef', 'IsStore'])
+    header_output += MiscRegRegImmMemOpDeclare.subst(McrDccmvacIop)
+    decoder_output += MiscRegRegImmOpConstructor.subst(McrDccmvacIop)
+    exec_output += Mcr15Execute.subst(McrDccmvacIop) + \
+                   Mcr15InitiateAcc.subst(McrDccmvacIop) + \
+                   Mcr15CompleteAcc.subst(McrDccmvacIop)
+
+    McrDccmvauCode = '''
+        const Request::Flags memAccessFlags(ArmISA::TLB::MustBeOne |
+                                            Request::CLEAN |
+                                            Request::DST_POU);
+        EA = Op1;
+    '''
+    McrDccmvauIop = InstObjParams("mcr", "McrDccmvau",
+                                  "MiscRegRegImmOp",
+                                  {"memacc_code": McrDcCheckCode,
+                                   "postacc_code": "",
+                                   "ea_code": McrDccmvauCode,
+                                   "predicate_test": predicateTest},
+                                ['IsMemRef', 'IsStore'])
+    header_output += MiscRegRegImmMemOpDeclare.subst(McrDccmvauIop)
+    decoder_output += MiscRegRegImmOpConstructor.subst(McrDccmvauIop)
+    exec_output += Mcr15Execute.subst(McrDccmvauIop) + \
+                   Mcr15InitiateAcc.subst(McrDccmvauIop) + \
+                   Mcr15CompleteAcc.subst(McrDccmvauIop)
+
+    McrDccimvacCode = '''
+        const Request::Flags memAccessFlags(ArmISA::TLB::MustBeOne |
+                                            Request::CLEAN |
+                                            Request::INVALIDATE |
+                                            Request::DST_POC);
+        EA = Op1;
+    '''
+    McrDccimvacIop = InstObjParams("mcr", "McrDccimvac",
+                                  "MiscRegRegImmOp",
+                                  {"memacc_code": McrDcCheckCode,
+                                   "postacc_code": "",
+                                   "ea_code": McrDccimvacCode,
+                                   "predicate_test": predicateTest},
+                                ['IsMemRef', 'IsStore'])
+    header_output += MiscRegRegImmMemOpDeclare.subst(McrDccimvacIop)
+    decoder_output += MiscRegRegImmOpConstructor.subst(McrDccimvacIop)
+    exec_output += Mcr15Execute.subst(McrDccimvacIop) + \
+                   Mcr15InitiateAcc.subst(McrDccimvacIop) + \
+                   Mcr15CompleteAcc.subst(McrDccimvacIop)
+
+    isbCode = '''
+        // If the barrier is due to a CP15 access check for hyp traps
+        if ((imm != 0) && mcrMrc15TrapToHyp(MISCREG_CP15ISB, Hcr, Cpsr, Scr,
+            Hdcr, Hstr, Hcptr, imm)) {
+            return std::make_shared<HypervisorTrap>(machInst, imm,
+                EC_TRAPPED_CP15_MCR_MRC);
+        }
+    '''
+    isbIop = InstObjParams("isb", "Isb", "ImmOp",
+                             {"code": isbCode,
+                               "predicate_test": predicateTest},
+                                ['IsSquashAfter'])
+    header_output += ImmOpDeclare.subst(isbIop)
+    decoder_output += ImmOpConstructor.subst(isbIop)
+    exec_output += PredOpExecute.subst(isbIop)
+
+    dsbCode = '''
+        // If the barrier is due to a CP15 access check for hyp traps
+        if ((imm != 0) && mcrMrc15TrapToHyp(MISCREG_CP15DSB, Hcr, Cpsr, Scr,
+            Hdcr, Hstr, Hcptr, imm)) {
+            return std::make_shared<HypervisorTrap>(machInst, imm,
+                EC_TRAPPED_CP15_MCR_MRC);
+        }
+    '''
+    dsbIop = InstObjParams("dsb", "Dsb", "ImmOp",
+                             {"code": dsbCode,
+                               "predicate_test": predicateTest},
+                              ['IsMemBarrier', 'IsSerializeAfter'])
+    header_output += ImmOpDeclare.subst(dsbIop)
+    decoder_output += ImmOpConstructor.subst(dsbIop)
+    exec_output += PredOpExecute.subst(dsbIop)
+
+    dmbCode = '''
+        // If the barrier is due to a CP15 access check for hyp traps
+        if ((imm != 0) && mcrMrc15TrapToHyp(MISCREG_CP15DMB, Hcr, Cpsr, Scr,
+            Hdcr, Hstr, Hcptr, imm)) {
+            return std::make_shared<HypervisorTrap>(machInst, imm,
+                EC_TRAPPED_CP15_MCR_MRC);
+        }
+    '''
+    dmbIop = InstObjParams("dmb", "Dmb", "ImmOp",
+                             {"code": dmbCode,
+                               "predicate_test": predicateTest},
+                               ['IsMemBarrier'])
+    header_output += ImmOpDeclare.subst(dmbIop)
+    decoder_output += ImmOpConstructor.subst(dmbIop)
+    exec_output += PredOpExecute.subst(dmbIop)
+
+    dbgCode = '''
+    '''
+    dbgIop = InstObjParams("dbg", "Dbg", "PredOp",
+                             {"code": dbgCode,
+                               "predicate_test": predicateTest})
+    header_output += BasicDeclare.subst(dbgIop)
+    decoder_output += BasicConstructor.subst(dbgIop)
+    exec_output += PredOpExecute.subst(dbgIop)
+
+    cpsCode = '''
+    uint32_t mode = bits(imm, 4, 0);
+    uint32_t f = bits(imm, 5);
+    uint32_t i = bits(imm, 6);
+    uint32_t a = bits(imm, 7);
+    bool setMode = bits(imm, 8);
+    bool enable = bits(imm, 9);
+    CPSR cpsr = Cpsr;
+    SCTLR sctlr = Sctlr;
+    if (cpsr.mode != MODE_USER) {
+        if (enable) {
+            if (f) cpsr.f = 0;
+            if (i) cpsr.i = 0;
+            if (a) cpsr.a = 0;
+        } else {
+            if (f && !sctlr.nmfi) cpsr.f = 1;
+            if (i) cpsr.i = 1;
+            if (a) cpsr.a = 1;
+        }
+        if (setMode) {
+            cpsr.mode = mode;
+        }
+    }
+    Cpsr = cpsr;
+    '''
+    cpsIop = InstObjParams("cps", "Cps", "ImmOp",
+                           { "code": cpsCode,
+                             "predicate_test": predicateTest },
+                           ["IsSerializeAfter","IsNonSpeculative"])
+    header_output += ImmOpDeclare.subst(cpsIop)
+    decoder_output += ImmOpConstructor.subst(cpsIop)
+    exec_output += PredOpExecute.subst(cpsIop)
+}};

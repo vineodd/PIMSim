@@ -1,0 +1,600 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2011-2013, 2016-2018 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+let {{
+
+    header_output = ""
+    decoder_output = ""
+    exec_output = ""
+
+    def createCcCode64(carry, overflow):
+        code = ""
+        code += '''
+            uint16_t _iz, _in;
+            _in = bits(resTemp, intWidth - 1);
+            _iz = ((resTemp & mask(intWidth)) == 0);
+            CondCodesNZ = (_in << 1) | _iz;
+            DPRINTF(Arm, "(in, iz) = (%d, %d)\\n", _in, _iz);
+        '''
+        if overflow and overflow != "none":
+            code +=  '''
+                uint16_t _iv;
+                _iv = %s & 1;
+                CondCodesV = _iv;
+                DPRINTF(Arm, "(iv) = (%%d)\\n", _iv);
+            ''' % overflow
+        if carry and carry != "none":
+            code += '''
+                uint16_t _ic;
+                _ic = %s & 1;
+                CondCodesC = _ic;
+                DPRINTF(Arm, "(ic) = (%%d)\\n", _ic);
+            ''' % carry
+        return code
+
+    oldC = 'CondCodesC'
+    oldV = 'CondCodesV'
+    # Dicts of ways to set the carry flag.
+    carryCode64 = {
+        "none": "none",
+        "add": 'findCarry(intWidth, resTemp, Op164, secOp)',
+        "sub": 'findCarry(intWidth, resTemp, Op164, ~secOp)',
+        "logic": '0'
+    }
+    # Dict of ways to set the overflow flag.
+    overflowCode64 = {
+        "none": "none",
+        "add": 'findOverflow(intWidth, resTemp, Op164, secOp)',
+        "sub": 'findOverflow(intWidth, resTemp, Op164, ~secOp)',
+        "logic": '0'
+    }
+
+    immOp2 = "uint64_t secOp M5_VAR_USED = imm;"
+    sRegOp2 = "uint64_t secOp M5_VAR_USED = " + \
+              "shiftReg64(Op264, shiftAmt, shiftType, intWidth);"
+    eRegOp2 = "uint64_t secOp M5_VAR_USED = " + \
+              "extendReg64(Op264, extendType, shiftAmt, intWidth);"
+
+    def buildDataWork(mnem, code, flagType, suffix, buildCc, buildNonCc,
+                      base, templateBase):
+        code = '''
+        uint64_t resTemp M5_VAR_USED = 0;
+        ''' + code
+        ccCode = createCcCode64(carryCode64[flagType], overflowCode64[flagType])
+        Name = mnem.capitalize() + suffix
+        iop = InstObjParams(mnem, Name, base, code)
+        iopCc = InstObjParams(mnem + "s", Name + "Cc", base, code + ccCode)
+
+        def subst(iop):
+            global header_output, decoder_output, exec_output
+            header_output += eval(templateBase + "Declare").subst(iop)
+            decoder_output += eval(templateBase + "Constructor").subst(iop)
+            exec_output += BasicExecute.subst(iop)
+
+        if buildNonCc:
+            subst(iop)
+        if buildCc:
+            subst(iopCc)
+
+    def buildXImmDataInst(mnem, code, flagType = "logic", \
+                          buildCc = True, buildNonCc = True, \
+                          suffix = "XImm"):
+        buildDataWork(mnem, immOp2 + code, flagType, suffix,
+                      buildCc, buildNonCc, "DataXImmOp", "DataXImm")
+
+    def buildXSRegDataInst(mnem, code, flagType = "logic", \
+                           buildCc = True, buildNonCc = True, \
+                           suffix = "XSReg"):
+        buildDataWork(mnem, sRegOp2 + code, flagType, suffix,
+                      buildCc, buildNonCc, "DataXSRegOp", "DataXSReg")
+
+    def buildXERegDataInst(mnem, code, flagType = "logic", \
+                           buildCc = True, buildNonCc = True, \
+                           suffix = "XEReg"):
+        buildDataWork(mnem, eRegOp2 + code, flagType, suffix,
+                      buildCc, buildNonCc, "DataXERegOp", "DataXEReg")
+
+    def buildDataInst(mnem, code, flagType = "logic",
+                      buildCc = True, buildNonCc = True):
+        buildXImmDataInst(mnem, code, flagType, buildCc, buildNonCc)
+        buildXSRegDataInst(mnem, code, flagType, buildCc, buildNonCc)
+        buildXERegDataInst(mnem, code, flagType, buildCc, buildNonCc)
+
+    buildXImmDataInst("adr", "Dest64 = RawPC + imm", buildCc = False);
+    buildXImmDataInst("adrp", "Dest64 = (RawPC & ~mask(12)) + imm",
+                      buildCc = False);
+    buildDataInst("and", "Dest64 = resTemp = Op164 & secOp;")
+    buildDataInst("eor", "Dest64 = Op164 ^ secOp;", buildCc = False)
+    buildXSRegDataInst("eon", "Dest64 = Op164 ^ ~secOp;", buildCc = False)
+    buildDataInst("sub", "Dest64 = resTemp = Op164 - secOp;", "sub")
+    buildDataInst("add", "Dest64 = resTemp = Op164 + secOp;", "add")
+    buildXSRegDataInst("adc",
+            "Dest64 = resTemp = Op164 + secOp + %s;" % oldC, "add")
+    buildXSRegDataInst("sbc",
+            "Dest64 = resTemp = Op164 - secOp - !%s;" % oldC, "sub")
+    buildDataInst("orr", "Dest64 = Op164 | secOp;", buildCc = False)
+    buildXSRegDataInst("orn", "Dest64 = Op164 | ~secOp;", buildCc = False)
+    buildXSRegDataInst("bic", "Dest64 = resTemp = Op164 & ~secOp;")
+
+    def buildDataXImmInst(mnem, code, optArgs = []):
+        global header_output, decoder_output, exec_output
+        classNamePrefix = mnem[0].upper() + mnem[1:]
+        templateBase = "DataXImm"
+        iop = InstObjParams(mnem, classNamePrefix + "64",
+                            templateBase + "Op", code, optArgs)
+        header_output += eval(templateBase + "Declare").subst(iop)
+        decoder_output += eval(templateBase + "Constructor").subst(iop)
+        exec_output += BasicExecute.subst(iop)
+
+    def buildDataXRegInst(mnem, regOps, code, optArgs = [],
+                          overrideOpClass=None):
+        global header_output, decoder_output, exec_output
+        templateBase = "DataX%dReg" % regOps
+        classNamePrefix = mnem[0].upper() + mnem[1:]
+        if overrideOpClass:
+            iop = InstObjParams(mnem, classNamePrefix + "64",
+                                templateBase + "Op",
+                                { 'code': code, 'op_class': overrideOpClass},
+                                optArgs)
+        else:
+            iop = InstObjParams(mnem, classNamePrefix + "64",
+                                templateBase + "Op", code, optArgs)
+        header_output += eval(templateBase + "Declare").subst(iop)
+        decoder_output += eval(templateBase + "Constructor").subst(iop)
+        exec_output += BasicExecute.subst(iop)
+
+    buildDataXRegInst("madd", 3, "Dest64 = Op164 + Op264 * Op364",
+        overrideOpClass="IntMultOp")
+    buildDataXRegInst("msub", 3, "Dest64 = Op164 - Op264 * Op364",
+        overrideOpClass="IntMultOp")
+    buildDataXRegInst("smaddl", 3,
+        "XDest = XOp1 + sext<32>(WOp2) * sext<32>(WOp3)",
+        overrideOpClass="IntMultOp")
+    buildDataXRegInst("smsubl", 3,
+        "XDest = XOp1 - sext<32>(WOp2) * sext<32>(WOp3)",
+        overrideOpClass="IntMultOp")
+    buildDataXRegInst("smulh", 2, '''
+        uint64_t op1H = (int32_t)(XOp1 >> 32);
+        uint64_t op1L = (uint32_t)XOp1;
+        uint64_t op2H = (int32_t)(XOp2 >> 32);
+        uint64_t op2L = (uint32_t)XOp2;
+        uint64_t mid1 = ((op1L * op2L) >> 32) + op1H * op2L;
+        uint64_t mid2 = op1L * op2H;
+        uint64_t result = ((uint64_t)(uint32_t)mid1 + (uint32_t)mid2) >> 32;
+        result += shiftReg64(mid1, 32, ASR, intWidth);
+        result += shiftReg64(mid2, 32, ASR, intWidth);
+        XDest = result + op1H * op2H;
+    ''', overrideOpClass="IntMultOp")
+    buildDataXRegInst("umaddl", 3, "XDest = XOp1 + WOp2 * WOp3",
+        overrideOpClass="IntMultOp")
+    buildDataXRegInst("umsubl", 3, "XDest = XOp1 - WOp2 * WOp3",
+        overrideOpClass="IntMultOp")
+    buildDataXRegInst("umulh", 2, '''
+        uint64_t op1H = (uint32_t)(XOp1 >> 32);
+        uint64_t op1L = (uint32_t)XOp1;
+        uint64_t op2H = (uint32_t)(XOp2 >> 32);
+        uint64_t op2L = (uint32_t)XOp2;
+        uint64_t mid1 = ((op1L * op2L) >> 32) + op1H * op2L;
+        uint64_t mid2 = op1L * op2H;
+        uint64_t result = ((uint64_t)(uint32_t)mid1 + (uint32_t)mid2) >> 32;
+        result += mid1 >> 32;
+        result += mid2 >> 32;
+        XDest = result + op1H * op2H;
+    ''', overrideOpClass="IntMultOp")
+
+    buildDataXRegInst("asrv", 2,
+        "Dest64 = shiftReg64(Op164, Op264, ASR, intWidth)")
+    buildDataXRegInst("lslv", 2,
+        "Dest64 = shiftReg64(Op164, Op264, LSL, intWidth)")
+    buildDataXRegInst("lsrv", 2,
+        "Dest64 = shiftReg64(Op164, Op264, LSR, intWidth)")
+    buildDataXRegInst("rorv", 2,
+        "Dest64 = shiftReg64(Op164, Op264, ROR, intWidth)")
+
+    crcCode = '''
+    constexpr uint8_t size_bytes = %(sz)d;
+    constexpr uint32_t poly = %(polynom)s;
+
+    // Initial value is often a previously evaluated
+    // crc value hence is always 32bit in CRC32
+    uint32_t initial_crc = Op164 & 0xFFFFFFFF;
+
+    uint64_t data = htole(Op264);
+    auto data_buffer = reinterpret_cast<uint8_t*>(&data);
+
+    Dest = crc32<poly>(
+        data_buffer,   /* Message register */
+        initial_crc,   /* Initial value of the CRC */
+        size_bytes     /* Size of the original Message */
+    );
+    '''
+    buildDataXRegInst("crc32b", 2,
+        crcCode % {"sz": 1, "polynom": "0x04C11DB7"})
+    buildDataXRegInst("crc32h", 2,
+        crcCode % {"sz": 2, "polynom": "0x04C11DB7"})
+    buildDataXRegInst("crc32w", 2,
+        crcCode % {"sz": 4, "polynom": "0x04C11DB7"})
+    buildDataXRegInst("crc32x", 2,
+        crcCode % {"sz": 8, "polynom": "0x04C11DB7"})
+
+    buildDataXRegInst("crc32cb", 2,
+        crcCode % {"sz": 1, "polynom": "0x1EDC6F41"})
+    buildDataXRegInst("crc32ch", 2,
+        crcCode % {"sz": 2, "polynom": "0x1EDC6F41"})
+    buildDataXRegInst("crc32cw", 2,
+        crcCode % {"sz": 4, "polynom": "0x1EDC6F41"})
+    buildDataXRegInst("crc32cx", 2,
+        crcCode % {"sz": 8, "polynom": "0x1EDC6F41"})
+
+    buildDataXRegInst("sdiv", 2, '''
+        int64_t op1 = Op164;
+        int64_t op2 = Op264;
+        if (intWidth == 32) {
+            op1 = sext<32>(op1);
+            op2 = sext<32>(op2);
+        }
+        Dest64 = op2 == -1 ? -op1 : op2 ? op1 / op2 : 0;
+    ''', overrideOpClass="IntDivOp")
+    buildDataXRegInst("udiv", 2, "Dest64 = Op264 ? Op164 / Op264 : 0",
+        overrideOpClass="IntDivOp")
+
+    buildDataXRegInst("cls", 1, '''
+        uint64_t op1 = Op164;
+        if (bits(op1, intWidth - 1))
+            op1 ^= mask(intWidth);
+        Dest64 = (op1 == 0) ? intWidth - 1 : (intWidth - 2 - findMsbSet(op1));
+    ''')
+    buildDataXRegInst("clz", 1, '''
+        Dest64 = (Op164 == 0) ? intWidth : (intWidth - 1 - findMsbSet(Op164));
+    ''')
+    buildDataXRegInst("rbit", 1, '''
+        Dest64 = reverseBits(Op164, intWidth/8);
+    ''')
+    buildDataXRegInst("rev", 1, '''
+        if (intWidth == 32)
+            Dest64 = betole<uint32_t>(Op164);
+        else
+            Dest64 = betole<uint64_t>(Op164);
+    ''')
+    buildDataXRegInst("rev16", 1, '''
+        int count = intWidth / 16;
+        uint64_t result = 0;
+        for (unsigned i = 0; i < count; i++) {
+            uint16_t hw = Op164 >> (i * 16);
+            result |= (uint64_t)betole<uint16_t>(hw) << (i * 16);
+        }
+        Dest64 = result;
+    ''')
+    buildDataXRegInst("rev32", 1, '''
+        int count = intWidth / 32;
+        uint64_t result = 0;
+        for (unsigned i = 0; i < count; i++) {
+            uint32_t hw = Op164 >> (i * 32);
+            result |= (uint64_t)betole<uint32_t>(hw) << (i * 32);
+        }
+        Dest64 = result;
+    ''')
+
+    msrMrs64EnabledCheckCode = '''
+        // Check for read/write access right
+        if (!can%sAArch64SysReg(flat_idx, Scr64, cpsr, xc->tcBase())) {
+            if (flat_idx == MISCREG_DAIF ||
+                flat_idx == MISCREG_DC_ZVA_Xt ||
+                flat_idx == MISCREG_DC_CVAC_Xt ||
+                flat_idx == MISCREG_DC_CIVAC_Xt
+                )
+                return std::make_shared<UndefinedInstruction>(
+                                    machInst, 0, EC_TRAPPED_MSR_MRS_64,
+                                    mnemonic);
+            return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                          mnemonic);
+        }
+
+        fault = this->trap(xc->tcBase(), flat_idx, el, imm);
+        if (fault != NoFault) return fault;
+    '''
+
+    mrsCode = '''
+        MiscRegIndex flat_idx = (MiscRegIndex) xc->tcBase()->
+            flattenRegId(RegId(MiscRegClass, op1)).index();
+        CPSR cpsr = Cpsr;
+        ExceptionLevel el = (ExceptionLevel) (uint8_t) cpsr.el;
+        %s
+        XDest = MiscOp1_ud;
+    ''' % (msrMrs64EnabledCheckCode % ('Read'),)
+
+    mrsIop = InstObjParams("mrs", "Mrs64", "RegMiscRegImmOp64",
+                           mrsCode,
+                           ["IsSerializeBefore"])
+    header_output += RegMiscRegOp64Declare.subst(mrsIop)
+    decoder_output += RegMiscRegOp64Constructor.subst(mrsIop)
+    exec_output += BasicExecute.subst(mrsIop)
+
+    buildDataXRegInst("mrsNZCV", 1, '''
+        CPSR cpsr = 0;
+        cpsr.nz = CondCodesNZ;
+        cpsr.c = CondCodesC;
+        cpsr.v = CondCodesV;
+        XDest = cpsr;
+    ''')
+
+    msrCode = '''
+        MiscRegIndex flat_idx = (MiscRegIndex) xc->tcBase()->
+            flattenRegId(RegId(MiscRegClass, dest)).index();
+        CPSR cpsr = Cpsr;
+        ExceptionLevel el = (ExceptionLevel) (uint8_t) cpsr.el;
+        %s
+        MiscDest_ud = XOp1;
+    ''' % (msrMrs64EnabledCheckCode % ('Write'),)
+
+    msrIop = InstObjParams("msr", "Msr64", "MiscRegRegImmOp64",
+                           msrCode,
+                           ["IsSerializeAfter", "IsNonSpeculative"])
+    header_output += MiscRegRegOp64Declare.subst(msrIop)
+    decoder_output += MiscRegRegOp64Constructor.subst(msrIop)
+    exec_output += BasicExecute.subst(msrIop)
+
+
+    buildDataXRegInst("msrNZCV", 1, '''
+        CPSR cpsr = XOp1;
+        CondCodesNZ = cpsr.nz;
+        CondCodesC = cpsr.c;
+        CondCodesV = cpsr.v;
+    ''')
+
+    msr_check_code = '''
+        MiscRegIndex flat_idx = (MiscRegIndex) xc->tcBase()->
+            flattenRegId(RegId(MiscRegClass, dest)).index();
+        CPSR cpsr = Cpsr;
+        ExceptionLevel el = (ExceptionLevel) (uint8_t) cpsr.el;
+        %s
+    ''' % (msrMrs64EnabledCheckCode % ('Write'),)
+
+
+    msrdczva_ea_code = msr_check_code
+    msrdczva_ea_code += '''
+           Request::Flags memAccessFlags = Request::CACHE_BLOCK_ZERO |
+               ArmISA::TLB::MustBeOne;
+           EA = XBase;
+           assert(!(Dczid & 0x10));
+           uint64_t op_size = power(2, Dczid + 2);
+           EA &= ~(op_size - 1);
+
+   '''
+
+    msrDCZVAIop = InstObjParams("dc zva", "Dczva", "SysDC64",
+                                { "ea_code" : msrdczva_ea_code,
+                                  "memacc_code" : ';',
+                                  "use_uops" : 0,
+                                  "op_wb" : ";",
+                                  "fa_code" : ";"},
+                                ['IsStore', 'IsMemRef']);
+    header_output += DCStore64Declare.subst(msrDCZVAIop);
+    decoder_output += DCStore64Constructor.subst(msrDCZVAIop);
+    exec_output += DCStore64Execute.subst(msrDCZVAIop);
+    exec_output += DCStore64InitiateAcc.subst(msrDCZVAIop);
+    exec_output += Store64CompleteAcc.subst(msrDCZVAIop);
+
+
+    msrdccvau_ea_code = msr_check_code
+    msrdccvau_ea_code += '''
+           Request::Flags memAccessFlags = Request::CLEAN | Request::DST_POU |
+              ArmISA::TLB::MustBeOne;
+           EA = XBase;
+           System *sys = xc->tcBase()->getSystemPtr();
+           Addr op_size = sys->cacheLineSize();
+           EA &= ~(op_size - 1);
+    '''
+
+    msrDCCVAUIop = InstObjParams("dc cvau", "Dccvau", "SysDC64",
+                                 { "ea_code" : msrdccvau_ea_code,
+                                   "memacc_code" : ';',
+                                   "use_uops" : 0,
+                                   "op_wb" : ";", "fa_code" : ";"},
+                                 ['IsStore', 'IsMemRef']);
+    header_output += DCStore64Declare.subst(msrDCCVAUIop);
+    decoder_output += DCStore64Constructor.subst(msrDCCVAUIop);
+    exec_output += DCStore64Execute.subst(msrDCCVAUIop);
+    exec_output += DCStore64InitiateAcc.subst(msrDCCVAUIop);
+    exec_output += Store64CompleteAcc.subst(msrDCCVAUIop);
+
+
+    msrdccvac_ea_code = msr_check_code
+    msrdccvac_ea_code += '''
+           Request::Flags memAccessFlags = Request::CLEAN | Request::DST_POC |
+              ArmISA::TLB::MustBeOne;
+           EA = XBase;
+           System *sys = xc->tcBase()->getSystemPtr();
+           Addr op_size = sys->cacheLineSize();
+           EA &= ~(op_size - 1);
+    '''
+
+    msrDCCVACIop = InstObjParams("dc cvac", "Dccvac", "SysDC64",
+                                 { "ea_code" : msrdccvac_ea_code,
+                                   "memacc_code" : ';',
+                                   "use_uops" : 0,
+                                   "op_wb" : ";", "fa_code" : ";"},
+                                 ['IsStore', 'IsMemRef']);
+    header_output += DCStore64Declare.subst(msrDCCVACIop);
+    decoder_output += DCStore64Constructor.subst(msrDCCVACIop);
+    exec_output += DCStore64Execute.subst(msrDCCVACIop);
+    exec_output += DCStore64InitiateAcc.subst(msrDCCVACIop);
+    exec_output += Store64CompleteAcc.subst(msrDCCVACIop);
+
+
+    msrdccivac_ea_code = msr_check_code
+    msrdccivac_ea_code += '''
+           Request::Flags memAccessFlags = Request::CLEAN |
+              Request::INVALIDATE | Request::DST_POC | ArmISA::TLB::MustBeOne;
+           EA = XBase;
+           System *sys = xc->tcBase()->getSystemPtr();
+           Addr op_size = sys->cacheLineSize();
+           EA &= ~(op_size - 1);
+    '''
+
+    msrDCCIVACIop = InstObjParams("dc civac", "Dccivac", "SysDC64",
+                                  { "ea_code" : msrdccivac_ea_code,
+                                    "memacc_code" : ';',
+                                    "use_uops" : 0,
+                                    "op_wb" : ";", "fa_code" : ";"},
+                                  ['IsStore', 'IsMemRef']);
+    header_output += DCStore64Declare.subst(msrDCCIVACIop);
+    decoder_output += DCStore64Constructor.subst(msrDCCIVACIop);
+    exec_output += DCStore64Execute.subst(msrDCCIVACIop);
+    exec_output += DCStore64InitiateAcc.subst(msrDCCIVACIop);
+    exec_output += Store64CompleteAcc.subst(msrDCCIVACIop);
+
+
+    msrdcivac_ea_code = msr_check_code
+    msrdcivac_ea_code += '''
+           Request::Flags memAccessFlags = Request::INVALIDATE |
+              Request::DST_POC | ArmISA::TLB::MustBeOne;
+           EA = XBase;
+           HCR hcr = Hcr64;
+           SCR scr = Scr64;
+           if (el == EL1 && ArmSystem::haveVirtualization(xc->tcBase()) &&
+               hcr.vm && (scr.ns || !ArmSystem::haveSecurity(xc->tcBase()))) {
+               memAccessFlags = memAccessFlags | Request::CLEAN;
+           }
+           System *sys = xc->tcBase()->getSystemPtr();
+           Addr op_size = sys->cacheLineSize();
+           EA &= ~(op_size - 1);
+    '''
+
+    msrDCIVACIop = InstObjParams("dc ivac", "Dcivac", "SysDC64",
+                                 { "ea_code" : msrdcivac_ea_code,
+                                   "memacc_code" : ';',
+                                   "use_uops" : 0,
+                                   "op_wb" : ";", "fa_code" : ";"},
+                                 ['IsStore', 'IsMemRef']);
+    header_output += DCStore64Declare.subst(msrDCIVACIop);
+    decoder_output += DCStore64Constructor.subst(msrDCIVACIop);
+    exec_output += DCStore64Execute.subst(msrDCIVACIop);
+    exec_output += DCStore64InitiateAcc.subst(msrDCIVACIop);
+    exec_output += Store64CompleteAcc.subst(msrDCIVACIop);
+
+
+    buildDataXImmInst("msrSP", '''
+        if (!canWriteAArch64SysReg(
+                (MiscRegIndex) xc->tcBase()->flattenRegId(
+                   RegId(MiscRegClass, dest)).index(),
+                Scr64, Cpsr, xc->tcBase())) {
+            return std::make_shared<UndefinedInstruction>(machInst, false,
+                                                          mnemonic);
+        }
+        MiscDest_ud = imm;
+    ''', optArgs = ["IsSerializeAfter", "IsNonSpeculative"])
+
+    buildDataXImmInst("msrDAIFSet", '''
+        if (!canWriteAArch64SysReg(
+                (MiscRegIndex) xc->tcBase()->flattenRegId(
+                   RegId(MiscRegClass, dest)).index(),
+                Scr64, Cpsr, xc->tcBase())) {
+            return std::make_shared<UndefinedInstruction>(
+                            machInst, 0, EC_TRAPPED_MSR_MRS_64,
+                            mnemonic);
+        }
+        CPSR cpsr = Cpsr;
+        cpsr.daif = cpsr.daif | imm;
+        Cpsr = cpsr;
+    ''', optArgs = ["IsSerializeAfter", "IsNonSpeculative"])
+
+    buildDataXImmInst("msrDAIFClr", '''
+        if (!canWriteAArch64SysReg(
+                (MiscRegIndex) xc->tcBase()->flattenRegId(
+                   RegId(MiscRegClass, dest)).index(),
+                Scr64, Cpsr, xc->tcBase())) {
+            return std::make_shared<UndefinedInstruction>(
+                                machInst, 0, EC_TRAPPED_MSR_MRS_64,
+                                mnemonic);
+        }
+        CPSR cpsr = Cpsr;
+        cpsr.daif = cpsr.daif & ~imm;
+        Cpsr = cpsr;
+    ''', optArgs = ["IsSerializeAfter", "IsNonSpeculative"])
+
+    def buildDataXCompInst(mnem, instType, suffix, code):
+        global header_output, decoder_output, exec_output
+        templateBase = "DataXCond%s" % instType
+        iop = InstObjParams(mnem, mnem.capitalize() + suffix + "64",
+                            templateBase + "Op", code)
+        header_output += eval(templateBase + "Declare").subst(iop)
+        decoder_output += eval(templateBase + "Constructor").subst(iop)
+        exec_output += BasicExecute.subst(iop)
+
+    def buildDataXCondImmInst(mnem, code):
+        buildDataXCompInst(mnem, "CompImm", "Imm", code)
+    def buildDataXCondRegInst(mnem, code):
+        buildDataXCompInst(mnem, "CompReg", "Reg", code)
+    def buildDataXCondSelInst(mnem, code):
+        buildDataXCompInst(mnem, "Sel", "", code)
+
+    def condCompCode(flagType, op, imm):
+        ccCode = createCcCode64(carryCode64[flagType], overflowCode64[flagType])
+        opDecl = "uint64_t secOp M5_VAR_USED = imm;"
+        if not imm:
+            opDecl = "uint64_t secOp M5_VAR_USED = Op264;"
+        return opDecl + '''
+            if (testPredicate(CondCodesNZ, CondCodesC, CondCodesV, condCode)) {
+                uint64_t resTemp = Op164 ''' + op + ''' secOp;
+        ''' + ccCode + '''
+            } else {
+                CondCodesNZ = (defCc >> 2) & 0x3;
+                CondCodesC = (defCc >> 1) & 0x1;
+                CondCodesV = defCc & 0x1;
+            }
+        '''
+
+    buildDataXCondImmInst("ccmn", condCompCode("add", "+", True))
+    buildDataXCondImmInst("ccmp", condCompCode("sub", "-", True))
+    buildDataXCondRegInst("ccmn", condCompCode("add", "+", False))
+    buildDataXCondRegInst("ccmp", condCompCode("sub", "-", False))
+
+    condSelCode = '''
+        if (testPredicate(CondCodesNZ, CondCodesC, CondCodesV, condCode)) {
+            Dest64 = Op164;
+        } else {
+            Dest64 = %(altVal)s;
+        }
+    '''
+    buildDataXCondSelInst("csel", condSelCode % {"altVal" : "Op264"})
+    buildDataXCondSelInst("csinc", condSelCode % {"altVal" : "Op264 + 1"})
+    buildDataXCondSelInst("csinv", condSelCode % {"altVal" : "~Op264"})
+    buildDataXCondSelInst("csneg", condSelCode % {"altVal" : "-Op264"})
+}};

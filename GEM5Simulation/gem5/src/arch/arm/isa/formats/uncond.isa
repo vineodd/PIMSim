@@ -1,0 +1,323 @@
+// Copyright (c) 2010-2012 ARM Limited
+// All rights reserved
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+def format ArmUnconditional() {{
+    decode_block = '''
+    {
+        const IntRegIndex rn = (IntRegIndex)(uint32_t)bits(machInst, 19, 16);
+        const uint32_t op1 = bits(machInst, 27, 20);
+        if (bits(op1, 7) == 0) {
+            const uint32_t op2 = bits(machInst, 7, 4);
+            if (op1 == 0x10) {
+                if (bits((uint32_t)rn, 0) == 1 && op2 == 0) {
+                    return new Setend(machInst, bits(machInst, 9));
+                } else if (bits((uint32_t)rn, 0) == 0 && bits(op2, 1) == 0) {
+                    const bool enable = bits(machInst, 19, 18) == 0x2;
+                    const uint32_t mods = bits(machInst, 4, 0) |
+                                          (bits(machInst, 8, 6) << 5) |
+                                          (bits(machInst, 17) << 8) |
+                                          ((enable ? 1 : 0) << 9);
+                    return new Cps(machInst, mods);
+                }
+            } else if (bits(op1, 6, 5) == 0x1) {
+                return decodeNeonData(machInst);
+            } else if (bits(op1, 6, 4) == 0x4) {
+                if (bits(op1, 0) == 0) {
+                    return decodeNeonMem(machInst);
+                } else if (bits(op1, 2, 0) == 1) {
+                    // Unallocated memory hint
+                    return new NopInst(machInst);
+                } else if (bits(op1, 2, 0) == 5) {
+                    const bool add = bits(machInst, 23);
+                    const uint32_t imm12 = bits(machInst, 11, 0);
+                    if (add) {
+                        return new %(pli_iadd)s(machInst, INTREG_ZERO,
+                                                rn, add, imm12);
+                    } else {
+                        return new %(pli_isub)s(machInst, INTREG_ZERO,
+                                                rn, add, imm12);
+                    }
+                }
+            } else if (bits(op1, 6, 4) == 0x5) {
+                if (bits(op1, 1, 0) == 0x1) {
+                    const bool add = bits(machInst, 23);
+                    const bool pldw = bits(machInst, 22);
+                    const uint32_t imm12 = bits(machInst, 11, 0);
+                    if (pldw) {
+                        if (add) {
+                            return new %(pldw_iadd)s(machInst, INTREG_ZERO,
+                                                     rn, add, imm12);
+                        } else {
+                            return new %(pldw_isub)s(machInst, INTREG_ZERO,
+                                                     rn, add, imm12);
+                        }
+                    } else {
+                        if (add) {
+                            return new %(pld_iadd)s(machInst, INTREG_ZERO,
+                                                    rn, add, imm12);
+                        } else {
+                            return new %(pld_isub)s(machInst, INTREG_ZERO,
+                                                    rn, add, imm12);
+                        }
+                    }
+                } else if (op1 == 0x57) {
+                    switch (op2) {
+                      case 0x1:
+                        return new Clrex(machInst);
+                      case 0x4:
+                        return new Dsb(machInst, 0);
+                      case 0x5:
+                        return new Dmb(machInst, 0);
+                      case 0x6:
+                        return new Isb(machInst, 0);
+                    }
+                }
+            } else if (bits(op2, 0) == 0) {
+                switch (op1 & 0xf7) {
+                  case 0x61:
+                    // Unallocated memory hint
+                    return new NopInst(machInst);
+                  case 0x65:
+                    {
+                        const uint32_t imm5 = bits(machInst, 11, 7);
+                        const uint32_t type = bits(machInst, 6, 5);
+                        const bool add = bits(machInst, 23);
+                        const IntRegIndex rm =
+                            (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                        if (add) {
+                            return new %(pli_radd)s(machInst, INTREG_ZERO, rn,
+                                                    add, imm5, type, rm);
+                        } else {
+                            return new %(pli_rsub)s(machInst, INTREG_ZERO, rn,
+                                                    add, imm5, type, rm);
+                        }
+                    }
+                  case 0x71:
+                  case 0x75:
+                    {
+                        const uint32_t imm5 = bits(machInst, 11, 7);
+                        const uint32_t type = bits(machInst, 6, 5);
+                        const bool add = bits(machInst, 23);
+                        const bool pldw = bits(machInst, 22);
+                        const IntRegIndex rm =
+                            (IntRegIndex)(uint32_t)bits(machInst, 3, 0);
+                        if (pldw) {
+                            if (add) {
+                                return new %(pldw_radd)s(machInst, INTREG_ZERO,
+                                                         rn, add, imm5,
+                                                         type, rm);
+                            } else {
+                                return new %(pldw_rsub)s(machInst, INTREG_ZERO,
+                                                         rn, add, imm5,
+                                                         type, rm);
+                            }
+                        } else {
+                            if (add) {
+                                return new %(pld_radd)s(machInst, INTREG_ZERO,
+                                                        rn, add, imm5,
+                                                        type, rm);
+                            } else {
+                                return new %(pld_rsub)s(machInst, INTREG_ZERO,
+                                                        rn, add, imm5,
+                                                        type, rm);
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            switch (bits(machInst, 26, 25)) {
+              case 0x0:
+                {
+                    const uint32_t val = ((machInst >> 20) & 0x5);
+                    if (val == 0x4) {
+                        const uint32_t mode = bits(machInst, 4, 0);
+                        // We check at decode stage if the mode exists even
+                        // if the checking is re-done by Srs::execute.
+                        // This is done because we will otherwise panic if
+                        // trying to read the banked stack pointer of an
+                        // unrecognized mode.
+                        if (unknownMode32((OperatingMode)mode))
+                            return new Unknown(machInst);
+                        switch (bits(machInst, 24, 21)) {
+                          case 0x2:
+                            return new %(srs)s(machInst, mode,
+                                    SrsOp::DecrementAfter, false);
+                          case 0x3:
+                            return new %(srs_w)s(machInst, mode,
+                                    SrsOp::DecrementAfter, true);
+                          case 0x6:
+                            return new %(srs_u)s(machInst, mode,
+                                    SrsOp::IncrementAfter, false);
+                          case 0x7:
+                            return new %(srs_uw)s(machInst, mode,
+                                    SrsOp::IncrementAfter, true);
+                          case 0xa:
+                            return new %(srs_p)s(machInst, mode,
+                                    SrsOp::DecrementBefore, false);
+                          case 0xb:
+                            return new %(srs_pw)s(machInst, mode,
+                                    SrsOp::DecrementBefore, true);
+                          case 0xe:
+                            return new %(srs_pu)s(machInst, mode,
+                                    SrsOp::IncrementBefore, false);
+                          case 0xf:
+                            return new %(srs_puw)s(machInst, mode,
+                                    SrsOp::IncrementBefore, true);
+                        }
+                        return new Unknown(machInst);
+                    } else if (val == 0x1) {
+                        switch (bits(machInst, 24, 21)) {
+                          case 0x0:
+                            return new %(rfe)s(machInst, rn,
+                                    RfeOp::DecrementAfter, false);
+                          case 0x1:
+                            return new %(rfe_w)s(machInst, rn,
+                                    RfeOp::DecrementAfter, true);
+                          case 0x4:
+                            return new %(rfe_u)s(machInst, rn,
+                                    RfeOp::IncrementAfter, false);
+                          case 0x5:
+                            return new %(rfe_uw)s(machInst, rn,
+                                    RfeOp::IncrementAfter, true);
+                          case 0x8:
+                            return new %(rfe_p)s(machInst, rn,
+                                    RfeOp::DecrementBefore, false);
+                          case 0x9:
+                            return new %(rfe_pw)s(machInst, rn,
+                                    RfeOp::DecrementBefore, true);
+                          case 0xc:
+                            return new %(rfe_pu)s(machInst, rn,
+                                    RfeOp::IncrementBefore, false);
+                          case 0xd:
+                            return new %(rfe_puw)s(machInst, rn,
+                                    RfeOp::IncrementBefore, true);
+                        }
+                        return new Unknown(machInst);
+                    }
+                }
+                break;
+              case 0x1:
+                {
+                    const uint32_t imm =
+                        (sext<26>(bits(machInst, 23, 0) << 2)) |
+                        (bits(machInst, 24) << 1);
+                    return new BlxImm(machInst, imm, COND_UC);
+                }
+              case 0x2:
+                if (bits(op1, 4, 0) != 0) {
+                    if (CPNUM == 0xa || CPNUM == 0xb) {
+                        return decodeExtensionRegLoadStore(machInst);
+                    }
+                    if (bits(op1, 0) == 1) {
+                        if (rn == INTREG_PC) {
+                            if (bits(op1, 4, 3) != 0x0) {
+                                return new WarnUnimplemented(
+                                        "ldc, ldc2 (literal)", machInst);
+                            }
+                        } else {
+                            if (op1 == 0xC3 || op1 == 0xC7) {
+                                return new WarnUnimplemented(
+                                        "ldc, ldc2 (immediate)", machInst);
+                            }
+                        }
+                    } else {
+                        if (bits(op1, 4, 3) != 0 || bits(op1, 1) == 1) {
+                            return new WarnUnimplemented(
+                                    "stc, stc2", machInst);
+                        }
+                    }
+                }
+                break;
+              case 0x3:
+                if (bits(op1, 4) == 0) {
+                    if (CPNUM == 0xa || CPNUM == 0xb) {
+                        return decodeShortFpTransfer(machInst);
+                    } else if (CPNUM == 0xe) {
+                        return decodeMcrMrc14(machInst);
+                    } else if (CPNUM == 0xf) {
+                        return decodeMcrMrc15(machInst);
+                    }
+                    const bool op = bits(machInst, 4);
+                    if (op) {
+                        if (bits(op1, 0)) {
+                            return new WarnUnimplemented(
+                                    "mrc, mrc2", machInst);
+                        } else {
+                            return new WarnUnimplemented(
+                                    "mcr, mcr2", machInst);
+                        }
+                    } else {
+                        return new WarnUnimplemented("cdp, cdp2", machInst);
+                    }
+                }
+                break;
+            }
+        }
+        return new Unknown(machInst);
+    }
+    ''' % {
+        "pli_iadd" : "PLI_" + loadImmClassName(False, True, False, 1),
+        "pli_isub" : "PLI_" + loadImmClassName(False, False, False, 1),
+        "pld_iadd" : "PLD_" + loadImmClassName(False, True, False, 1),
+        "pld_isub" : "PLD_" + loadImmClassName(False, False, False, 1),
+        "pldw_iadd" : "PLDW_" + loadImmClassName(False, True, False, 1),
+        "pldw_isub" : "PLDW_" + loadImmClassName(False, False, False, 1),
+        "pli_radd" : "PLI_" + loadRegClassName(False, True, False, 1),
+        "pli_rsub" : "PLI_" + loadRegClassName(False, False, False, 1),
+        "pld_radd" : "PLD_" + loadRegClassName(False, True, False, 1),
+        "pld_rsub" : "PLD_" + loadRegClassName(False, False, False, 1),
+        "pldw_radd" : "PLDW_" + loadRegClassName(False, True, False, 1),
+        "pldw_rsub" : "PLDW_" + loadRegClassName(False, False, False, 1),
+        "rfe" : "RFE_" + loadImmClassName(True, False, False, 8),
+        "rfe_w" : "RFE_" + loadImmClassName(True, False, True, 8),
+        "rfe_u" : "RFE_" + loadImmClassName(True, True, False, 8),
+        "rfe_uw" : "RFE_" + loadImmClassName(True, True, True, 8),
+        "rfe_p" : "RFE_" + loadImmClassName(False, False, False, 8),
+        "rfe_pw" : "RFE_" + loadImmClassName(False, False, True, 8),
+        "rfe_pu" : "RFE_" + loadImmClassName(False, True, False, 8),
+        "rfe_puw" : "RFE_" + loadImmClassName(False, True, True, 8),
+        "srs" : "SRS_" + storeImmClassName(True, False, False, 8),
+        "srs_w" : "SRS_" + storeImmClassName(True, False, True, 8),
+        "srs_u" : "SRS_" + storeImmClassName(True, True, False, 8),
+        "srs_uw" : "SRS_" + storeImmClassName(True, True, True, 8),
+        "srs_p" : "SRS_" + storeImmClassName(False, False, False, 8),
+        "srs_pw" : "SRS_" + storeImmClassName(False, False, True, 8),
+        "srs_pu" : "SRS_" + storeImmClassName(False, True, False, 8),
+        "srs_puw" : "SRS_" + storeImmClassName(False, True, True, 8)
+    };
+}};

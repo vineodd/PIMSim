@@ -1,0 +1,33 @@
+
+Learning_gem README
+-------------------
+This directory contains the configuration scripts used in the "Learning gem5"
+book. The scripts contained in these directories are for educational purposes
+only and should not be used for architectural research as-is.
+
+"Learning gem5" is a work-in-progress book that is frequently updated. For the
+most up-to-date version of the book, see the website.
+
+http://learning.gem5.org/book/
+
+This directory is broken into one subdirectory per part of the book.
+
+If you would like to contribute (please do!) the code for the Learning gem5 book
+is hosted on GitHub.
+
+https://github.com/powerjg/learning_gem5
+
+Goals of these scripts
+~~~~~~~~~~~~~~~~~~~~~~
+These scripts are not necessarily useful outside the scope of the Learning
+gem5 book. The goal is to include the learning gem5 scripts, following the
+book as closely as possible, so that the regression tester will catch any
+changes that affect the book.
+
+For general users, these are *not* good scripts to use for running complex
+architectural experiments. These scripts *are* a good starting point example
+of how to write your own scripts for experiments.
+
+Feedback
+~~~~~~~~
+Send mail to jason@lowepower.com to provide feedback.
