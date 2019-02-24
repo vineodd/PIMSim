@@ -1,5 +1,7 @@
 This is the gem5 simulator which support PIM features.
 
+Recommand g++/gcc version is 4.8.1 
+
 To start:
 
 sh hellopim.sh
