@@ -1,0 +1,259 @@
+// Copyright (c) 2007-2008 The Hewlett-Packard Development Company
+// Copyright (c) 2011 Mark D. Hill and David A. Wood
+// All rights reserved.
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+//////////////////////////////////////////////////////////////////////////
+//
+// Fault Microop
+//
+//////////////////////////////////////////////////////////////////////////
+
+output header {{
+    class MicroFaultBase : public X86ISA::X86MicroopBase
+    {
+      protected:
+        Fault fault;
+        uint8_t cc;
+
+      public:
+        MicroFaultBase(ExtMachInst _machInst, const char * instMnem,
+                uint64_t setFlags, Fault _fault, uint8_t _cc);
+
+        std::string generateDisassembly(Addr pc,
+                const SymbolTable *symtab) const;
+    };
+
+    class MicroHalt : public X86ISA::X86MicroopBase
+    {
+      public:
+        MicroHalt(ExtMachInst _machInst, const char * instMnem,
+                uint64_t setFlags) :
+            X86MicroopBase(_machInst, "halt", instMnem,
+                           setFlags | (ULL(1) << StaticInst::IsNonSpeculative) |
+                           (ULL(1) << StaticInst::IsQuiesce),
+                           No_OpClass)
+        {
+        }
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const;
+
+        std::string generateDisassembly(Addr pc,
+                const SymbolTable *symtab) const;
+    };
+}};
+
+def template MicroFaultDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst _machInst, const char * instMnem,
+                uint64_t setFlags, Fault _fault, uint8_t _cc);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const;
+    };
+}};
+
+def template MicroFaultExecute {{
+        Fault %(class_name)s::execute(ExecContext *xc,
+                Trace::InstRecord *traceData) const
+        {
+            %(op_decl)s;
+            %(op_rd)s;
+            if (%(cond_test)s) {
+                //Return the fault we were constructed with
+                return fault;
+            } else {
+                return NoFault;
+            }
+        }
+}};
+
+output exec {{
+    Fault
+    MicroHalt::execute(ExecContext *xc, Trace::InstRecord * traceData) const
+    {
+        xc->tcBase()->suspend();
+        return NoFault;
+    }
+}};
+
+output decoder {{
+    MicroFaultBase::MicroFaultBase(
+            ExtMachInst machInst, const char * instMnem,
+            uint64_t setFlags, Fault _fault, uint8_t _cc) :
+        X86MicroopBase(machInst, "fault", instMnem, setFlags, No_OpClass),
+                fault(_fault), cc(_cc)
+    {
+    }
+}};
+
+def template MicroFaultConstructor {{
+    %(class_name)s::%(class_name)s(
+            ExtMachInst machInst, const char * instMnem, uint64_t setFlags,
+            Fault _fault, uint8_t _cc) :
+        %(base_class)s(machInst, instMnem, setFlags, _fault, _cc)
+    {
+        %(constructor)s;
+    }
+}};
+
+output decoder {{
+    std::string MicroFaultBase::generateDisassembly(Addr pc,
+            const SymbolTable *symtab) const
+    {
+        std::stringstream response;
+
+        printMnemonic(response, instMnem, mnemonic);
+        if(fault)
+            response << fault->name();
+        else
+            response << "No Fault";
+
+        return response.str();
+    }
+
+    std::string MicroHalt::generateDisassembly(Addr pc,
+            const SymbolTable *symtab) const
+    {
+        std::stringstream response;
+
+        printMnemonic(response, instMnem, mnemonic);
+
+        return response.str();
+    }
+}};
+
+let {{
+    class Fault(X86Microop):
+        className = "MicroFault"
+        def __init__(self, fault, flags=None):
+            self.fault = fault
+            if flags:
+                if not isinstance(flags, (list, tuple)):
+                    raise Exception, "flags must be a list or tuple of flags"
+                self.cond = " | ".join(flags)
+                self.className += "Flags"
+            else:
+                self.cond = "0"
+
+        def getAllocator(self, microFlags):
+            allocator = '''new %(class_name)s(machInst, macrocodeBlock,
+                    %(flags)s, %(fault)s, %(cc)s)''' % {
+                "class_name" : self.className,
+                "flags" : self.microFlagsText(microFlags),
+                "fault" : self.fault,
+                "cc" : self.cond}
+            return allocator
+
+    iop = InstObjParams("fault", "MicroFaultFlags", "MicroFaultBase",
+            {"code": "",
+             "cond_test": "checkCondition(ccFlagBits | cfofBits | dfBit | \
+                                          ecfBit | ezfBit, cc)"})
+    exec_output = MicroFaultExecute.subst(iop)
+    header_output = MicroFaultDeclare.subst(iop)
+    decoder_output = MicroFaultConstructor.subst(iop)
+    iop = InstObjParams("fault", "MicroFault", "MicroFaultBase",
+            {"code": "",
+             "cond_test": "true"})
+    exec_output += MicroFaultExecute.subst(iop)
+    header_output += MicroFaultDeclare.subst(iop)
+    decoder_output += MicroFaultConstructor.subst(iop)
+    microopClasses["fault"] = Fault
+
+    class Halt(X86Microop):
+        className = "MicroHalt"
+        def __init__(self):
+            pass
+
+        def getAllocator(self, microFlags):
+            return "new MicroHalt(machInst, macrocodeBlock, %s)" % \
+                    self.microFlagsText(microFlags)
+
+    microopClasses["halt"] = Halt
+}};
+
+def template MicroFenceOpDeclare {{
+    class %(class_name)s : public X86ISA::X86MicroopBase
+    {
+      public:
+        %(class_name)s(ExtMachInst _machInst,
+                const char * instMnem,
+                uint64_t setFlags);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const;
+    };
+}};
+
+def template MicroFenceOpConstructor {{
+    %(class_name)s::%(class_name)s(
+            ExtMachInst machInst, const char * instMnem, uint64_t setFlags) :
+        %(base_class)s(machInst, "%(mnemonic)s", instMnem,
+                setFlags, %(op_class)s)
+    {
+        %(constructor)s;
+    }
+}};
+
+let {{
+    class MfenceOp(X86Microop):
+        def __init__(self):
+            self.className = "Mfence"
+            self.mnemonic = "mfence"
+            self.instFlags = "| (1ULL << StaticInst::IsMemBarrier)"
+
+        def getAllocator(self, microFlags):
+            allocString = '''
+                    (StaticInstPtr)(new %(class_name)s(machInst,
+                        macrocodeBlock, %(flags)s))
+            '''
+            allocator = allocString % {
+                "class_name" : self.className,
+                "mnemonic" : self.mnemonic,
+                "flags" : self.microFlagsText(microFlags) + self.instFlags}
+            return allocator
+
+    microopClasses["mfence"] = MfenceOp
+}};
+
+let {{
+    # Build up the all register version of this micro op
+    iop = InstObjParams("mfence", "Mfence", 'X86MicroopBase',
+            {"code" : ""})
+    header_output += MicroFenceOpDeclare.subst(iop)
+    decoder_output += MicroFenceOpConstructor.subst(iop)
+    exec_output += BasicExecute.subst(iop)
+}};

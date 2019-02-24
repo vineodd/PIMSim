@@ -1,0 +1,207 @@
+// Copyright (c) 2008 The Hewlett-Packard Development Company
+// All rights reserved.
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+output header {{
+    class SeqOpBase : public X86ISA::X86MicroopBase
+    {
+      protected:
+        uint16_t target;
+        uint8_t cc;
+
+      public:
+        SeqOpBase(ExtMachInst _machInst, const char * instMnem,
+                const char * mnemonic, uint64_t setFlags,
+                uint16_t _target, uint8_t _cc);
+
+        SeqOpBase(ExtMachInst _machInst, const char * instMnem,
+                const char * mnemonic,
+                uint16_t _target, uint8_t _cc);
+
+        std::string generateDisassembly(Addr pc,
+                const SymbolTable *symtab) const;
+    };
+}};
+
+def template SeqOpDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst _machInst, const char * instMnem,
+                uint64_t setFlags, uint16_t _target, uint8_t _cc);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const;
+    };
+}};
+
+def template SeqOpExecute {{
+        Fault %(class_name)s::execute(ExecContext *xc,
+                Trace::InstRecord *traceData) const
+        {
+            %(op_decl)s;
+            %(op_rd)s;
+            if (%(cond_test)s) {
+                %(code)s;
+            } else {
+                %(else_code)s;
+            }
+            %(op_wb)s;
+            return NoFault;
+        }
+}};
+
+output decoder {{
+    SeqOpBase::SeqOpBase(
+            ExtMachInst machInst, const char * mnemonic, const char * instMnem,
+            uint64_t setFlags, uint16_t _target, uint8_t _cc) :
+        X86MicroopBase(machInst, mnemonic, instMnem, setFlags, No_OpClass),
+                target(_target), cc(_cc)
+    {
+    }
+}};
+
+def template SeqOpConstructor {{
+    %(class_name)s::%(class_name)s(
+            ExtMachInst machInst, const char * instMnem,
+            uint64_t setFlags, uint16_t _target, uint8_t _cc) :
+        %(base_class)s(machInst, "%(mnemonic)s", instMnem,
+                setFlags, _target, _cc)
+    {
+        %(constructor)s;
+        %(cond_control_flag_init)s;
+    }
+}};
+
+output decoder {{
+    std::string SeqOpBase::generateDisassembly(Addr pc,
+            const SymbolTable *symtab) const
+    {
+        std::stringstream response;
+
+        printMnemonic(response, instMnem, mnemonic);
+        ccprintf(response, "%#x", target);
+
+        return response.str();
+    }
+}};
+
+let {{
+    class SeqOp(X86Microop):
+        def __init__(self, target, flags=None):
+            self.target = target
+            if flags:
+                if not isinstance(flags, (list, tuple)):
+                    raise Exception, "flags must be a list or tuple of flags"
+                self.cond = " | ".join(flags)
+                self.className += "Flags"
+            else:
+                self.cond = "0"
+
+        def getAllocator(self, microFlags):
+            allocator = '''new %(class_name)s(machInst, macrocodeBlock,
+                    %(flags)s, %(target)s, %(cc)s)''' % {
+                "class_name" : self.className,
+                "flags" : self.microFlagsText(microFlags),
+                "target" : self.target,
+                "cc" : self.cond}
+            return allocator
+
+    class Br(SeqOp):
+        className = "MicroBranch"
+
+        def getAllocator(self, microFlags):
+            if "IsLastMicroop" in microFlags:
+                microFlags.remove("IsLastMicroop")
+            if not "IsDelayedCommit" in microFlags:
+                microFlags.append("IsDelayedCommit")
+            return super(Br, self).getAllocator(microFlags)
+
+    class Eret(SeqOp):
+        target = "normalMicroPC(0)"
+        className = "Eret"
+
+        def __init__(self, flags=None):
+            if flags:
+                if not isinstance(flags, (list, tuple)):
+                    raise Exception, "flags must be a list or tuple of flags"
+                self.cond = " | ".join(flags)
+                self.className += "Flags"
+            else:
+                self.cond = "0"
+
+        def getAllocator(self, microFlags):
+            if not "IsLastMicroop" in microFlags:
+                microFlags.append("IsLastMicroop")
+            if "IsDelayedCommit" in microFlags:
+                microFlags.remove("IsDelayedCommit")
+            return super(Eret, self).getAllocator(microFlags)
+
+    iop = InstObjParams("br", "MicroBranchFlags", "SeqOpBase",
+            {"code": "nuIP = target;",
+             "else_code": "nuIP = nuIP;",
+             "cond_test": "checkCondition(ccFlagBits | cfofBits | dfBit | \
+                                          ecfBit | ezfBit, cc)",
+             "cond_control_flag_init": "flags[IsCondControl] = true"})
+    exec_output += SeqOpExecute.subst(iop)
+    header_output += SeqOpDeclare.subst(iop)
+    decoder_output += SeqOpConstructor.subst(iop)
+    iop = InstObjParams("br", "MicroBranch", "SeqOpBase",
+            {"code": "nuIP = target;",
+             "else_code": "nuIP = nuIP;",
+             "cond_test": "true",
+             "cond_control_flag_init": ""})
+    exec_output += SeqOpExecute.subst(iop)
+    header_output += SeqOpDeclare.subst(iop)
+    decoder_output += SeqOpConstructor.subst(iop)
+    microopClasses["br"] = Br
+
+    iop = InstObjParams("eret", "EretFlags", "SeqOpBase",
+            {"code": "", "else_code": "",
+             "cond_test": "checkCondition(ccFlagBits | cfofBits | dfBit | \
+                                          ecfBit | ezfBit, cc)",
+             "cond_control_flag_init": ""})
+    exec_output += SeqOpExecute.subst(iop)
+    header_output += SeqOpDeclare.subst(iop)
+    decoder_output += SeqOpConstructor.subst(iop)
+    iop = InstObjParams("eret", "Eret", "SeqOpBase",
+            {"code": "", "else_code": "",
+             "cond_test": "true",
+             "cond_control_flag_init": ""})
+    exec_output += SeqOpExecute.subst(iop)
+    header_output += SeqOpDeclare.subst(iop)
+    decoder_output += SeqOpConstructor.subst(iop)
+    microopClasses["eret"] = Eret
+}};

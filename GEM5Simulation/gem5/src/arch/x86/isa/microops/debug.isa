@@ -1,0 +1,171 @@
+// Copyright (c) 2008 The Hewlett-Packard Development Company
+// All rights reserved.
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+//////////////////////////////////////////////////////////////////////////
+//
+// Debug Microops
+//
+//////////////////////////////////////////////////////////////////////////
+
+output header {{
+    class MicroDebugBase : public X86ISA::X86MicroopBase
+    {
+      protected:
+        typedef GenericISA::M5DebugFault::DebugFunc DebugFunc;
+        DebugFunc func;
+        std::string message;
+        uint8_t cc;
+
+      public:
+        MicroDebugBase(ExtMachInst machInst, const char * mnem,
+                const char * instMnem, uint64_t setFlags,
+                DebugFunc _func, std::string _message, uint8_t _cc) :
+            X86MicroopBase(machInst, mnem, instMnem, setFlags, No_OpClass),
+                    func(_func), message(_message), cc(_cc)
+        {}
+
+        std::string
+        generateDisassembly(Addr pc, const SymbolTable *symtab) const
+        {
+            std::stringstream response;
+
+            printMnemonic(response, instMnem, mnemonic);
+            response << "\"" << message << "\"";
+
+            return response.str();
+        }
+    };
+}};
+
+def template MicroDebugDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst _machInst, const char * instMnem,
+                uint64_t setFlags, std::string _message, uint8_t _cc);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const;
+    };
+}};
+
+def template MicroDebugExecute {{
+        Fault
+        %(class_name)s::execute(ExecContext *xc,
+                Trace::InstRecord *traceData) const
+        {
+            %(op_decl)s
+            %(op_rd)s
+            if (%(cond_test)s) {
+                return std::make_shared<GenericISA::M5DebugFault>(func,
+                                                                  message);
+            } else {
+                return NoFault;
+            }
+        }
+}};
+
+def template MicroDebugConstructor {{
+    %(class_name)s::%(class_name)s(
+            ExtMachInst machInst, const char * instMnem, uint64_t setFlags,
+            std::string _message, uint8_t _cc) :
+        %(base_class)s(machInst, "%(func)s", instMnem,
+                setFlags, %(func_num)s, _message, _cc)
+    {
+        %(constructor)s;
+    }
+}};
+
+let {{
+    class MicroDebug(X86Microop):
+        def __init__(self, message, flags=None):
+            self.message = message
+            if flags:
+                if not isinstance(flags, (list, tuple)):
+                    raise Exception, "flags must be a list or tuple of flags"
+                self.cond = " | ".join(flags)
+                self.className += "Flags"
+            else:
+                self.cond = "0"
+
+        def getAllocator(self, microFlags):
+            allocator = '''new %(class_name)s(machInst, macrocodeBlock,
+                    %(flags)s, "%(message)s", %(cc)s)''' % {
+                "class_name" : self.className,
+                "flags" : self.microFlagsText(microFlags),
+                "message" : self.message,
+                "cc" : self.cond}
+            return allocator
+
+    exec_output = ""
+    header_output = ""
+    decoder_output = ""
+
+    def buildDebugMicro(func, func_num):
+        global exec_output, header_output, decoder_output
+
+        iop = InstObjParams(func, "Micro%sFlags" % func.capitalize(),
+                "MicroDebugBase",
+                {"code": "",
+                 "func": func,
+                 "func_num": "GenericISA::M5DebugFault::%s" % func_num,
+                 "cond_test": "checkCondition(ccFlagBits | cfofBits | \
+                                              dfBit | ecfBit | ezfBit, cc)"})
+        exec_output += MicroDebugExecute.subst(iop)
+        header_output += MicroDebugDeclare.subst(iop)
+        decoder_output += MicroDebugConstructor.subst(iop)
+
+        iop = InstObjParams(func, "Micro%s" % func.capitalize(),
+                "MicroDebugBase",
+                {"code": "",
+                 "func": func,
+                 "func_num": "GenericISA::M5DebugFault::%s" % func_num,
+                 "cond_test": "true"})
+        exec_output += MicroDebugExecute.subst(iop)
+        header_output += MicroDebugDeclare.subst(iop)
+        decoder_output += MicroDebugConstructor.subst(iop)
+
+        class MicroDebugChild(MicroDebug):
+            className = "Micro%s" % func.capitalize()
+
+        global microopClasses
+        microopClasses[func] = MicroDebugChild
+
+    buildDebugMicro("panic", "PanicFunc")
+    buildDebugMicro("fatal", "FatalFunc")
+    buildDebugMicro("warn", "WarnFunc")
+    buildDebugMicro("warn_once", "WarnOnceFunc")
+}};

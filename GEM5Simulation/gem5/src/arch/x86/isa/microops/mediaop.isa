@@ -1,0 +1,1592 @@
+// Copyright (c) 2009 The Regents of The University of Michigan
+// Copyright (c) 2015 Advanced Micro Devices, Inc.
+//
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+def template MediaOpExecute {{
+        Fault %(class_name)s::execute(ExecContext *xc,
+                Trace::InstRecord *traceData) const
+        {
+            Fault fault = NoFault;
+
+            %(op_decl)s;
+            %(op_rd)s;
+
+            %(code)s;
+
+            //Write the resulting state to the execution context
+            if(fault == NoFault)
+            {
+                %(op_wb)s;
+            }
+            return fault;
+        }
+}};
+
+def template MediaOpRegDeclare {{
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst _machInst,
+                const char * instMnem, uint64_t setFlags,
+                InstRegIndex _src1, InstRegIndex _src2, InstRegIndex _dest,
+                uint8_t _srcSize, uint8_t _destSize, uint16_t _ext);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const;
+    };
+}};
+
+def template MediaOpImmDeclare {{
+
+    class %(class_name)s : public %(base_class)s
+    {
+      public:
+        %(class_name)s(ExtMachInst _machInst,
+                const char * instMnem, uint64_t setFlags,
+                InstRegIndex _src1, uint16_t _imm8, InstRegIndex _dest,
+                uint8_t _srcSize, uint8_t _destSize, uint16_t _ext);
+
+        Fault execute(ExecContext *, Trace::InstRecord *) const;
+    };
+}};
+
+def template MediaOpRegConstructor {{
+    %(class_name)s::%(class_name)s(
+            ExtMachInst machInst, const char * instMnem, uint64_t setFlags,
+            InstRegIndex _src1, InstRegIndex _src2, InstRegIndex _dest,
+            uint8_t _srcSize, uint8_t _destSize, uint16_t _ext) :
+        %(base_class)s(machInst, "%(mnemonic)s", instMnem, setFlags,
+                _src1, _src2, _dest, _srcSize, _destSize, _ext,
+                %(op_class)s)
+    {
+        %(constructor)s;
+    }
+}};
+
+def template MediaOpImmConstructor {{
+    %(class_name)s::%(class_name)s(
+            ExtMachInst machInst, const char * instMnem, uint64_t setFlags,
+            InstRegIndex _src1, uint16_t _imm8, InstRegIndex _dest,
+            uint8_t _srcSize, uint8_t _destSize, uint16_t _ext) :
+        %(base_class)s(machInst, "%(mnemonic)s", instMnem, setFlags,
+                _src1, _imm8, _dest, _srcSize, _destSize, _ext,
+                %(op_class)s)
+    {
+        %(constructor)s;
+    }
+}};
+
+let {{
+    # Make these empty strings so that concatenating onto
+    # them will always work.
+    header_output = ""
+    decoder_output = ""
+    exec_output = ""
+
+    immTemplates = (
+            MediaOpImmDeclare,
+            MediaOpImmConstructor,
+            MediaOpExecute)
+
+    regTemplates = (
+            MediaOpRegDeclare,
+            MediaOpRegConstructor,
+            MediaOpExecute)
+
+    class MediaOpMeta(type):
+        def buildCppClasses(self, name, Name, suffix, code):
+
+            # Globals to stick the output in
+            global header_output
+            global decoder_output
+            global exec_output
+
+            # If op2 is used anywhere, make register and immediate versions
+            # of this code.
+            matcher = re.compile(r"(?<!\w)(?P<prefix>s?)op2(?P<typeQual>_[^\W_]+)?")
+            match = matcher.search(code)
+            if match:
+                typeQual = ""
+                if match.group("typeQual"):
+                    typeQual = match.group("typeQual")
+                src2_name = "%sFpSrcReg2%s" % (match.group("prefix"), typeQual)
+                self.buildCppClasses(name, Name, suffix,
+                        matcher.sub(src2_name, code))
+                self.buildCppClasses(name + "i", Name, suffix + "Imm",
+                        matcher.sub("imm8", code))
+                return
+
+            base = "X86ISA::MediaOp"
+
+            # If imm8 shows up in the code, use the immediate templates, if
+            # not, hopefully the register ones will be correct.
+            matcher = re.compile("(?<!\w)imm8(?!\w)")
+            if matcher.search(code):
+                base += "Imm"
+                templates = immTemplates
+            else:
+                base += "Reg"
+                templates = regTemplates
+
+            # Get everything ready for the substitution
+            opt_args = []
+            if self.op_class:
+                opt_args.append(self.op_class)
+            iop = InstObjParams(name, Name + suffix, base, {"code" : code},
+                                opt_args)
+
+            # Generate the actual code (finally!)
+            header_output += templates[0].subst(iop)
+            decoder_output += templates[1].subst(iop)
+            exec_output += templates[2].subst(iop)
+
+
+        def __new__(mcls, Name, bases, dict):
+            abstract = False
+            name = Name.lower()
+            if "abstract" in dict:
+                abstract = dict['abstract']
+                del dict['abstract']
+            if not "op_class" in dict:
+                dict["op_class"] = None
+
+            cls = super(MediaOpMeta, mcls).__new__(mcls, Name, bases, dict)
+            if not abstract:
+                cls.className = Name
+                cls.base_mnemonic = name
+                code = cls.code
+
+                # Set up the C++ classes
+                mcls.buildCppClasses(cls, name, Name, "", code)
+
+                # Hook into the microassembler dict
+                global microopClasses
+                microopClasses[name] = cls
+
+                # If op2 is used anywhere, make register and immediate versions
+                # of this code.
+                matcher = re.compile(r"op2(?P<typeQual>_[^\W_]+)?")
+                if matcher.search(code):
+                    microopClasses[name + 'i'] = cls
+            return cls
+
+
+    class MediaOp(X86Microop):
+        __metaclass__ = MediaOpMeta
+        # This class itself doesn't act as a microop
+        abstract = True
+
+        def __init__(self, dest, src1, op2,
+                size = None, destSize = None, srcSize = None, ext = None):
+            self.dest = dest
+            self.src1 = src1
+            self.op2 = op2
+            if size is not None:
+                self.srcSize = size
+                self.destSize = size
+            if srcSize is not None:
+                self.srcSize = srcSize
+            if destSize is not None:
+                self.destSize = destSize
+            if self.srcSize is None:
+                raise Exception, "Source size not set."
+            if self.destSize is None:
+                raise Exception, "Dest size not set."
+            if ext is None:
+                self.ext = 0
+            else:
+                self.ext = ext
+
+        def getAllocator(self, microFlags):
+            className = self.className
+            if self.mnemonic == self.base_mnemonic + 'i':
+                className += "Imm"
+            allocator = '''new %(class_name)s(machInst, macrocodeBlock,
+                    %(flags)s, %(src1)s, %(op2)s, %(dest)s,
+                    %(srcSize)s, %(destSize)s, %(ext)s)''' % {
+                "class_name" : className,
+                "flags" : self.microFlagsText(microFlags),
+                "src1" : self.src1, "op2" : self.op2,
+                "dest" : self.dest,
+                "srcSize" : self.srcSize,
+                "destSize" : self.destSize,
+                "ext" : self.ext}
+            return allocator
+
+    class Mov2int(MediaOp):
+        def __init__(self, dest, src1, src2 = 0, \
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Mov2int, self).__init__(dest, src1,\
+                    src2, size, destSize, srcSize, ext)
+        op_class = 'SimdMiscOp'
+        code = '''
+            int items = sizeof(FloatRegBits) / srcSize;
+            int offset = imm8;
+            if (bits(src1, 0) && (ext & 0x1))
+                offset -= items;
+            if (offset >= 0 && offset < items) {
+                uint64_t fpSrcReg1 =
+                    bits(FpSrcReg1_uqw,
+                            (offset + 1) * srcSize * 8 - 1,
+                            (offset + 0) * srcSize * 8);
+                DestReg = merge(0, fpSrcReg1, destSize);
+            } else {
+                DestReg = DestReg;
+            }
+        '''
+
+    class Mov2fp(MediaOp):
+        def __init__(self, dest, src1, src2 = 0, \
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Mov2fp, self).__init__(dest, src1,\
+                    src2, size, destSize, srcSize, ext)
+        op_class = 'SimdMiscOp'
+        code = '''
+            int items = sizeof(FloatRegBits) / destSize;
+            int offset = imm8;
+            if (bits(dest, 0) && (ext & 0x1))
+                offset -= items;
+            if (offset >= 0 && offset < items) {
+                uint64_t srcReg1 = pick(SrcReg1, 0, srcSize);
+                FpDestReg_uqw =
+                    insertBits(FpDestReg_uqw,
+                            (offset + 1) * destSize * 8 - 1,
+                            (offset + 0) * destSize * 8, srcReg1);
+            } else {
+                FpDestReg_uqw = FpDestReg_uqw;
+            }
+        '''
+
+    class Movsign(MediaOp):
+        def __init__(self, dest, src, \
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Movsign, self).__init__(dest, src,\
+                    "InstRegIndex(0)", size, destSize, srcSize, ext)
+        op_class = 'SimdMiscOp'
+        code = '''
+            int items = sizeof(FloatRegBits) / srcSize;
+            uint64_t result = 0;
+            int offset = (ext & 0x1) ? items : 0;
+            for (int i = 0; i < items; i++) {
+                uint64_t picked =
+                    bits(FpSrcReg1_uqw, (i + 1) * 8 * srcSize - 1);
+                result = insertBits(result, i + offset, i + offset, picked);
+            }
+            DestReg = DestReg | result;
+        '''
+
+    class Maskmov(MediaOp):
+        op_class = 'SimdMiscOp'
+        code = '''
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                if (bits(FpSrcReg2_uqw, hiIndex))
+                    result = insertBits(result, hiIndex, loIndex, arg1Bits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class shuffle(MediaOp):
+        op_class = 'SimdMiscOp'
+        code = '''
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = sizeof(FloatRegBits) / size;
+            int options;
+            int optionBits;
+            if (size == 8) {
+                options = 2;
+                optionBits = 1;
+            } else {
+                options = 4;
+                optionBits = 2;
+            }
+
+            uint64_t result = 0;
+            uint8_t sel = ext;
+
+            for (int i = 0; i < items; i++) {
+                uint64_t resBits;
+                uint8_t lsel = sel & mask(optionBits);
+                if (lsel * size >= sizeof(FloatRegBits)) {
+                    lsel -= options / 2;
+                    resBits = bits(FpSrcReg2_uqw,
+                            (lsel + 1) * sizeBits - 1,
+                            (lsel + 0) * sizeBits);
+                }  else {
+                    resBits = bits(FpSrcReg1_uqw,
+                            (lsel + 1) * sizeBits - 1,
+                            (lsel + 0) * sizeBits);
+                }
+
+                sel >>= optionBits;
+
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Unpack(MediaOp):
+        op_class = 'SimdMiscOp'
+        code = '''
+            assert(srcSize == destSize);
+            int size = destSize;
+            int items = (sizeof(FloatRegBits) / size) / 2;
+            int offset = ext ? items : 0;
+            uint64_t result = 0;
+            for (int i = 0; i < items; i++) {
+                uint64_t pickedLow =
+                    bits(FpSrcReg1_uqw, (i + offset + 1) * 8 * size - 1,
+                                        (i + offset) * 8 * size);
+                result = insertBits(result,
+                                    (2 * i + 1) * 8 * size - 1,
+                                    (2 * i + 0) * 8 * size,
+                                    pickedLow);
+                uint64_t pickedHigh =
+                    bits(FpSrcReg2_uqw, (i + offset + 1) * 8 * size - 1,
+                                        (i + offset) * 8 * size);
+                result = insertBits(result,
+                                    (2 * i + 2) * 8 * size - 1,
+                                    (2 * i + 1) * 8 * size,
+                                    pickedHigh);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Pack(MediaOp):
+        op_class = 'SimdMiscOp'
+        code = '''
+            assert(srcSize == destSize * 2);
+            int items = (sizeof(FloatRegBits) / destSize);
+            int destBits = destSize * 8;
+            int srcBits = srcSize * 8;
+            uint64_t result = 0;
+            int i;
+            for (i = 0; i < items / 2; i++) {
+                uint64_t picked =
+                    bits(FpSrcReg1_uqw, (i + 1) * srcBits - 1,
+                                        (i + 0) * srcBits);
+                unsigned signBit = bits(picked, srcBits - 1);
+                uint64_t overflow = bits(picked, srcBits - 1, destBits - 1);
+
+                // Handle saturation.
+                if (signBit) {
+                    if (overflow != mask(destBits - srcBits + 1)) {
+                        if (signedOp())
+                            picked = (ULL(1) << (destBits - 1));
+                        else
+                            picked = 0;
+                    }
+                } else {
+                    if (overflow != 0) {
+                        if (signedOp())
+                            picked = mask(destBits - 1);
+                        else
+                            picked = mask(destBits);
+                    }
+                }
+                result = insertBits(result,
+                                    (i + 1) * destBits - 1,
+                                    (i + 0) * destBits,
+                                    picked);
+            }
+            for (;i < items; i++) {
+                uint64_t picked =
+                    bits(FpSrcReg2_uqw, (i - items + 1) * srcBits - 1,
+                                        (i - items + 0) * srcBits);
+                unsigned signBit = bits(picked, srcBits - 1);
+                uint64_t overflow = bits(picked, srcBits - 1, destBits - 1);
+
+                // Handle saturation.
+                if (signBit) {
+                    if (overflow != mask(destBits - srcBits + 1)) {
+                        if (signedOp())
+                            picked = (ULL(1) << (destBits - 1));
+                        else
+                            picked = 0;
+                    }
+                } else {
+                    if (overflow != 0) {
+                        if (signedOp())
+                            picked = mask(destBits - 1);
+                        else
+                            picked = mask(destBits);
+                    }
+                }
+                result = insertBits(result,
+                                    (i + 1) * destBits - 1,
+                                    (i + 0) * destBits,
+                                    picked);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mxor(MediaOp):
+        def __init__(self, dest, src1, src2):
+            super(Mxor, self).__init__(dest, src1, src2, 1)
+        op_class = 'SimdAluOp'
+        code = '''
+            FpDestReg_uqw = FpSrcReg1_uqw ^ FpSrcReg2_uqw;
+        '''
+
+    class Mor(MediaOp):
+        def __init__(self, dest, src1, src2):
+            super(Mor, self).__init__(dest, src1, src2, 1)
+        op_class = 'SimdAluOp'
+        code = '''
+            FpDestReg_uqw = FpSrcReg1_uqw | FpSrcReg2_uqw;
+        '''
+
+    class Mand(MediaOp):
+        def __init__(self, dest, src1, src2):
+            super(Mand, self).__init__(dest, src1, src2, 1)
+        op_class = 'SimdAluOp'
+        code = '''
+            FpDestReg_uqw = FpSrcReg1_uqw & FpSrcReg2_uqw;
+        '''
+
+    class Mandn(MediaOp):
+        def __init__(self, dest, src1, src2):
+            super(Mandn, self).__init__(dest, src1, src2, 1)
+        op_class = 'SimdAluOp'
+        code = '''
+            FpDestReg_uqw = ~FpSrcReg1_uqw & FpSrcReg2_uqw;
+        '''
+
+    class Mminf(MediaOp):
+        op_class = 'SimdFloatCmpOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            assert(srcSize == 4 || srcSize == 8);
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                double arg1, arg2;
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+
+                if (size == 4) {
+                    floatInt fi;
+                    fi.i = arg1Bits;
+                    arg1 = fi.f;
+                    fi.i = arg2Bits;
+                    arg2 = fi.f;
+                } else {
+                    doubleInt di;
+                    di.i = arg1Bits;
+                    arg1 = di.d;
+                    di.i = arg2Bits;
+                    arg2 = di.d;
+                }
+
+                if (arg1 < arg2) {
+                    result = insertBits(result, hiIndex, loIndex, arg1Bits);
+                } else {
+                    result = insertBits(result, hiIndex, loIndex, arg2Bits);
+                }
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mmaxf(MediaOp):
+        op_class = 'SimdFloatCmpOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            assert(srcSize == 4 || srcSize == 8);
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                double arg1, arg2;
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+
+                if (size == 4) {
+                    floatInt fi;
+                    fi.i = arg1Bits;
+                    arg1 = fi.f;
+                    fi.i = arg2Bits;
+                    arg2 = fi.f;
+                } else {
+                    doubleInt di;
+                    di.i = arg1Bits;
+                    arg1 = di.d;
+                    di.i = arg2Bits;
+                    arg2 = di.d;
+                }
+
+                if (arg1 > arg2) {
+                    result = insertBits(result, hiIndex, loIndex, arg1Bits);
+                } else {
+                    result = insertBits(result, hiIndex, loIndex, arg2Bits);
+                }
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mmini(MediaOp):
+        op_class = 'SimdCmpOp'
+        code = '''
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                int64_t arg1 = arg1Bits |
+                    (0 - (arg1Bits & (ULL(1) << (sizeBits - 1))));
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                int64_t arg2 = arg2Bits |
+                    (0 - (arg2Bits & (ULL(1) << (sizeBits - 1))));
+                uint64_t resBits;
+
+                if (signedOp()) {
+                    if (arg1 < arg2) {
+                        resBits = arg1Bits;
+                    } else {
+                        resBits = arg2Bits;
+                    }
+                } else {
+                    if (arg1Bits < arg2Bits) {
+                        resBits = arg1Bits;
+                    } else {
+                        resBits = arg2Bits;
+                    }
+                }
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mmaxi(MediaOp):
+        op_class = 'SimdCmpOp'
+        code = '''
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                int64_t arg1 = arg1Bits |
+                    (0 - (arg1Bits & (ULL(1) << (sizeBits - 1))));
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                int64_t arg2 = arg2Bits |
+                    (0 - (arg2Bits & (ULL(1) << (sizeBits - 1))));
+                uint64_t resBits;
+
+                if (signedOp()) {
+                    if (arg1 > arg2) {
+                        resBits = arg1Bits;
+                    } else {
+                        resBits = arg2Bits;
+                    }
+                } else {
+                    if (arg1Bits > arg2Bits) {
+                        resBits = arg1Bits;
+                    } else {
+                        resBits = arg2Bits;
+                    }
+                }
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Msqrt(MediaOp):
+        op_class = 'SimdFloatSqrtOp'
+        def __init__(self, dest, src, \
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Msqrt, self).__init__(dest, src,\
+                    "InstRegIndex(0)", size, destSize, srcSize, ext)
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            assert(srcSize == 4 || srcSize == 8);
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t argBits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+
+                if (size == 4) {
+                    floatInt fi;
+                    fi.i = argBits;
+                    fi.f = sqrt(fi.f);
+                    argBits = fi.i;
+                } else {
+                    doubleInt di;
+                    di.i = argBits;
+                    di.d = sqrt(di.d);
+                    argBits = di.i;
+                }
+                result = insertBits(result, hiIndex, loIndex, argBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    # compute approximate reciprocal --- single-precision only
+    class Mrcp(MediaOp):
+        def __init__(self, dest, src, \
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Mrcp, self).__init__(dest, src,\
+                    "InstRegIndex(0)", size, destSize, srcSize, ext)
+        op_class = 'SimdFloatAluOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+
+            assert(srcSize == 4);  // ISA defines single-precision only
+            assert(srcSize == destSize);
+            const int size = 4;
+            const int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t argBits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+
+                floatInt fi;
+                fi.i = argBits;
+                // This is more accuracy than HW provides, but oh well
+                fi.f = 1.0 / fi.f;
+                argBits = fi.i;
+                result = insertBits(result, hiIndex, loIndex, argBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Maddf(MediaOp):
+        op_class = 'SimdFloatAddOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            assert(srcSize == 4 || srcSize == 8);
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                uint64_t resBits;
+
+                if (size == 4) {
+                    floatInt arg1, arg2, res;
+                    arg1.i = arg1Bits;
+                    arg2.i = arg2Bits;
+                    res.f = arg1.f + arg2.f;
+                    resBits = res.i;
+                } else {
+                    doubleInt arg1, arg2, res;
+                    arg1.i = arg1Bits;
+                    arg2.i = arg2Bits;
+                    res.d = arg1.d + arg2.d;
+                    resBits = res.i;
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Msubf(MediaOp):
+        op_class = 'SimdFloatAddOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            assert(srcSize == 4 || srcSize == 8);
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                uint64_t resBits;
+
+                if (size == 4) {
+                    floatInt arg1, arg2, res;
+                    arg1.i = arg1Bits;
+                    arg2.i = arg2Bits;
+                    res.f = arg1.f - arg2.f;
+                    resBits = res.i;
+                } else {
+                    doubleInt arg1, arg2, res;
+                    arg1.i = arg1Bits;
+                    arg2.i = arg2Bits;
+                    res.d = arg1.d - arg2.d;
+                    resBits = res.i;
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mmulf(MediaOp):
+        op_class = 'SimdFloatMultOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            assert(srcSize == 4 || srcSize == 8);
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                uint64_t resBits;
+
+                if (size == 4) {
+                    floatInt arg1, arg2, res;
+                    arg1.i = arg1Bits;
+                    arg2.i = arg2Bits;
+                    res.f = arg1.f * arg2.f;
+                    resBits = res.i;
+                } else {
+                    doubleInt arg1, arg2, res;
+                    arg1.i = arg1Bits;
+                    arg2.i = arg2Bits;
+                    res.d = arg1.d * arg2.d;
+                    resBits = res.i;
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mdivf(MediaOp):
+        op_class = 'SimdFloatDivOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            assert(srcSize == 4 || srcSize == 8);
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                uint64_t resBits;
+
+                if (size == 4) {
+                    floatInt arg1, arg2, res;
+                    arg1.i = arg1Bits;
+                    arg2.i = arg2Bits;
+                    res.f = arg1.f / arg2.f;
+                    resBits = res.i;
+                } else {
+                    doubleInt arg1, arg2, res;
+                    arg1.i = arg1Bits;
+                    arg2.i = arg2Bits;
+                    res.d = arg1.d / arg2.d;
+                    resBits = res.i;
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Maddi(MediaOp):
+        op_class = 'SimdAddOp'
+        code = '''
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                uint64_t resBits = arg1Bits + arg2Bits;
+
+                if (ext & 0x2) {
+                    if (signedOp()) {
+                        int arg1Sign = bits(arg1Bits, sizeBits - 1);
+                        int arg2Sign = bits(arg2Bits, sizeBits - 1);
+                        int resSign = bits(resBits, sizeBits - 1);
+                        if ((arg1Sign == arg2Sign) && (arg1Sign != resSign)) {
+                            if (resSign == 0)
+                                resBits = (ULL(1) << (sizeBits - 1));
+                            else
+                                resBits = mask(sizeBits - 1);
+                        }
+                    } else {
+                        if (findCarry(sizeBits, resBits, arg1Bits, arg2Bits))
+                            resBits = mask(sizeBits);
+                    }
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Msubi(MediaOp):
+        op_class = 'SimdAddOp'
+        code = '''
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                uint64_t resBits = arg1Bits - arg2Bits;
+
+                if (ext & 0x2) {
+                    if (signedOp()) {
+                        int arg1Sign = bits(arg1Bits, sizeBits - 1);
+                        int arg2Sign = !bits(arg2Bits, sizeBits - 1);
+                        int resSign = bits(resBits, sizeBits - 1);
+                        if ((arg1Sign == arg2Sign) && (arg1Sign != resSign)) {
+                            if (resSign == 0)
+                                resBits = (ULL(1) << (sizeBits - 1));
+                            else
+                                resBits = mask(sizeBits - 1);
+                        }
+                    } else {
+                        if (arg2Bits > arg1Bits) {
+                            resBits = 0;
+                        } else if (!findCarry(sizeBits, resBits,
+                                             arg1Bits, ~arg2Bits)) {
+                            resBits = mask(sizeBits);
+                        }
+                    }
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mmuli(MediaOp):
+        op_class = 'SimdMultOp'
+        code = '''
+            int srcBits = srcSize * 8;
+            int destBits = destSize * 8;
+            assert(destBits <= 64);
+            assert(destSize >= srcSize);
+            int items = numItems(destSize);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int offset = 0;
+                if (ext & 16) {
+                    if (ext & 32)
+                        offset = i * (destBits - srcBits);
+                    else
+                        offset = i * (destBits - srcBits) + srcBits;
+                }
+                int srcHiIndex = (i + 1) * srcBits - 1 + offset;
+                int srcLoIndex = (i + 0) * srcBits + offset;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, srcHiIndex, srcLoIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, srcHiIndex, srcLoIndex);
+                uint64_t resBits;
+
+                if (signedOp()) {
+                    int64_t arg1 = arg1Bits |
+                        (0 - (arg1Bits & (ULL(1) << (srcBits - 1))));
+                    int64_t arg2 = arg2Bits |
+                        (0 - (arg2Bits & (ULL(1) << (srcBits - 1))));
+                    resBits = (uint64_t)(arg1 * arg2);
+                } else {
+                    resBits = arg1Bits * arg2Bits;
+                }
+
+                if (ext & 0x4)
+                    resBits += (ULL(1) << (destBits - 1));
+
+                if (multHi())
+                    resBits >>= destBits;
+
+                int destHiIndex = (i + 1) * destBits - 1;
+                int destLoIndex = (i + 0) * destBits;
+                result = insertBits(result, destHiIndex, destLoIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mavg(MediaOp):
+        op_class = 'SimdAddOp'
+        code = '''
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                uint64_t resBits = (arg1Bits + arg2Bits + 1) / 2;
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Msad(MediaOp):
+        op_class = 'SimdAddOp'
+        code = '''
+            int srcBits = srcSize * 8;
+            int items = sizeof(FloatRegBits) / srcSize;
+
+            uint64_t sum = 0;
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * srcBits - 1;
+                int loIndex = (i + 0) * srcBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                int64_t resBits = arg1Bits - arg2Bits;
+                if (resBits < 0)
+                    resBits = -resBits;
+                sum += resBits;
+            }
+            FpDestReg_uqw = sum & mask(destSize * 8);
+        '''
+
+    class Msrl(MediaOp):
+        op_class = 'SimdShiftOp'
+        code = '''
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t shiftAmt = op2_uqw;
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t resBits;
+                if (shiftAmt >= sizeBits) {
+                    resBits = 0;
+                } else {
+                    resBits = (arg1Bits >> shiftAmt) &
+                        mask(sizeBits - shiftAmt);
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Msra(MediaOp):
+        op_class = 'SimdShiftOp'
+        code = '''
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t shiftAmt = op2_uqw;
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t resBits;
+                if (shiftAmt >= sizeBits) {
+                    if (bits(arg1Bits, sizeBits - 1))
+                        resBits = mask(sizeBits);
+                    else
+                        resBits = 0;
+                } else {
+                    resBits = (arg1Bits >> shiftAmt);
+                    resBits = resBits |
+                        (0 - (resBits & (ULL(1) << (sizeBits - 1 - shiftAmt))));
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Msll(MediaOp):
+        op_class = 'SimdShiftOp'
+        code = '''
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t shiftAmt = op2_uqw;
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t resBits;
+                if (shiftAmt >= sizeBits) {
+                    resBits = 0;
+                } else {
+                    resBits = (arg1Bits << shiftAmt);
+                }
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Cvtf2i(MediaOp):
+        def __init__(self, dest, src, \
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Cvtf2i, self).__init__(dest, src,\
+                    "InstRegIndex(0)", size, destSize, srcSize, ext)
+        op_class = 'SimdFloatCvtOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(destSize == 4 || destSize == 8);
+            assert(srcSize == 4 || srcSize == 8);
+            int srcSizeBits = srcSize * 8;
+            int destSizeBits = destSize * 8;
+            int items;
+            int srcStart = 0;
+            int destStart = 0;
+            if (srcSize == 2 * destSize) {
+                items = numItems(srcSize);
+                if (ext & 0x2)
+                    destStart = destSizeBits * items;
+            } else if (destSize == 2 * srcSize) {
+                items = numItems(destSize);
+                if (ext & 0x2)
+                    srcStart = srcSizeBits * items;
+            } else {
+                items = numItems(destSize);
+            }
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int srcHiIndex = srcStart + (i + 1) * srcSizeBits - 1;
+                int srcLoIndex = srcStart + (i + 0) * srcSizeBits;
+                uint64_t argBits = bits(FpSrcReg1_uqw, srcHiIndex, srcLoIndex);
+                double arg;
+
+                if (srcSize == 4) {
+                    floatInt fi;
+                    fi.i = argBits;
+                    arg = fi.f;
+                } else {
+                    doubleInt di;
+                    di.i = argBits;
+                    arg = di.d;
+                }
+
+                if (ext & 0x4) {
+                    if (arg >= 0)
+                        arg += 0.5;
+                    else
+                        arg -= 0.5;
+                }
+
+                if (destSize == 4) {
+                    int32_t i_arg = (int32_t)arg;
+                    argBits = *((uint32_t*)&i_arg);
+                } else {
+                    int64_t i_arg = (int64_t)arg;
+                    argBits = *((uint64_t*)&i_arg);
+                }
+                int destHiIndex = destStart + (i + 1) * destSizeBits - 1;
+                int destLoIndex = destStart + (i + 0) * destSizeBits;
+                result = insertBits(result, destHiIndex, destLoIndex, argBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Cvti2f(MediaOp):
+        def __init__(self, dest, src, \
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Cvti2f, self).__init__(dest, src,\
+                    "InstRegIndex(0)", size, destSize, srcSize, ext)
+        op_class = 'SimdFloatCvtOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(destSize == 4 || destSize == 8);
+            assert(srcSize == 4 || srcSize == 8);
+            int srcSizeBits = srcSize * 8;
+            int destSizeBits = destSize * 8;
+            int items;
+            int srcStart = 0;
+            int destStart = 0;
+            if (srcSize == 2 * destSize) {
+                items = numItems(srcSize);
+                if (ext & 0x2)
+                    destStart = destSizeBits * items;
+            } else if (destSize == 2 * srcSize) {
+                items = numItems(destSize);
+                if (ext & 0x2)
+                    srcStart = srcSizeBits * items;
+            } else {
+                items = numItems(destSize);
+            }
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int srcHiIndex = srcStart + (i + 1) * srcSizeBits - 1;
+                int srcLoIndex = srcStart + (i + 0) * srcSizeBits;
+                uint64_t argBits = bits(FpSrcReg1_uqw, srcHiIndex, srcLoIndex);
+
+                int64_t sArg = argBits |
+                    (0 - (argBits & (ULL(1) << (srcSizeBits - 1))));
+                double arg = sArg;
+
+                if (destSize == 4) {
+                    floatInt fi;
+                    fi.f = arg;
+                    argBits = fi.i;
+                } else {
+                    doubleInt di;
+                    di.d = arg;
+                    argBits = di.i;
+                }
+                int destHiIndex = destStart + (i + 1) * destSizeBits - 1;
+                int destLoIndex = destStart + (i + 0) * destSizeBits;
+                result = insertBits(result, destHiIndex, destLoIndex, argBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Cvtf2f(MediaOp):
+        def __init__(self, dest, src, \
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Cvtf2f, self).__init__(dest, src,\
+                    "InstRegIndex(0)", size, destSize, srcSize, ext)
+        op_class = 'SimdFloatCvtOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(destSize == 4 || destSize == 8);
+            assert(srcSize == 4 || srcSize == 8);
+            int srcSizeBits = srcSize * 8;
+            int destSizeBits = destSize * 8;
+            int items;
+            int srcStart = 0;
+            int destStart = 0;
+            if (srcSize == 2 * destSize) {
+                items = numItems(srcSize);
+                if (ext & 0x2)
+                    destStart = destSizeBits * items;
+            } else if (destSize == 2 * srcSize) {
+                items = numItems(destSize);
+                if (ext & 0x2)
+                    srcStart = srcSizeBits * items;
+            } else {
+                items = numItems(destSize);
+            }
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int srcHiIndex = srcStart + (i + 1) * srcSizeBits - 1;
+                int srcLoIndex = srcStart + (i + 0) * srcSizeBits;
+                uint64_t argBits = bits(FpSrcReg1_uqw, srcHiIndex, srcLoIndex);
+                double arg;
+
+                if (srcSize == 4) {
+                    floatInt fi;
+                    fi.i = argBits;
+                    arg = fi.f;
+                } else {
+                    doubleInt di;
+                    di.i = argBits;
+                    arg = di.d;
+                }
+                if (destSize == 4) {
+                    floatInt fi;
+                    fi.f = arg;
+                    argBits = fi.i;
+                } else {
+                    doubleInt di;
+                    di.d = arg;
+                    argBits = di.i;
+                }
+                int destHiIndex = destStart + (i + 1) * destSizeBits - 1;
+                int destLoIndex = destStart + (i + 0) * destSizeBits;
+                result = insertBits(result, destHiIndex, destLoIndex, argBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mcmpi2r(MediaOp):
+        op_class = 'SimdCvtOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                int64_t arg1 = arg1Bits |
+                    (0 - (arg1Bits & (ULL(1) << (sizeBits - 1))));
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                int64_t arg2 = arg2Bits |
+                    (0 - (arg2Bits & (ULL(1) << (sizeBits - 1))));
+
+                uint64_t resBits = 0;
+                if (((ext & 0x2) == 0 && arg1 == arg2) ||
+                    ((ext & 0x2) == 0x2 && arg1 > arg2))
+                    resBits = mask(sizeBits);
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mcmpf2r(MediaOp):
+        op_class = 'SimdFloatCvtOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            int size = srcSize;
+            int sizeBits = size * 8;
+            int items = numItems(size);
+            uint64_t result = FpDestReg_uqw;
+
+            for (int i = 0; i < items; i++) {
+                int hiIndex = (i + 1) * sizeBits - 1;
+                int loIndex = (i + 0) * sizeBits;
+                uint64_t arg1Bits = bits(FpSrcReg1_uqw, hiIndex, loIndex);
+                uint64_t arg2Bits = bits(FpSrcReg2_uqw, hiIndex, loIndex);
+                double arg1, arg2;
+
+                if (size == 4) {
+                    floatInt fi;
+                    fi.i = arg1Bits;
+                    arg1 = fi.f;
+                    fi.i = arg2Bits;
+                    arg2 = fi.f;
+                } else {
+                    doubleInt di;
+                    di.i = arg1Bits;
+                    arg1 = di.d;
+                    di.i = arg2Bits;
+                    arg2 = di.d;
+                }
+
+                uint64_t resBits = 0;
+                bool nanop = std::isnan(arg1) || std::isnan(arg2);
+                switch (ext & mask(3)) {
+                  case 0:
+                    if (arg1 == arg2 && !nanop)
+                        resBits = mask(sizeBits);
+                    break;
+                  case 1:
+                    if (arg1 < arg2 && !nanop)
+                        resBits = mask(sizeBits);
+                    break;
+                  case 2:
+                    if (arg1 <= arg2 && !nanop)
+                        resBits = mask(sizeBits);
+                    break;
+                  case 3:
+                    if (nanop)
+                        resBits = mask(sizeBits);
+                    break;
+                  case 4:
+                    if (arg1 != arg2 || nanop)
+                        resBits = mask(sizeBits);
+                    break;
+                  case 5:
+                    if (!(arg1 < arg2) || nanop)
+                        resBits = mask(sizeBits);
+                    break;
+                  case 6:
+                    if (!(arg1 <= arg2) || nanop)
+                        resBits = mask(sizeBits);
+                    break;
+                  case 7:
+                    if (!nanop)
+                        resBits = mask(sizeBits);
+                    break;
+                };
+
+                result = insertBits(result, hiIndex, loIndex, resBits);
+            }
+            FpDestReg_uqw = result;
+        '''
+
+    class Mcmpf2rf(MediaOp):
+        def __init__(self, src1, src2,\
+                size = None, destSize = None, srcSize = None, ext = None):
+            super(Mcmpf2rf, self).__init__("InstRegIndex(0)", src1,\
+                    src2, size, destSize, srcSize, ext)
+        op_class = 'SimdFloatCvtOp'
+        code = '''
+            union floatInt
+            {
+                float f;
+                uint32_t i;
+            };
+            union doubleInt
+            {
+                double d;
+                uint64_t i;
+            };
+
+            assert(srcSize == destSize);
+            assert(srcSize == 4 || srcSize == 8);
+            int size = srcSize;
+            int sizeBits = size * 8;
+
+            double arg1, arg2;
+            uint64_t arg1Bits = bits(FpSrcReg1_uqw, sizeBits - 1, 0);
+            uint64_t arg2Bits = bits(FpSrcReg2_uqw, sizeBits - 1, 0);
+            if (size == 4) {
+                floatInt fi;
+                fi.i = arg1Bits;
+                arg1 = fi.f;
+                fi.i = arg2Bits;
+                arg2 = fi.f;
+            } else {
+                doubleInt di;
+                di.i = arg1Bits;
+                arg1 = di.d;
+                di.i = arg2Bits;
+                arg2 = di.d;
+            }
+
+            //               ZF PF CF
+            // Unordered      1  1  1
+            // Greater than   0  0  0
+            // Less than      0  0  1
+            // Equal          1  0  0
+            //           OF = SF = AF = 0
+            ccFlagBits = ccFlagBits & ~(SFBit | AFBit | ZFBit | PFBit);
+            cfofBits   = cfofBits   & ~(OFBit | CFBit);
+
+            if (std::isnan(arg1) || std::isnan(arg2)) {
+                ccFlagBits = ccFlagBits | (ZFBit | PFBit);
+                cfofBits = cfofBits | CFBit;
+            }
+            else if(arg1 < arg2)
+                cfofBits = cfofBits | CFBit;
+            else if(arg1 == arg2)
+                ccFlagBits = ccFlagBits | ZFBit;
+        '''
+
+    class Emms(MediaOp):
+        op_class = 'FloatMiscOp'
+        def __init__(self):
+            super(Emms, self).__init__('InstRegIndex(MISCREG_FTW)',
+                    'InstRegIndex(0)', 'InstRegIndex(0)', 2)
+        code = 'FTW = 0xFFFF;'
+}};

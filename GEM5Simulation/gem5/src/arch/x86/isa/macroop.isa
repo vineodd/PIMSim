@@ -1,0 +1,349 @@
+// -*- mode:c++ -*-
+
+// Copyright (c) 2007 The Hewlett-Packard Development Company
+// All rights reserved.
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+//////////////////////////////////////////////////////////////////////////////
+//
+//  Architecture independent
+//
+
+// Execute method for macroops.
+def template MacroExecPanic {{
+        Fault execute(ExecContext *, Trace::InstRecord *) const
+        {
+            panic("Tried to execute macroop directly!");
+            return NoFault;
+        }
+}};
+
+output header {{
+
+        // Base class for combinationally generated macroops
+        class Macroop : public X86ISA::MacroopBase
+        {
+          public:
+            Macroop(const char *mnem, ExtMachInst _machInst,
+                    uint32_t _numMicroops, X86ISA::EmulEnv _env)
+                        : MacroopBase(mnem, _machInst, _numMicroops, _env)
+            {}
+
+            Fault
+            execute(ExecContext *, Trace::InstRecord *) const
+            {
+                panic("Tried to execute macroop directly!");
+            }
+        };
+}};
+
+//////////////////////////////////////////////////////////////////////////////
+//
+//  X86 specific
+//
+//////////////////////////////////////////////////////////////////////////////
+
+// Basic instruction class declaration template.
+def template MacroDeclare {{
+        namespace X86Macroop
+        {
+            /**
+             * Static instruction class for "%(mnemonic)s".
+             */
+            class %(class_name)s : public %(base_class)s
+            {
+              private:
+                %(declareLabels)s
+              public:
+                // Constructor.
+                %(class_name)s(ExtMachInst machInst, X86ISA::EmulEnv _env);
+
+                std::string
+                generateDisassembly(Addr pc, const SymbolTable *symtab) const;
+            };
+        }
+}};
+
+def template MacroDisassembly {{
+    std::string
+    X86Macroop::%(class_name)s::generateDisassembly(Addr pc,
+            const SymbolTable *symtab) const
+    {
+        std::stringstream out;
+        out << mnemonic << "\t";
+
+        int regSize = %(regSize)s;
+        %(disassembly)s
+        // Shut up gcc.
+        regSize = regSize;
+        return out.str();
+    }
+}};
+
+// Basic instruction class constructor template.
+def template MacroConstructor {{
+        X86Macroop::%(class_name)s::%(class_name)s(
+                ExtMachInst machInst, EmulEnv _env)
+            : %(base_class)s("%(mnemonic)s", machInst, %(num_microops)s, _env)
+        {
+            %(adjust_env)s;
+            %(adjust_imm)s;
+            %(adjust_disp)s;
+            %(init_env)s;
+            %(constructor)s;
+            const char *macrocodeBlock = "%(class_name)s";
+            //alloc_microops is the code that sets up the microops
+            //array in the parent class.
+            %(alloc_microops)s;
+        }
+}};
+
+let {{
+    from micro_asm import Combinational_Macroop, Rom_Macroop
+    class X86Macroop(Combinational_Macroop):
+        def add_microop(self, mnemonic, microop):
+            microop.mnemonic = mnemonic
+            microop.micropc = len(self.microops)
+            self.microops.append(microop)
+        def setAdjustEnv(self, val):
+            self.adjust_env = val
+        def adjustImm(self, val):
+            self.adjust_imm += val
+        def adjustDisp(self, val):
+            self.adjust_disp += val
+        def serializeBefore(self):
+            self.serialize_before = True
+        def serializeAfter(self):
+            self.serialize_after = True
+
+        def function_call(self):
+            self.function_call = True
+        def function_return(self):
+            self.function_return = True
+
+        def __init__(self, name):
+            super(X86Macroop, self).__init__(name)
+            self.directives = {
+                "adjust_env" : self.setAdjustEnv,
+                "adjust_imm" : self.adjustImm,
+                "adjust_disp" : self.adjustDisp,
+                "serialize_before" : self.serializeBefore,
+                "serialize_after" : self.serializeAfter,
+                "function_call" : self.function_call,
+                "function_return" : self.function_return
+            }
+            self.declared = False
+            self.adjust_env = ""
+            self.init_env = ""
+            self.adjust_imm = '''
+                uint64_t adjustedImm = IMMEDIATE;
+                //This is to pacify gcc in case the immediate isn't used.
+                adjustedImm = adjustedImm;
+            '''
+            self.adjust_disp = '''
+                uint64_t adjustedDisp = DISPLACEMENT;
+                //This is to pacify gcc in case the displacement isn't used.
+                adjustedDisp = adjustedDisp;
+            '''
+            self.serialize_before = False
+            self.serialize_after = False
+            self.function_call = False
+            self.function_return = False
+
+        def getAllocator(self, env):
+            return "new X86Macroop::%s(machInst, %s)" % \
+                    (self.name, env.getAllocator())
+        def getMnemonic(self):
+            mnemonic = self.name.lower()
+            mnemonic = re.match(r'[^_]*', mnemonic).group(0)
+            return mnemonic
+        def getDeclaration(self):
+            #FIXME This first parameter should be the mnemonic. I need to
+            #write some code which pulls that out
+            declareLabels = ""
+            for (label, microop) in self.labels.items():
+                declareLabels += "const static uint64_t label_%s = %d;\n" \
+                                  % (label, microop.micropc)
+            iop = InstObjParams(self.getMnemonic(), self.name, "Macroop",
+                    {"code" : "",
+                     "declareLabels" : declareLabels
+                    })
+            return MacroDeclare.subst(iop);
+        def getDefinition(self, env):
+            #FIXME This first parameter should be the mnemonic. I need to
+            #write some code which pulls that out
+            numMicroops = len(self.microops)
+            allocMicroops = ''
+            micropc = 0
+            for op in self.microops:
+                flags = ["IsMicroop"]
+                if micropc == 0:
+                    flags.append("IsFirstMicroop")
+
+                    if self.serialize_before:
+                        flags.append("IsSerializing")
+                        flags.append("IsSerializeBefore")
+
+                if micropc == numMicroops - 1:
+                    flags.append("IsLastMicroop")
+
+                    if self.serialize_after:
+                        flags.append("IsSerializing")
+                        flags.append("IsSerializeAfter")
+
+                    if self.function_call:
+                        flags.append("IsCall")
+                    if self.function_return:
+                        flags.append("IsReturn")
+                else:
+                    flags.append("IsDelayedCommit")
+
+                allocMicroops += \
+                    "microops[%d] = %s;\n" % \
+                    (micropc, op.getAllocator(flags))
+                micropc += 1
+            if env.useStackSize:
+                useStackSize = "true"
+            else:
+                useStackSize = "false"
+            if env.memoryInst:
+                memoryInst = "true"
+            else:
+                memoryInst = "false"
+            regSize = '''(%s || (env.base == INTREG_RSP && %s) ?
+                         env.stackSize :
+                         env.dataSize)''' % (useStackSize, memoryInst)
+            iop = InstObjParams(self.getMnemonic(), self.name, "Macroop",
+                                {"code" : "", "num_microops" : numMicroops,
+                                 "alloc_microops" : allocMicroops,
+                                 "adjust_env" : self.adjust_env,
+                                 "adjust_imm" : self.adjust_imm,
+                                 "adjust_disp" : self.adjust_disp,
+                                 "disassembly" : env.disassembly,
+                                 "regSize" : regSize,
+                                 "init_env" : self.initEnv})
+            return MacroConstructor.subst(iop) + \
+                   MacroDisassembly.subst(iop);
+}};
+
+let {{
+    class EmulEnv(object):
+        def __init__(self):
+            self.reg = "0"
+            self.regUsed = False
+            self.regm = "0"
+            self.regmUsed = False
+            self.seg = "SEGMENT_REG_DS"
+            self.size = None
+            self.addressSize = "ADDRSIZE"
+            self.dataSize = "OPSIZE"
+            self.stackSize = "STACKSIZE"
+            self.doModRM = False
+            self.disassembly = ""
+            self.firstArgument = True
+            self.useStackSize = False
+            self.memoryInst = False
+
+        def addToDisassembly(self, code):
+            if not self.firstArgument:
+                self.disassembly += "out << \", \";\n"
+            self.firstArgument = False
+            self.disassembly += code
+
+        def getAllocator(self):
+            if self.size == 'b':
+                self.dataSize = 1
+            elif self.size == 'd':
+                self.dataSize = 4
+            #This is for "double plus" which is normally a double word unless
+            #the REX W bit is set, in which case it's a quad word. It's used
+            #for some SSE instructions.
+            elif self.size == 'dp':
+                self.dataSize = "(REX_W ? 8 : 4)"
+            elif self.size == 'q':
+                self.dataSize = 8
+            elif self.size == 'v':
+                self.dataSize = "OPSIZE"
+            elif self.size == 'w':
+                self.dataSize = 2
+            elif self.size == 'z':
+                self.dataSize = "((OPSIZE == 8) ? 4 : OPSIZE)"
+            elif self.size:
+                raise Exception, "Unrecognized size type %s!" % self.size
+            return '''EmulEnv(%(reg)s,
+                              %(regm)s,
+                              %(dataSize)s,
+                              %(addressSize)s,
+                              %(stackSize)s)''' % \
+                self.__dict__
+
+        def addReg(self, reg):
+            if not self.regUsed:
+                self.reg = reg
+                self.regUsed = True
+            elif not self.regmUsed:
+                self.regm = reg
+                self.regmUsed = True
+            else:
+                raise Exception, "EmulEnv is out of register specialization spots."
+        def setSize(self, size):
+            if not self.size:
+                self.size = size
+            else:
+                if self.size != size:
+                    raise Exception, "Conflicting register sizes %s and %s!" %\
+                        (self.size, size)
+}};
+
+let {{
+    doModRMString = "env.doModRM(machInst);\n"
+    noModRMString = "env.setSeg(machInst);\n"
+    def genMacroop(Name, env):
+        blocks = OutputBlocks()
+        if not macroopDict.has_key(Name):
+            raise Exception, "Unrecognized instruction: %s" % Name
+        macroop = macroopDict[Name]
+        if not macroop.declared:
+            if env.doModRM:
+                macroop.initEnv = doModRMString
+            else:
+                macroop.initEnv = noModRMString
+            blocks.header_output = macroop.getDeclaration()
+            blocks.decoder_output = macroop.getDefinition(env)
+            macroop.declared = True
+        blocks.decode_block = "return %s;\n" % macroop.getAllocator(env)
+        return blocks
+}};

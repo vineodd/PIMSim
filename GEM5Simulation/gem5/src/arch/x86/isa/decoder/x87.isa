@@ -1,0 +1,376 @@
+// Copyright (c) 2007 The Hewlett-Packard Development Company
+// Copyright (c) 2012-13 Mark D. Hill and David A. Wood
+// Copyright (c) 2015 Advanced Micro Devices, Inc.
+//
+// All rights reserved.
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+//          Nilay Vaish
+//          Steve Reinhardt
+
+format WarnUnimpl {
+    0x1B: decode OPCODE_OP_BOTTOM3 {
+        0x0: decode MODRM_REG {
+            0x0: decode MODRM_MOD {
+                0x3: Inst::FADD1(Eq);
+                // 32-bit memory operand
+                default: Inst::FADD1(Md);
+            }
+            0x1: decode MODRM_MOD {
+                0x3: Inst::FMUL1(Eq);
+                default: Inst::FMUL1(Md);
+            }
+            0x2: fcom();
+            0x3: fcomp();
+            0x4: decode MODRM_MOD {
+                0x3: Inst::FSUB1(Eq);
+                default: Inst::FSUB1(Md);
+            }
+            0x5: fsubr();
+            0x6: decode MODRM_MOD {
+                0x3: Inst::FDIV1(Eq);
+                default: Inst::FDIV1(Md);
+            }
+            0x7: fdivr();
+        }
+        0x1: decode MODRM_REG {
+            0x0: decode MODRM_MOD {
+                0x3: Inst::FLD(Eq);
+                // 32-bit load
+                default: Inst::FLD(Md);
+            }
+            0x1: decode MODRM_MOD {
+                0x3: Inst::FXCH(Eq);
+                default: Inst::UD2();
+            }
+            0x2: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x0: fnop();
+                    default: Inst::UD2();
+                }
+                default: Inst::FST(Ed);
+            }
+            0x3: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: Inst::FSTP(Ed);
+            }
+            0x4: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x0: Inst::FCHS();
+                    0x1: Inst::FABS();
+                    0x4: ftst();
+                    0x5: fxam();
+                    default: Inst::UD2();
+                }
+                default: Inst::FLDENV(M);
+            }
+            0x5: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x0: Inst::FLD1();
+                    0x1: Inst::FLDL2T();
+                    0x2: Inst::FLDL2E();
+                    0x3: Inst::FLDPI();
+                    0x4: Inst::FLDLG2();
+                    0x5: Inst::FLDLN2();
+                    0x6: Inst::FLDZ();
+                }
+                default: Inst::FLDCW(Mw);
+            }
+            0x6: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x0: f2xm1();
+                    0x1: Inst::FYL2X();
+                    0x2: Inst::FPTAN();
+                    0x3: fpatan();
+                    0x4: fxtract();
+                    0x5: Inst::FPREM1();
+                    0x6: fdecstp();
+                    0x7: fincstp();
+                }
+                default: Inst::FNSTENV(M);
+            }
+            0x7: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x0: Inst::FPREM();
+                    0x1: fyl2xp1();
+                    0x2: fsqrt();
+                    0x3: Inst::FSINCOS();
+                    0x4: frndint();
+                    0x5: fscale();
+                    0x6: Inst::FSIN();
+                    0x7: Inst::FCOS();
+                }
+                default: Inst::FNSTCW(Mw);
+            }
+        }
+        //0x2: esc2();
+        0x2: decode MODRM_REG {
+            0x0: decode MODRM_MOD {
+                0x3: fcmovb();
+                default: fiadd();
+            }
+            0x1: decode MODRM_MOD {
+                0x3: fcmove();
+                default: fimul();
+            }
+            0x2: decode MODRM_MOD {
+                0x3: fcmovbe();
+                default: ficom();
+            }
+            0x3: decode MODRM_MOD {
+                0x3: fcmovu();
+                default: ficomp();
+            }
+            0x4: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fisub();
+            }
+            0x5: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x1: fucompp();
+                    default: Inst::UD2();
+                }
+                default: fisubr();
+            }
+            0x6: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fidiv();
+            }
+            0x7: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fidivr();
+            }
+        }
+        //0x3: esc3();
+        0x3: decode MODRM_REG {
+            0x0: decode MODRM_MOD {
+                0x3: fcmovnb();
+                default: Inst::FILD(Md); // 32-bit int
+            }
+            0x1: decode MODRM_MOD {
+                0x3: fcmovne();
+                default: fisttp();
+            }
+            0x2: decode MODRM_MOD {
+                0x3: fcmovnbe();
+                default: fist();
+            }
+            0x3: decode MODRM_MOD {
+                0x3: fcmovnu();
+                default: fistp();
+            }
+            0x4: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x2: fnclex();
+                    0x3: fninit();
+                    default: Inst::UD2();
+                }
+                default: Inst::UD2();
+            }
+            0x5: decode MODRM_MOD {
+                // 'R' insists on having a size qualifier, so I picked 'q',
+                // but I don't think it has any effect
+                0x3: Inst::FUCOMI(Rq);
+                // 80-bit load
+                default: Inst::FLD80(M);
+            }
+            0x6: decode MODRM_MOD {
+                0x3: fcomi();
+                default: Inst::UD2();
+            }
+            0x7: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: Inst::FST80P(M);
+            }
+        }
+        //0x4: esc4();
+        0x4: decode MODRM_REG {
+            0x0: decode MODRM_MOD {
+                0x3: Inst::FADD2(Eq);
+                default: Inst::FADD2(Mq);
+            }
+            0x1: decode MODRM_MOD {
+                0x3: Inst::FMUL2(Eq);
+                default: Inst::FMUL2(Mq);
+            }
+            0x2: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fcom();
+            }
+            0x3: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fcomp();
+            }
+            0x4: decode MODRM_MOD {
+                0x3: fsubr();
+                default: Inst::FSUB2(Mq);
+            }
+            0x5: decode MODRM_MOD {
+                0x3: Inst::FSUB2(Eq);
+                default: fsubr();
+            }
+            0x6: decode MODRM_MOD {
+                0x3: fdivr();
+                default: Inst::FDIV2(Mq);
+            }
+            0x7: decode MODRM_MOD {
+                0x3: Inst::FDIV2(Eq);
+                default: fdivr();
+            }
+        }
+        //0x5: esc5();
+        0x5: decode MODRM_REG {
+            0x0: decode MODRM_MOD {
+                0x3: ffree();
+                // 64-bit load
+                default: Inst::FLD(Mq);
+            }
+            0x1: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fisttp();
+            }
+            0x2: decode MODRM_MOD {
+                0x3: Inst::FST(Eq);
+                default: Inst::FST(Mq);
+            }
+            0x3: decode MODRM_MOD {
+                0x3: Inst::FSTP(Eq);
+                default: Inst::FSTP(Mq);
+            }
+            0x4: decode MODRM_MOD {
+                0x3: fucom();
+                default: frstor();
+            }
+            0x5: decode MODRM_MOD {
+                0x3: fucomp();
+                default: Inst::UD2();
+            }
+            0x6: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fnsave();
+            }
+            0x7: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: Inst::FNSTSW(Mw);
+            }
+        }
+        //0x6: esc6();
+        0x6: decode MODRM_REG {
+            0x0: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x1: Inst::FADDP();
+                    default: Inst::FADDP(Eq);
+                }
+                default: fiadd();
+            }
+            0x1: decode MODRM_MOD {
+                0x3: Inst::FMULP(Eq);
+                default: fimul();
+            }
+            0x2: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: ficom();
+            }
+            0x3: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x1: fcompp();
+                    default: Inst::UD2();
+                }
+                default: ficomp();
+            }
+            0x4: decode MODRM_MOD {
+                0x3: fsubrp();
+                default: fisub();
+            }
+            0x5: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x1: Inst::FSUBP();
+                    default: Inst::FSUBP(Eq);
+                }
+                default: fisubr();
+            }
+            0x6: decode MODRM_MOD {
+                0x3: fdivrp();
+                default: fidiv();
+            }
+            0x7: decode MODRM_MOD {
+                0x3: Inst::FDIVP(Eq);
+                default: fidivr();
+            }
+        }
+        //0x7: esc7();
+        0x7: decode MODRM_REG {
+            0x0: decode MODRM_MOD {
+                // The ffreep instruction isn't entirely real. It should work
+                // the same as ffree but then also pop the register stack.
+                0x3: ffreep();
+                default: Inst::FILD(Mw); // 16-bit int
+            }
+            0x1: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fisttp();
+            }
+            0x2: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fist();
+            }
+            0x3: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fistp();
+            }
+            0x4: decode MODRM_MOD {
+                0x3: decode MODRM_RM {
+                    0x0: Inst::FNSTSW(rAw);
+                    default: Inst::UD2();
+                }
+                default: fbld();
+            }
+            0x5: decode MODRM_MOD {
+                // 'R' insists on having a size qualifier, so I picked 'q',
+                // but I don't think it has any effect
+                0x3: Inst::FUCOMIP(Rq);
+                default: Inst::FILD(Mq); // 64-bit int
+            }
+            0x6: decode MODRM_MOD {
+                0x3: fcomip();
+                default: fbstp();
+            }
+            0x7: decode MODRM_MOD {
+                0x3: Inst::UD2();
+                default: fistp();
+            }
+        }
+    }
+}

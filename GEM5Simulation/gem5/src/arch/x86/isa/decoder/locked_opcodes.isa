@@ -1,0 +1,173 @@
+// Copyright (c) 2009 The Regents of The University of Michigan
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+////////////////////////////////////////////////////////////////////
+//
+// Decode opcodes with the lock prefix. Opcodes which shouldn't have that
+// prefix should effectively decode to UD2.
+//
+
+// All the memory references in these instructions happen through modrm bytes.
+// We therefore only need to make sure the modrm byte encodes a memory
+// reference to make sure these are the memory forms of these instructions.
+0x1: decode MODRM_MOD {
+    format Inst {
+        0x3: UD2();
+        default: decode OPCODE_TYPE {
+            'X86ISA::OneByteOpcode': decode OPCODE_OP_TOP5 {
+                0x00: decode OPCODE_OP_BOTTOM3 {
+                    default: MultiInst::ADD_LOCKED(OPCODE_OP_BOTTOM3,
+                                            [Mb,Gb], [Mv,Gv]);
+                }
+                0x01: decode OPCODE_OP_BOTTOM3 {
+                    default: MultiInst::OR_LOCKED(OPCODE_OP_BOTTOM3,
+                                           [Mb,Gb], [Mv,Gv]);
+                }
+                0x02: decode OPCODE_OP_BOTTOM3 {
+                    default: MultiInst::ADC_LOCKED(OPCODE_OP_BOTTOM3,
+                                            [Mb,Gb], [Mv,Gv]);
+                }
+                0x03: decode OPCODE_OP_BOTTOM3 {
+                    default: MultiInst::SBB_LOCKED(OPCODE_OP_BOTTOM3,
+                                            [Mb,Gb], [Mv,Gv]);
+                }
+                0x04: decode OPCODE_OP_BOTTOM3 {
+                    default: MultiInst::AND_LOCKED(OPCODE_OP_BOTTOM3,
+                                            [Mb,Gb], [Mv,Gv]);
+                }
+                0x05: decode OPCODE_OP_BOTTOM3 {
+                    default: MultiInst::SUB_LOCKED(OPCODE_OP_BOTTOM3,
+                                            [Mb,Gb], [Mv,Gv]);
+                }
+                0x06: decode OPCODE_OP_BOTTOM3 {
+                    default: MultiInst::XOR_LOCKED(OPCODE_OP_BOTTOM3,
+                                            [Mb,Gb], [Mv,Gv]);
+                }
+                0x10: decode OPCODE_OP_BOTTOM3 {
+                    0x0: decode MODRM_REG {
+                        0x0: ADD_LOCKED(Mb,Ib);
+                        0x1: OR_LOCKED(Mb,Ib);
+                        0x2: ADC_LOCKED(Mb,Ib);
+                        0x3: SBB_LOCKED(Mb,Ib);
+                        0x4: AND_LOCKED(Mb,Ib);
+                        0x5: SUB_LOCKED(Mb,Ib);
+                        0x6: XOR_LOCKED(Mb,Ib);
+                    }
+                    0x1: decode MODRM_REG {
+                        0x0: ADD_LOCKED(Mv,Iz);
+                        0x1: OR_LOCKED(Mv,Iz);
+                        0x2: ADC_LOCKED(Mv,Iz);
+                        0x3: SBB_LOCKED(Mv,Iz);
+                        0x4: AND_LOCKED(Mv,Iz);
+                        0x5: SUB_LOCKED(Mv,Iz);
+                        0x6: XOR_LOCKED(Mv,Iz);
+                    }
+                    0x2: decode MODE_SUBMODE {
+                        0x0: UD2();
+                        default: decode MODRM_REG {
+                            0x0: ADD_LOCKED(Mb,Ib);
+                            0x1: OR_LOCKED(Mb,Ib);
+                            0x2: ADC_LOCKED(Mb,Ib);
+                            0x3: SBB_LOCKED(Mb,Ib);
+                            0x4: AND_LOCKED(Mb,Ib);
+                            0x5: SUB_LOCKED(Mb,Ib);
+                            0x6: XOR_LOCKED(Mb,Ib);
+                        }
+                    }
+                    //0x3: group1_Ev_Ib();
+                    0x3: decode MODRM_REG {
+                        0x0: ADD_LOCKED(Mv,Ib);
+                        0x1: OR_LOCKED(Mv,Ib);
+                        0x2: ADC_LOCKED(Mv,Ib);
+                        0x3: SBB_LOCKED(Mv,Ib);
+                        0x4: AND_LOCKED(Mv,Ib);
+                        0x5: SUB_LOCKED(Mv,Ib);
+                        0x6: XOR_LOCKED(Mv,Ib);
+                    }
+                    0x6: XCHG_LOCKED(Mb,Gb);
+                    0x7: XCHG_LOCKED(Mv,Gv);
+                }
+                0x1E: decode OPCODE_OP_BOTTOM3 {
+                    //0x6: group3_Eb();
+                    0x6: decode MODRM_REG {
+                        0x2: NOT_LOCKED(Mb);
+                        0x3: NEG_LOCKED(Mb);
+                    }
+                    //0x7: group3_Ev();
+                    0x7: decode MODRM_REG {
+                        0x2: NOT_LOCKED(Mv);
+                        0x3: NEG_LOCKED(Mv);
+                    }
+                }
+                0x1F: decode OPCODE_OP_BOTTOM3 {
+                    0x6: decode MODRM_REG {
+                        0x0: INC_LOCKED(Mb);
+                        0x1: DEC_LOCKED(Mb);
+                        default: UD2();
+                    }
+                    //0x7: group5();
+                    0x7: decode MODRM_REG {
+                        0x0: INC_LOCKED(Mv);
+                        0x1: DEC_LOCKED(Mv);
+                    }
+                }
+            }
+            'X86ISA::TwoByteOpcode': decode OPCODE_OP_TOP5 {
+                0x04: decode OPCODE_OP_BOTTOM3 {
+                    0x0: WarnUnimpl::mov_Rd_CR8D();
+                    0x2: WarnUnimpl::mov_CR8D_Rd();
+                }
+                0x15: decode OPCODE_OP_BOTTOM3 {
+                    0x3: BTS_LOCKED(Mv,Gv);
+                }
+                0x16: decode OPCODE_OP_BOTTOM3 {
+                    0x0: CMPXCHG_LOCKED(Mb,Gb);
+                    0x1: CMPXCHG_LOCKED(Mv,Gv);
+                    0x3: BTR_LOCKED(Mv,Gv);
+                }
+                0x17: decode OPCODE_OP_BOTTOM3 {
+                    0x2: decode MODRM_REG {
+                        0x5: BTS_LOCKED(Mv,Ib);
+                        0x6: BTR_LOCKED(Mv,Ib);
+                        0x7: BTC_LOCKED(Mv,Ib);
+                    }
+                    0x3: BTC_LOCKED(Mv,Gv);
+                }
+                0x18: decode OPCODE_OP_BOTTOM3 {
+                    0x0: XADD_LOCKED(Mb,Gb);
+                    0x1: XADD_LOCKED(Mv,Gv);
+                    //0x7: group9();
+                    0x7: decode MODRM_REG {
+                        //Also CMPXCHG16B
+                        0x1: CMPXCHG8B_LOCKED(Mdp);
+                    }
+                }
+            }
+        }
+    }
+}

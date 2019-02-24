@@ -1,0 +1,577 @@
+// Copyright (c) 2007-2008 The Hewlett-Packard Development Company
+// All rights reserved.
+//
+// The license below extends only to copyright in the software and shall
+// not be construed as granting a license to any other intellectual
+// property including but not limited to intellectual property relating
+// to a hardware implementation of the functionality of the software
+// licensed hereunder.  You may use the software subject to the license
+// terms below provided that you ensure that this notice is replicated
+// unmodified and in its entirety in all distributions of the software,
+// modified or unmodified, in source code or in binary form.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met: redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer;
+// redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution;
+// neither the name of the copyright holders nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Authors: Gabe Black
+
+////////////////////////////////////////////////////////////////////
+//
+// Decode the one byte opcodes
+//
+
+'X86ISA::OneByteOpcode': decode OPCODE_OP_TOP5 {
+    format Inst {
+        0x00: decode OPCODE_OP_BOTTOM3 {
+            0x6: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::push_ES();
+            }
+            0x7: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::pop_ES();
+            }
+            default: MultiInst::ADD(OPCODE_OP_BOTTOM3,
+                                    [Eb,Gb], [Ev,Gv],
+                                    [Gb,Eb], [Gv,Ev],
+                                    [rAb,Ib], [rAv,Iz]);
+        }
+        0x01: decode OPCODE_OP_BOTTOM3 {
+            0x6: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::push_CS();
+            }
+            //Any time this is seen, it should generate a two byte opcode
+            0x7: M5InternalError::error(
+                {{"Saw a one byte opcode whose value was 0x0F!"}});
+            default: MultiInst::OR(OPCODE_OP_BOTTOM3,
+                                   [Eb,Gb], [Ev,Gv],
+                                   [Gb,Eb], [Gv,Ev],
+                                   [rAb,Ib], [rAv,Iz]);
+        }
+        0x02: decode OPCODE_OP_BOTTOM3 {
+            0x6: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::push_SS();
+            }
+            0x7: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::pop_SS();
+            }
+            default: MultiInst::ADC(OPCODE_OP_BOTTOM3,
+                                    [Eb,Gb], [Ev,Gv],
+                                    [Gb,Eb], [Gv,Ev],
+                                    [rAb,Ib], [rAv,Iz]);
+        }
+        0x03: decode OPCODE_OP_BOTTOM3 {
+            0x6: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::push_DS();
+            }
+            0x7: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::pop_DS();
+            }
+            default: MultiInst::SBB(OPCODE_OP_BOTTOM3,
+                                    [Eb,Gb], [Ev,Gv],
+                                    [Gb,Eb], [Gv,Ev],
+                                    [rAb,Ib], [rAv,Iz]);
+        }
+        0x04: decode OPCODE_OP_BOTTOM3 {
+            0x6: M5InternalError::error(
+                {{"Tried to execute the ES segment override prefix!"}});
+            0x7: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::daa();
+            }
+            default: MultiInst::AND(OPCODE_OP_BOTTOM3,
+                                    [Eb,Gb], [Ev,Gv],
+                                    [Gb,Eb], [Gv,Ev],
+                                    [rAb,Ib], [rAv,Iz]);
+        }
+        0x05: decode OPCODE_OP_BOTTOM3 {
+            0x6: M5InternalError::error(
+                {{"Tried to execute the CS segment override prefix!"}});
+            0x7: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::das();
+            }
+            default: MultiInst::SUB(OPCODE_OP_BOTTOM3,
+                                    [Eb,Gb], [Ev,Gv],
+                                    [Gb,Eb], [Gv,Ev],
+                                    [rAb,Ib], [rAv,Iz]);
+        }
+        0x06: decode OPCODE_OP_BOTTOM3 {
+            0x6: M5InternalError::error(
+                {{"Tried to execute the SS segment override prefix!"}});
+            0x7: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::aaa();
+            }
+            default: MultiInst::XOR(OPCODE_OP_BOTTOM3,
+                                    [Eb,Gb], [Ev,Gv],
+                                    [Gb,Eb], [Gv,Ev],
+                                    [rAb,Ib], [rAv,Iz]);
+        }
+        0x07: decode OPCODE_OP_BOTTOM3 {
+            0x6: M5InternalError::error(
+                {{"Tried to execute the DS segment override prefix!"}});
+            0x7: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::aas();
+            }
+            default: MultiInst::CMP(OPCODE_OP_BOTTOM3,
+                                    [Eb,Gb], [Ev,Gv],
+                                    [Gb,Eb], [Gv,Ev],
+                                    [rAb,Ib], [rAv,Iz]);
+        }
+        0x08: decode MODE_SUBMODE {
+            0x0: M5InternalError::error (
+                {{"Tried to execute an REX prefix!"}});
+            default: INC(Bv);
+        }
+        0x09: decode MODE_SUBMODE {
+            0x0: M5InternalError::error (
+                {{"Tried to execute an REX prefix!"}});
+            default: DEC(Bv);
+        }
+        0x0A: PUSH(Bv);
+        0x0B: POP(Bv);
+        0x0C: decode OPCODE_OP_BOTTOM3 {
+            0x0: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: PUSHA();
+            }
+            0x1: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: POPA();
+            }
+            0x2: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: BOUND(Gv,Mv);
+            }
+            0x3: decode MODE_SUBMODE {
+                //The second operand should really be of size "d", but it's
+                //set to "v" in order to have a consistent register size.
+                //This shouldn't affect behavior.
+                0x0: MOVSXD(Gv,Ev);
+                default: WarnUnimpl::arpl_Ew_Gw();
+            }
+            0x4: M5InternalError::error(
+                {{"Tried to execute the FS segment override prefix!"}});
+            0x5: M5InternalError::error(
+                {{"Tried to execute the GS segment override prefix!"}});
+            0x6: M5InternalError::error(
+                {{"Tried to execute the operand size override prefix!"}});
+            0x7: M5InternalError::error(
+                {{"Tried to execute the DS address size override prefix!"}});
+        }
+        0x0D: decode OPCODE_OP_BOTTOM3 {
+            0x0: PUSH(Iz);
+            0x1: IMUL(Gv,Ev,Iz);
+            0x2: PUSH(Ib);
+            0x3: IMUL(Gv,Ev,Ib);
+            0x4: StringInst::INS(Yb,rD);
+            0x5: StringInst::INS(Yz,rD);
+            0x6: StringInst::OUTS(rD,Xb);
+            0x7: StringInst::OUTS(rD,Xz);
+        }
+        0x0E: decode OPCODE_OP_BOTTOM3 {
+            0x0: JO(Jb);
+            0x1: JNO(Jb);
+            0x2: JB(Jb);
+            0x3: JNB(Jb);
+            0x4: JZ(Jb);
+            0x5: JNZ(Jb);
+            0x6: JBE(Jb);
+            0x7: JNBE(Jb);
+        }
+        0x0F: decode OPCODE_OP_BOTTOM3 {
+            0x0: JS(Jb);
+            0x1: JNS(Jb);
+            0x2: JP(Jb);
+            0x3: JNP(Jb);
+            0x4: JL(Jb);
+            0x5: JNL(Jb);
+            0x6: JLE(Jb);
+            0x7: JNLE(Jb);
+        }
+        0x10: decode OPCODE_OP_BOTTOM3 {
+            //0x0: group1_Eb_Ib();
+            0x0: decode MODRM_REG {
+                0x0: ADD(Eb,Ib);
+                0x1: OR(Eb,Ib);
+                0x2: ADC(Eb,Ib);
+                0x3: SBB(Eb,Ib);
+                0x4: AND(Eb,Ib);
+                0x5: SUB(Eb,Ib);
+                0x6: XOR(Eb,Ib);
+                0x7: CMP(Eb,Ib);
+            }
+            //0x1: group1_Ev_Iz();
+            0x1: decode MODRM_REG {
+                0x0: ADD(Ev,Iz);
+                0x1: OR(Ev,Iz);
+                0x2: ADC(Ev,Iz);
+                0x3: SBB(Ev,Iz);
+                0x4: AND(Ev,Iz);
+                0x5: SUB(Ev,Iz);
+                0x6: XOR(Ev,Iz);
+                0x7: CMP(Ev,Iz);
+            }
+            0x2: decode MODE_SUBMODE {
+                0x0: UD2();
+                //default: group1_Eb_Ib();
+                default: decode MODRM_REG {
+                    0x0: ADD(Eb,Ib);
+                    0x1: OR(Eb,Ib);
+                    0x2: ADC(Eb,Ib);
+                    0x3: SBB(Eb,Ib);
+                    0x4: AND(Eb,Ib);
+                    0x5: SUB(Eb,Ib);
+                    0x6: XOR(Eb,Ib);
+                    0x7: CMP(Eb,Ib);
+                }
+            }
+            //0x3: group1_Ev_Ib();
+            0x3: decode MODRM_REG {
+                0x0: ADD(Ev,Ib);
+                0x1: OR(Ev,Ib);
+                0x2: ADC(Ev,Ib);
+                0x3: SBB(Ev,Ib);
+                0x4: AND(Ev,Ib);
+                0x5: SUB(Ev,Ib);
+                0x6: XOR(Ev,Ib);
+                0x7: CMP(Ev,Ib);
+            }
+            0x4: TEST(Eb,Gb);
+            0x5: TEST(Ev,Gv);
+            0x6: XCHG(Eb,Gb);
+            0x7: XCHG(Ev,Gv);
+        }
+        0x11: decode OPCODE_OP_BOTTOM3 {
+            0x0: MOV(Eb,Gb);
+            0x1: MOV(Ev,Gv);
+            0x2: MOV(Gb,Eb);
+            0x3: MOV(Gv,Ev);
+            0x4: decode MODRM_REG {
+                0x0, 0x1, 0x2,
+                0x3, 0x4, 0x5: MOV(Ev,Sv);
+            }
+            0x5: LEA(Gv,M);
+            0x6: decode MODE_SUBMODE {
+                0x3, 0x4: MOV_REAL(Sv,Ev);
+                default: decode MODRM_REG {
+                    0x1: UD2(); // Moving to the CS selector is illegal.
+                    0x2: MOVSS(Sv,Ev);
+                    0x0, 0x3,
+                    0x4, 0x5: MOV(Sv,Ev);
+                    default: UD2();
+                }
+            }
+            //0x7: group10_Ev();
+            0x7: decode MODRM_REG {
+                0x0: POP(Ev);
+                default: UD2();
+            }
+        }
+        0x12: decode OPCODE_OP_BOTTOM3 {
+            0x0: NopInst::NOP(); //XXX repe makes this a "pause"
+            default: XCHG(Bv,rAv);
+        }
+        0x13: decode OPCODE_OP_BOTTOM3 {
+            0x0: CDQE(rAv);
+            0x1: CQO(rAv,rDv);
+            0x2: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::call_far_Ap();
+            }
+            0x3: WarnUnimpl::fwait(); //aka wait
+            0x4: PUSHF();
+            0x5: POPF();
+            //The 64 bit versions of both of these should be illegal only
+            //if CPUID says it isn't supported. For now, we'll just assume
+            //that it's supported.
+            0x6: SAHF();
+            0x7: LAHF();
+        }
+        0x14: decode OPCODE_OP_BOTTOM3 {
+            0x0: MOV(rAb, Ob);
+            0x1: MOV(rAv, Ov);
+            0x2: MOV(Ob, rAb);
+            0x3: MOV(Ov, rAv);
+            0x4: StringInst::MOVS(Yb,Xb);
+            0x5: StringInst::MOVS(Yv,Xv);
+            0x6: StringTestInst::CMPS(Yb,Xb);
+            0x7: StringTestInst::CMPS(Yv,Xv);
+        }
+        0x15: decode OPCODE_OP_BOTTOM3 {
+            0x0: TEST(rAb,Ib);
+            0x1: TEST(rAv,Iz);
+            0x2: StringInst::STOS(Yb);
+            0x3: StringInst::STOS(Yv);
+            0x4: StringInst::LODS(Xb);
+            0x5: StringInst::LODS(Xv);
+            0x6: StringTestInst::SCAS(Yb);
+            0x7: StringTestInst::SCAS(Yv);
+        }
+        0x16: MOV(Bb,Ib);
+        0x17: MOV(Bv,Iv);
+        0x18: decode OPCODE_OP_BOTTOM3 {
+            //0x0: group2_Eb_Ib();
+            0x0: decode MODRM_REG {
+                0x0: ROL(Eb,Ib);
+                0x1: ROR(Eb,Ib);
+                0x2: RCL(Eb,Ib);
+                0x3: RCR(Eb,Ib);
+                0x4: SAL(Eb,Ib);
+                0x5: SHR(Eb,Ib);
+                0x6: SAL(Eb,Ib);
+                0x7: SAR(Eb,Ib);
+            }
+            //0x1: group2_Ev_Ib();
+            0x1: decode MODRM_REG {
+                0x0: ROL(Ev,Ib);
+                0x1: ROR(Ev,Ib);
+                0x2: RCL(Ev,Ib);
+                0x3: RCR(Ev,Ib);
+                0x4: SAL(Ev,Ib);
+                0x5: SHR(Ev,Ib);
+                0x6: SAL(Ev,Ib);
+                0x7: SAR(Ev,Ib);
+            }
+            0x2: RET_NEAR(Iw);
+            0x3: RET_NEAR();
+            0x4: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::les_Gz_Mp();
+            }
+            0x5: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::lds_Gz_Mp();
+            }
+            //0x6: group12_Eb_Ib();
+            0x6: decode MODRM_REG {
+                0x0: MOV(Eb,Ib);
+                default: UD2();
+            }
+            //0x7: group12_Ev_Iz();
+            0x7: decode MODRM_REG {
+                0x0: MOV(Ev,Iz);
+                default: UD2();
+            }
+        }
+        format WarnUnimpl {
+            0x19: decode OPCODE_OP_BOTTOM3 {
+                // The second parameter here should be of size b, but
+                // immediate sizes are determined elsewhere and this would
+                // confuse the instruction type specialization code.
+                0x0: Inst::ENTER(Iw,Iw);
+                0x1: Inst::LEAVE();
+                0x2: ret_far_Iw();
+                0x3: decode MODE_SUBMODE {
+                    0x3, 0x4: ret_far_real();
+                    default: Inst::RET_FAR();
+                }
+                0x4: Inst::INT3();
+                0x5: decode FullSystemInt default inst_ib() {
+                    0: decode IMMEDIATE {
+                        // Really only the LSB matters, but the decoder
+                        // will sign extend it, and there's no easy way to
+                        // specify only checking the first byte.
+                        0xffffffffffffff80:
+                            SyscallInst::int80('xc->syscall(Rax, &fault)',
+                                               IsSyscall, IsNonSpeculative,
+                                               IsSerializeAfter);
+                    }
+
+                    default: Inst::INT(Ib);
+                }
+                0x6: decode MODE_SUBMODE {
+                    0x0: Inst::UD2();
+                    default: into();
+                }
+                0x7: decode MODE_SUBMODE {
+                    0x4: Inst::IRET_REAL();
+                    0x3: Inst::IRET_VIRT();
+                    default: Inst::IRET_PROT();
+                }
+            }
+        }
+        0x1A: decode OPCODE_OP_BOTTOM3 {
+            //0x0: group2_Eb_1();
+            0x0: decode MODRM_REG {
+                0x0: ROL_1(Eb);
+                0x1: ROR_1(Eb);
+                0x2: RCL_1(Eb);
+                0x3: RCR_1(Eb);
+                0x4: SAL_1(Eb);
+                0x5: SHR_1(Eb);
+                0x6: SAL_1(Eb);
+                0x7: SAR_1(Eb);
+            }
+            //0x1: group2_Ev_1();
+            0x1: decode MODRM_REG {
+                0x0: ROL_1(Ev);
+                0x1: ROR_1(Ev);
+                0x2: RCL_1(Ev);
+                0x3: RCR_1(Ev);
+                0x4: SAL_1(Ev);
+                0x5: SHR_1(Ev);
+                0x6: SAL_1(Ev);
+                0x7: SAR_1(Ev);
+            }
+            //0x2: group2_Eb_Cl();
+            0x2: decode MODRM_REG {
+                0x0: ROL(Eb,rCb);
+                0x1: ROR(Eb,rCb);
+                0x2: RCL(Eb,rCb);
+                0x3: RCR(Eb,rCb);
+                0x4: SAL(Eb,rCb);
+                0x5: SHR(Eb,rCb);
+                0x6: SAL(Eb,rCb);
+                0x7: SAR(Eb,rCb);
+            }
+            //The second operand should have size "b", but to have
+            //consistent register sizes it's "v". This shouldn't have
+            //any affect on functionality.
+            //0x3: group2_Ev_Cl();
+            0x3: decode MODRM_REG {
+                0x0: ROL(Ev,rCv);
+                0x1: ROR(Ev,rCv);
+                0x2: RCL(Ev,rCv);
+                0x3: RCR(Ev,rCv);
+                0x4: SAL(Ev,rCv);
+                0x5: SHR(Ev,rCv);
+                0x6: SAL(Ev,rCv);
+                0x7: SAR(Ev,rCv);
+            }
+            0x4: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::aam_Ib();
+            }
+            0x5: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: WarnUnimpl::aad_Ib();
+            }
+            0x6: decode MODE_SUBMODE {
+                0x0: UD2();
+                default: SALC(rAb);
+            }
+            0x7: XLAT();
+        }
+        ##include "x87.isa"
+        0x1C: decode OPCODE_OP_BOTTOM3 {
+            0x0: LOOPNE(Jb);
+            0x1: LOOPE(Jb);
+            0x2: LOOP(Jb);
+            0x3: JRCX(Jb);
+            0x4: IN(rAb,Ib);
+            0x5: IN(rAv,Iv);
+            0x6: OUT(Ib,rAb);
+            0x7: OUT(Iv,rAv);
+        }
+        0x1D: decode OPCODE_OP_BOTTOM3 {
+            0x0: CALL_NEAR(Jz);
+            0x1: JMP(Jz);
+            0x2: decode MODE_SUBMODE {
+                0x0: UD2();
+                0x1: JMP_FAR(Iz);
+                0x2: JMP_FAR(Iz);
+                0x3: JMP_FAR_REAL(Iz);
+                0x4: JMP_FAR_REAL(Iz);
+            }
+            0x3: JMP(Jb);
+            0x4: IN(rAb,rD);
+            0x5: IN(rAv,rD);
+            0x6: OUT(rD,rAb);
+            0x7: OUT(rD,rAv);
+        }
+        0x1E: decode OPCODE_OP_BOTTOM3 {
+            0x0: M5InternalError::error(
+                {{"Tried to execute the lock prefix!"}});
+            0x1: WarnUnimpl::int1();
+            0x2: M5InternalError::error(
+                {{"Tried to execute the repne prefix!"}});
+            0x3: M5InternalError::error(
+                {{"Tried to execute the rep/repe prefix!"}});
+            0x4: HLT();
+            0x5: CMC();
+            //0x6: group3_Eb();
+            0x6: decode MODRM_REG {
+                0x0: TEST(Eb,Iz);
+                0x1: TEST(Eb,Iz);
+                0x2: NOT(Eb);
+                0x3: NEG(Eb);
+                0x4: MUL_B(Eb);
+                0x5: IMUL_B(Eb);
+                //This should be Eb, but it access the entire word value ax.
+                0x6: DIV_B(Ew);
+                0x7: IDIV_B(Eb);
+            }
+            //0x7: group3_Ev();
+            0x7: decode MODRM_REG {
+                0x0: TEST(Ev,Iz);
+                0x1: TEST(Ev,Iz);
+                0x2: NOT(Ev);
+                0x3: NEG(Ev);
+                0x4: MUL(Ev);
+                0x5: IMUL(Ev);
+                0x6: DIV(Ev);
+                0x7: IDIV(Ev);
+            }
+        }
+        0x1F: decode OPCODE_OP_BOTTOM3 {
+            0x0: CLC();
+            0x1: STC();
+            0x2: CLI();
+            0x3: STI();
+            0x4: CLD();
+            0x5: STD();
+            //0x6: group4();
+            0x6: decode MODRM_REG {
+                0x0: INC(Eb);
+                0x1: DEC(Eb);
+                default: UD2();
+            }
+            //0x7: group5();
+            0x7: decode MODRM_REG {
+                0x0: INC(Ev);
+                0x1: DEC(Ev);
+                0x2: CALL_NEAR(Ev);
+                0x3: WarnUnimpl::call_far_Mp();
+                0x4: JMP(Ev);
+                0x5: decode MODE_SUBMODE {
+                    0x0: JMP_FAR(Mz);
+                    0x1: JMP_FAR(Mz);
+                    0x2: JMP_FAR(Mz);
+                    0x3: JMP_FAR_REAL(Mz);
+                    0x4: JMP_FAR_REAL(Mz);
+                }
+                0x6: PUSH(Ev);
+                0x7: UD2();
+            }
+        }
+    }
+    default: FailUnimpl::oneByteOps();
+}
