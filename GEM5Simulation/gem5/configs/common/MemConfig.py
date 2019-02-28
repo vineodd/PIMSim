@@ -176,6 +176,7 @@ def config_mem(options, system):
         HMC.config_hmc_dev(options, system, HMChost.hmc_host)
         subsystem = system.hmc_dev
         xbar = system.hmc_dev.xbar
+	
     else:
         subsystem = system
         xbar = system.membus
@@ -244,7 +245,7 @@ def config_mem(options, system):
                 mem_ctrl.latency = '1ns'
                 print("For elastic trace, over-riding Simple Memory "
                     "latency to 1ns.")
-	    if options.enable_pim:
+	    if hasattr(options,'enable_pim') and options.enable_pim:
 	        mem_ctrl.cpu_type = options.cpu_type
 		mem_ctrl.coherence_granularity=options.coherence_granularity
             mem_ctrls.append(mem_ctrl)
@@ -256,13 +257,16 @@ def config_mem(options, system):
 		addr_base = r.end
 
     subsystem.mem_ctrls = mem_ctrls
-
-
+    if options.mem_type.startswith("HMC"):
+	print("xxx")
+    	addr_base = int(MemorySize(options.hmc_dev_vault_size))*options.hmc_dev_num_vaults  -1
+        print(addr_base)
     # @PIM 
     # define in-memory processing units here
     addr_base = addr_base + 1
-    pim_enable = options.enable_pim
-    if pim_enable:
+    if(hasattr(options,'enable_pim')):
+	pim_enable = options.enable_pim
+    if hasattr(options,'enable_pim') and pim_enable:
         print ("Enable PIM simulation in the system.")
 
         pim_type = options.pim_type
@@ -272,7 +276,13 @@ def config_mem(options, system):
 
         if num_pim_logic <= 0:
             fatal ("The num of PIM logic/processors cannot be zero while enabling PIM.")
-	
+	if options.mem_type.startswith("HMC"):
+	    if num_kernels>0:
+		num_kernels=16
+		num_processors=0
+	    else:
+		num_processors=16
+		num_kernels=0
         system.pim_type = pim_type
         for cpu in system.cpu:
 	    # let host-side processors know the address of PIM logic
@@ -308,7 +318,9 @@ def config_mem(options, system):
 		    # connect to the memory bus if the memory is DRAM
                     _kernel.port = xbar.slave
                     _kernel.mem_port = xbar.master
-        
+		if options.mem_type.startswith("HMC"):
+        	    _kernel.port = system.membus.slave
+            	    _kernel.mem_port = system.membus.master
                 pim_kernerls.append(_kernel)
             system.pim_kernerls = pim_kernerls
 
@@ -340,6 +352,7 @@ def config_mem(options, system):
     for i in xrange(len(subsystem.mem_ctrls)):
         if opt_mem_type == "HMC_2500_1x32":
             subsystem.mem_ctrls[i].port = xbar[i/4].master
+
             # Set memory device size. There is an independent controller for
             # each vault. All vaults are same size.
             subsystem.mem_ctrls[i].device_size = options.hmc_dev_vault_size

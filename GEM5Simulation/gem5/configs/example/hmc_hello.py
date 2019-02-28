@@ -55,6 +55,7 @@ vd = VoltageDomain(voltage='1V')
 system.clk_domain = SrcClockDomain(clock=clk, voltage_domain=vd)
 # create a simple CPU
 system.cpu = TimingSimpleCPU()
+
 # config memory system
 MemConfig.config_mem(options, system)
 # hook the CPU ports up to the membus
@@ -65,6 +66,11 @@ system.cpu.createInterruptController()
 # connect special port in the system to the membus. This port is a
 # functional-only port to allow the system to read and write memory.
 system.system_port = system.membus.slave
+
+if m5.defines.buildEnv['TARGET_ISA'] == "x86":
+    system.cpu.interrupts[0].pio = system.membus.master
+    system.cpu.interrupts[0].int_master = system.membus.slave
+    system.cpu.interrupts[0].int_slave = system.membus.master
 # get ISA for the binary to run.
 isa = str(m5.defines.buildEnv['TARGET_ISA']).lower()
 # run 'hello' and use the compiled ISA to find the binary

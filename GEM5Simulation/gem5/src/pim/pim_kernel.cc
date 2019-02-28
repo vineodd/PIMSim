@@ -35,7 +35,7 @@ addrRanges(p->addr_ranges.begin(), p->addr_ranges.end())
         regs.push_back(make_pair<PIMKernel::dataType,DataStatus>(0,dataEmpty));
 	data.push_back(0);
     }
-
+	DPRINTF(PIM, "Kernel: %d [0x%lx - 0x%lx]\n",_id,addrRanges.begin()->start(),addrRanges.end()->end());
 }
 
 

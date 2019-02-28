@@ -1830,6 +1830,9 @@ bool
 FullO3CPU<Impl>::stopCurrent(PacketPtr pkt, int id){
 
     AbstractMemory* mem = (AbstractMemory*)SimObject::find("system.mem_ctrls");
+    if(!mem){
+	mem = (AbstractMemory*)SimObject::find("system.hmc_dev.mem_ctrls00");
+    }
     assert(mem);
     if(mem->stalledAddr(pkt)){
 	DPRINTF(PIM, "The access is blocked by PIM Coherence [%lx]\n",pkt->getAddr());
@@ -1916,6 +1919,10 @@ FullO3CPU<Impl>::PIMCommand(ThreadContext *tc, uint64_t in1, uint64_t in2, uint6
         }
     }
     AbstractMemory* mem = (AbstractMemory*)SimObject::find("system.mem_ctrls");
+    if(!mem){
+	mem = (AbstractMemory*)SimObject::find("system.hmc_dev.mem_ctrls00");
+    }
+    assert(mem);
     uint64_t data1;
     mem->functionalData(pimpAddr[0],8,(uint8_t*)&data1);
 

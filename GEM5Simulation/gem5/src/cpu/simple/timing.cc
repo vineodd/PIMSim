@@ -758,6 +758,14 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
 void
 TimingSimpleCPU::completeIfetch(PacketPtr pkt)
 {
+    if(!(_status == IcacheWaitResponse)){
+    for(int i=0;i<pCaches.size();i++){
+        if(pCaches[i]->check_addr(pkt->getAddr())){
+            pCaches[i]->flushPIM(pkt->getAddr());
+        }
+    }
+	return;
+    }
     SimpleExecContext& t_info = *threadInfo[curThread];
 
     DPRINTF(SimpleCPU, "Complete ICache Fetch for addr %#x\n", pkt ?
@@ -865,6 +873,15 @@ TimingSimpleCPU::completeDataAccess(PacketPtr pkt)
     // received a response from the dcache: complete the load or store
     // instruction
     assert(!pkt->isError());
+    if(!(_status == DcacheWaitResponse || _status == DTBWaitResponse ||
+           pkt->req->getFlags().isSet(Request::NO_ACCESS))){
+    for(int i=0;i<pCaches.size();i++){
+        if(pCaches[i]->check_addr(pkt->getAddr())){
+            pCaches[i]->flushPIM(pkt->getAddr());
+        }
+    }
+	return;
+    }
     assert(_status == DcacheWaitResponse || _status == DTBWaitResponse ||
            pkt->req->getFlags().isSet(Request::NO_ACCESS));
 
@@ -1071,8 +1088,11 @@ bool
 TimingSimpleCPU::stopCurrent(PacketPtr pkt, int id){
 
     AbstractMemory* mem = (AbstractMemory*)SimObject::find("system.mem_ctrls");
+    if(!mem){
+	mem = (AbstractMemory*)SimObject::find("system.hmc_dev.mem_ctrls00");
+    }
     assert(mem);
-    if(mem->stalledAddr(pkt)){
+    if(mem&&mem->stalledAddr(pkt)){
 	DPRINTF(PIM, "The access is blocked by PIM Coherence [%lx]\n",pkt->getAddr());
         SimpleExecContext &t_info = *threadInfo[curThread];
         SimpleThread* thread = t_info.thread;
@@ -1085,7 +1105,12 @@ bool
 TimingSimpleCPU::PIMCommand(ThreadContext *tc, uint64_t in1, uint64_t in2, uint64_t out1)
 {
 
+    //setDebugFlag("IsaFake");
+        //setDebugFlag("TLB");
+    //setDebugFlag("X86");
     //setDebugFlag("SimpleCPU");
+    //setDebugFlag("Fetch");
+    //setDebugFlag("Decoder");
     // @PIM: Uncomment this line to show debug information of the processors upon receving PIM operations.
     // It may provide more flexibilities while debuging PIMSim.
 
@@ -1127,7 +1152,7 @@ TimingSimpleCPU::PIMCommand(ThreadContext *tc, uint64_t in1, uint64_t in2, uint6
     
         //got physical address for the first PIM address
         pimpAddr.push_back(req->getPaddr());
-        DPRINTF(PIM, "Translated Physical Address for PIM [%llx]\n",pimAddr[i]);
+        DPRINTF(PIM, "Translated Physical Address for PIM [0x%lx] -> [0x%lx]\n",addr,req->getPaddr());
     }
     if (fault != NoFault){
 	DPRINTF(PIM, "Fault occured. Handling the fault for PIM address\n");
@@ -1157,6 +1182,10 @@ TimingSimpleCPU::PIMCommand(ThreadContext *tc, uint64_t in1, uint64_t in2, uint6
         }
     }
     AbstractMemory* mem = (AbstractMemory*)SimObject::find("system.mem_ctrls");
+    if(!mem){
+	mem = (AbstractMemory*)SimObject::find("system.hmc_dev.mem_ctrls00");
+    }
+    assert(mem);
     uint64_t data1;
     mem->functionalData(pimpAddr[0],8,(uint8_t*)&data1);
 
@@ -1203,11 +1232,11 @@ TimingSimpleCPU::retryPIM(){
 
 void
 TimingSimpleCPU::PIMProcess(ThreadContext *tc, int pim_id){
-    setDebugFlag("TLB");
-    setDebugFlag("X86");
-    setDebugFlag("SimpleCPU");
-    setDebugFlag("Fetch");
-    setDebugFlag("Decoder");
+    //setDebugFlag("TLB");
+    //setDebugFlag("X86");
+    //setDebugFlag("SimpleCPU");
+    //setDebugFlag("Fetch");
+    //setDebugFlag("Decoder");
 	
     //setDebugFlag("SnoopFilter");
     //assert(pim_id>=0);

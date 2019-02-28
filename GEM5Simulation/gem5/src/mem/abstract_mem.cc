@@ -471,6 +471,14 @@ AbstractMemory::functionalAccess(PacketPtr pkt)
 		cpu=(BaseCPU*)SimObject::find(("system.cpu"+to_string(threadid)).data());
 	    }
 	    assert(cpu);
+	    	
+    for(int i=0;i<cpu->pCaches.size();i++){
+	for(int j=0;j<3;j++){
+        if(cpu->pCaches[i]->check_addr((*index)->addr[j])){
+            cpu->pCaches[i]->flushPIM((*index)->addr[j]);
+        }
+	}
+    }
 	    if(this->cpu_type=="TimingSimpleCPU"){
 		TimingSimpleCPU* simplecpu=(TimingSimpleCPU*)cpu;
 	        simplecpu->activateContext((*(simplecpu->threadInfo[simplecpu->curThread])).thread->contextId());

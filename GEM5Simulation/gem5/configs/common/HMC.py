@@ -292,7 +292,8 @@ def config_hmc_host_ctrl(opt, system):
 
     # create HMC host controller
     system.hmc_host = SubSystem()
-
+    if not hasattr(opt,"arch"):
+        add_options_hmc(opt)
     # Create additional crossbar for arch1
     if opt.arch == "distributed" or opt.arch == "mixed":
         clk = '100GHz'
@@ -397,7 +398,9 @@ def config_hmc_dev(opt, system, hmc_host):
     if opt.enable_link_monitor:
         lm = [CommMonitor() for i in xrange(opt.num_links_controllers)]
         system.hmc_dev.lmonitor = lm
-
+    computing = 0
+    if opt.enable_pim:
+	computing = 16
     # 4 HMC Crossbars located in its logic-base (LoB)
     xb = [NoncoherentXBar(width=opt.xbar_width,
                           frontend_latency=opt.xbar_frontend_latency,

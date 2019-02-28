@@ -70,4 +70,4 @@ class AbstractMemory(MemObject):
 
     ############kernels = VectorParam.PIMKernel("Integrated PIM Kernels")
     cpu_type = Param.String("", "The host-side cpu type")
-    coherence_granularity = Param.MemorySize("PIM coherence granularity")
+    coherence_granularity = Param.MemorySize('64B',"PIM coherence granularity")

@@ -123,7 +123,7 @@ Options.addSEOptions(parser)
 
 # @PIM
 Options.addPIMOptions(parser)
-
+Options.add_hmc_options(parser)
 if '--ruby' in sys.argv:
     Ruby.define_options(parser)
 
@@ -268,10 +268,13 @@ if options.ruby:
             system.cpu[i].dtb.walker.port = ruby_port.slave
 else:
     MemClass = Simulation.setMemClass(options)
-    system.membus = IOXBar()#SystemXBar()
-    system.system_port = system.membus.slave
-    CacheConfig.config_cache(options, system)
+    if not options.mem_type.startswith("HMC"):
+        system.membus = IOXBar()#SystemXBar()
+
+
     MemConfig.config_mem(options, system)
+    CacheConfig.config_cache(options, system)
+    system.system_port = system.membus.slave
 
 root = Root(full_system = False, system = system)
 Simulation.run(options, root, system, FutureClass)

@@ -87,7 +87,7 @@ def addNoISAOptions(parser):
                       help = "type of memory to use")
     parser.add_option("--mem-channels", type="int", default=1,
                       help = "number of memory channels")
-    parser.add_option("--mem-ranks", type="int", default=None,
+    parser.add_option("--mem-ranks", type="int", default=1,
                       help = "number of memory ranks per channel")
     parser.add_option("--mem-size", action="store", type="string",
                       default="512MB",
@@ -406,3 +406,163 @@ def addPIMOptions(parser):
     parser.add_option("--num-pim-processors", type="int", default=0,
                   help="Number of in-memory processors")
     parser.add_option("--coherence-granularity", type="string", default="64B")
+
+
+def add_hmc_options(parser):
+    # *****************************CROSSBAR PARAMETERS*************************
+    # Flit size of the main interconnect [1]
+    parser.add_option("--xbar-width", default=32, action="store", type=int,
+                        help="Data width of the main XBar (Bytes)")
+
+    # Clock frequency of the main interconnect [1]
+    # This crossbar, is placed on the logic-based of the HMC and it has its
+    # own voltage and clock domains, different from the DRAM dies or from the
+    # host.
+    parser.add_option("--xbar-frequency", default='1GHz', type=str,
+                        help="Clock Frequency of the main XBar")
+
+    # Arbitration latency of the HMC XBar [1]
+    parser.add_option("--xbar-frontend-latency", default=1, action="store",
+                        type=int, help="Arbitration latency of the XBar")
+
+    # Latency to forward a packet via the interconnect [1](two levels of FIFOs
+    # at the input and output of the inteconnect)
+    parser.add_option("--xbar-forward-latency", default=2, action="store",
+                        type=int, help="Forward latency of the XBar")
+
+    # Latency to forward a response via the interconnect [1](two levels of
+    # FIFOs at the input and output of the inteconnect)
+    parser.add_option("--xbar-response-latency", default=2, action="store",
+                        type=int, help="Response latency of the XBar")
+
+    # number of cross which connects 16 Vaults to serial link[7]
+    parser.add_option("--number-mem-crossbar", default=4, action="store",
+                        type=int, help="Number of crossbar in HMC")
+
+    # *****************************SERIAL LINK PARAMETERS**********************
+    # Number of serial links controllers [1]
+    parser.add_option("--num-links-controllers", default=4, action="store",
+                        type=int, help="Number of serial links")
+
+    # Number of packets (not flits) to store at the request side of the serial
+    #  link. This number should be adjusted to achive required bandwidth
+    parser.add_option("--link-buffer-size-req", default=10, action="store",
+                        type=int, help="Number of packets to buffer at the\
+                        request side of the serial link")
+
+    # Number of packets (not flits) to store at the response side of the serial
+    #  link. This number should be adjusted to achive required bandwidth
+    parser.add_option("--link-buffer-size-rsp", default=10, action="store",
+                        type=int, help="Number of packets to buffer at the\
+                        response side of the serial link")
+
+    # Latency of the serial link composed by SER/DES latency (1.6ns [4]) plus
+    # the PCB trace latency (3ns Estimated based on [5])
+    parser.add_option("--link-latency", default='4.6ns', type=str,
+                        help="Latency of the serial links")
+
+    # Clock frequency of the each serial link(SerDes) [1]
+    parser.add_option("--link-frequency", default='10GHz', type=str,
+                        help="Clock Frequency of the serial links")
+
+    # Clock frequency of serial link Controller[6]
+    # clk_hmc[Mhz]= num_lanes_per_link * lane_speed [Gbits/s] /
+    # data_path_width * 10^6
+    # clk_hmc[Mhz]= 16 * 10 Gbps / 256 * 10^6 = 625 Mhz
+    parser.add_option("--link-controller-frequency", default='625MHz',
+                        type=str, help="Clock Frequency of the link\
+                        controller")
+
+    # Latency of the serial link controller to process the packets[1][6]
+    # (ClockDomain = 625 Mhz )
+    # used here for calculations only
+    parser.add_option("--link-ctrl-latency", default=4, action="store",
+                        type=int, help="The number of cycles required for the\
+                        controller to process the packet")
+
+    # total_ctrl_latency = link_ctrl_latency + link_latency
+    # total_ctrl_latency = 4(Cycles) * 1.6 ns +  4.6 ns
+    parser.add_option("--total-ctrl-latency", default='11ns', type=str,
+                        help="The latency experienced by every packet\
+                        regardless of size of packet")
+
+    # Number of parallel lanes in each serial link [1]
+    parser.add_option("--num-lanes-per-link", default=16, action="store",
+                        type=int, help="Number of lanes per each link")
+
+    # Number of serial links [1]
+    parser.add_option("--num-serial-links", default=4, action="store",
+                        type=int, help="Number of serial links")
+
+    # speed of each lane of serial link - SerDes serial interface 10 Gb/s
+    parser.add_option("--serial-link-speed", default=10, action="store",
+                        type=int, help="Gbs/s speed of each lane of serial\
+                        link")
+
+    # address range for each of the serial links
+    parser.add_option("--serial-link-addr-range", default='1GB', type=str,
+                        help="memory range for each of the serial links.\
+                        Default: 1GB")
+
+    # *****************************PERFORMANCE MONITORING*********************
+    # The main monitor behind the HMC Controller
+    parser.add_option("--enable-global-monitor", action="store_true",
+                        help="The main monitor behind the HMC Controller")
+
+    # The link performance monitors
+    parser.add_option("--enable-link-monitor", action="store_true",
+                        help="The link monitors")
+
+    # link aggregator enable - put a cross between buffers & links
+    parser.add_option("--enable-link-aggr", action="store_true", help="The\
+                        crossbar between port and Link Controller")
+
+    parser.add_option("--enable-buff-div", action="store_true",
+                        help="Memory Range of Buffer is ivided between total\
+                        range")
+
+    # *****************************HMC ARCHITECTURE **************************
+    # Memory chunk for 16 vault - numbers of vault / number of crossbars
+    parser.add_option("--mem-chunk", default=4, action="store", type=int,
+                        help="Chunk of memory range for each cross bar in\
+                        arch 0")
+
+    # size of req buffer within crossbar, used for modelling extra latency
+    # when the reuqest go to non-local vault
+    parser.add_option("--xbar-buffer-size-req", default=10, action="store",
+                        type=int, help="Number of packets to buffer at the\
+                        request side of the crossbar")
+
+    # size of response buffer within crossbar, used for modelling extra latency
+    # when the response received from non-local vault
+    parser.add_option("--xbar-buffer-size-resp", default=10, action="store",
+                        type=int, help="Number of packets to buffer at the\
+                        response side of the crossbar")
+    # HMC device architecture. It affects the HMC host controller as well
+    parser.add_option("--arch", type="choice", choices=["same", "distributed",
+                        "mixed"], default="distributed", help="same: HMC with\
+                        4 links, all with same range.\ndistributed: HMC with\
+                        4 links with distributed range.\nmixed: mixed with\
+                        same and distributed range.\nDefault: distributed")
+    # HMC device - number of vaults
+    parser.add_option("--hmc-dev-num-vaults", default=16, action="store",
+                        type=int, help="number of independent vaults within\
+                        the HMC device. Note: each vault has a memory\
+                        controller (valut controller)\nDefault: 16")
+    # HMC device - vault capacity or size
+    parser.add_option("--hmc-dev-vault-size", default='256MB', type=str,
+                        help="vault storage capacity in bytes. Default:\
+                        256MB")
+    #parser.add_option("--mem-type", type=str, choices=["HMC_2500_1x32"],
+    #                    default="HMC_2500_1x32", help="type of HMC memory to\
+    #                    use. Default: HMC_2500_1x32")
+    #parser.add_option("--mem-channels", default=1, action="store", type=int,
+    #                    help="Number of memory channels")
+    #parser.add_option("--mem-ranks", default=1, action="store", type=int,
+    #                    help="Number of ranks to iterate across")
+    parser.add_option("--burst-length", default=256, action="store",
+                        type=int, help="burst length in bytes. Note: the\
+                        cache line size will be set to this value.\nDefault:\
+                        256")
+
+

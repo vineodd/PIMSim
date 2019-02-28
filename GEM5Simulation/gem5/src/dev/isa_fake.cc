@@ -93,6 +93,8 @@ IsaFake::read(PacketPtr pkt)
 Tick
 IsaFake::write(PacketPtr pkt)
 {
+    if(!pkt->isPIM())
+	//return pioDelay;
     pkt->makeAtomicResponse();
     if (params()->warn_access != "") {
         uint64_t data;

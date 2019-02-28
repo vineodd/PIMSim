@@ -9,10 +9,10 @@
             "forward_latency": 1, 
             "slave": {
                 "peer": [
-                    "system.system_port", 
+                    "system.pim_kernerls.port", 
                     "system.l2.mem_side", 
                     "system.cpu.interrupts.int_master", 
-                    "system.pim_kernerls.port"
+                    "system.system_port"
                 ], 
                 "role": "SLAVE"
             }, 
@@ -26,10 +26,10 @@
             "eventq_index": 0, 
             "master": {
                 "peer": [
-                    "system.cpu.interrupts.pio", 
-                    "system.cpu.interrupts.int_slave", 
                     "system.pim_kernerls.mem_port", 
-                    "system.mem_ctrls.port"
+                    "system.mem_ctrls.port", 
+                    "system.cpu.interrupts.pio", 
+                    "system.cpu.interrupts.int_slave"
                 ], 
                 "role": "MASTER"
             }, 
@@ -81,7 +81,7 @@
                 }, 
                 "power_model": [], 
                 "port": {
-                    "peer": "system.membus.slave[3]", 
+                    "peer": "system.membus.slave[0]", 
                     "role": "MASTER"
                 }, 
                 "addr_ranges": [
@@ -92,7 +92,7 @@
                 "p_state_clk_gate_max": 1000000000000, 
                 "path": "system.pim_kernerls", 
                 "mem_port": {
-                    "peer": "system.membus.master[2]", 
+                    "peer": "system.membus.master[0]", 
                     "role": "SLAVE"
                 }, 
                 "type": "PIMAdder", 
@@ -151,7 +151,7 @@
         "cache_line_size": 64, 
         "boot_osflags": "a", 
         "system_port": {
-            "peer": "system.membus.slave[0]", 
+            "peer": "system.membus.slave[3]", 
             "role": "MASTER"
         }, 
         "power_model": [], 
@@ -477,11 +477,11 @@
                         "name": "interrupts", 
                         "p_state_clk_gate_min": 1000, 
                         "pio": {
-                            "peer": "system.membus.master[0]", 
+                            "peer": "system.membus.master[2]", 
                             "role": "SLAVE"
                         }, 
                         "int_slave": {
-                            "peer": "system.membus.master[1]", 
+                            "peer": "system.membus.master[3]", 
                             "role": "SLAVE"
                         }, 
                         "p_state_clk_gate_bins": 20, 
@@ -534,7 +534,7 @@
                         "maxStackSize": 67108864, 
                         "ppid": 0, 
                         "type": "Process", 
-                        "cwd": "/home/xuchen/newpim/gem5", 
+                        "cwd": "/home/xuchen/newpim/PIMSim/GEM5Simulation/gem5", 
                         "pgid": 100, 
                         "simpoint": 0, 
                         "euid": 100, 
@@ -872,7 +872,7 @@
                 "write_high_thresh_perc": 85, 
                 "IDD2N2": 0.0, 
                 "port": {
-                    "peer": "system.membus.master[3]", 
+                    "peer": "system.membus.master[1]", 
                     "role": "SLAVE"
                 }, 
                 "IDD4R": 0.157, 
@@ -900,7 +900,7 @@
                     ""
                 ], 
                 "p_state_clk_gate_min": 1000, 
-                "ranks_per_channel": 2, 
+                "ranks_per_channel": 1, 
                 "qos_q_policy": "fifo", 
                 "tRAS": 35000, 
                 "static_frontend_latency": 10000, 

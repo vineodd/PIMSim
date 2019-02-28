@@ -61,7 +61,7 @@ PioPort::recvAtomic(PacketPtr pkt)
     pkt->headerDelay = pkt->payloadDelay = 0;
 
     const Tick delay(pkt->isRead() ? device->read(pkt) : device->write(pkt));
-    assert(pkt->isResponse() || pkt->isError());
+    assert(pkt->isResponse() || pkt->isError() );//||pkt->isPIM());
     return delay + receive_delay;
 }
 

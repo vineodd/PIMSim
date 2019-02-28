@@ -50,7 +50,7 @@
 </g>
 </g>
 <g id="clust13" class="cluster"><title>cluster_system_mem_ctrls</title>
-<g id="a_clust13"><a xlink:title="IDD0&#61;0.055&#10;IDD02&#61;0.0&#10;IDD2N&#61;0.032&#10;IDD2N2&#61;0.0&#10;IDD2P0&#61;0.0&#10;IDD2P02&#61;0.0&#10;IDD2P1&#61;0.032&#10;IDD2P12&#61;0.0&#10;IDD3N&#61;0.038&#10;IDD3N2&#61;0.0&#10;IDD3P0&#61;0.0&#10;IDD3P02&#61;0.0&#10;IDD3P1&#61;0.038&#10;IDD3P12&#61;0.0&#10;IDD4R&#61;0.157&#10;IDD4R2&#61;0.0&#10;IDD4W&#61;0.125&#10;IDD4W2&#61;0.0&#10;IDD5&#61;0.235&#10;IDD52&#61;0.0&#10;IDD6&#61;0.02&#10;IDD62&#61;0.0&#10;VDD&#61;1.5&#10;VDD2&#61;0.0&#10;activation_limit&#61;4&#10;addr_mapping&#61;RoRaBaCoCh&#10;bank_groups_per_rank&#61;0&#10;banks_per_rank&#61;8&#10;burst_length&#61;8&#10;channels&#61;1&#10;clk_domain&#61;system.clk_domain&#10;coherence_granularity&#61;64&#10;conf_table_reported&#61;true&#10;cpu_type&#61;TimingSimpleCPU&#10;default_p_state&#61;UNDEFINED&#10;device_bus_width&#61;8&#10;device_rowbuffer_size&#61;1024&#10;device_size&#61;536870912&#10;devices_per_rank&#61;8&#10;dll&#61;true&#10;eventq_index&#61;0&#10;in_addr_map&#61;true&#10;kvm_map&#61;true&#10;max_accesses_per_row&#61;16&#10;mem_sched_policy&#61;frfcfs&#10;min_writes_per_switch&#61;16&#10;null&#61;false&#10;p_state_clk_gate_bins&#61;20&#10;p_state_clk_gate_max&#61;1000000000000&#10;p_state_clk_gate_min&#61;1000&#10;page_policy&#61;open_adaptive&#10;power_model&#61;&#10;qos_masters&#61; &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#10;qos_policy&#61;Null&#10;qos_priorities&#61;1&#10;qos_priority_escalation&#61;false&#10;qos_q_policy&#61;fifo&#10;qos_syncro_scheduler&#61;false&#10;qos_turnaround_policy&#61;Null&#10;range&#61;0:536870911:6:19:0:0&#10;ranks_per_channel&#61;2&#10;read_buffer_size&#61;32&#10;static_backend_latency&#61;10000&#10;static_frontend_latency&#61;10000&#10;tBURST&#61;5000&#10;tCCD_L&#61;0&#10;tCCD_L_WR&#61;0&#10;tCK&#61;1250&#10;tCL&#61;13750&#10;tCS&#61;2500&#10;tRAS&#61;35000&#10;tRCD&#61;13750&#10;tREFI&#61;7800000&#10;tRFC&#61;260000&#10;tRP&#61;13750&#10;tRRD&#61;6000&#10;tRRD_L&#61;0&#10;tRTP&#61;7500&#10;tRTW&#61;2500&#10;tWR&#61;15000&#10;tWTR&#61;7500&#10;tXAW&#61;30000&#10;tXP&#61;6000&#10;tXPDLL&#61;0&#10;tXS&#61;270000&#10;tXSDLL&#61;0&#10;write_buffer_size&#61;64&#10;write_high_thresh_perc&#61;85&#10;write_low_thresh_perc&#61;50">
+<g id="a_clust13"><a xlink:title="IDD0&#61;0.055&#10;IDD02&#61;0.0&#10;IDD2N&#61;0.032&#10;IDD2N2&#61;0.0&#10;IDD2P0&#61;0.0&#10;IDD2P02&#61;0.0&#10;IDD2P1&#61;0.032&#10;IDD2P12&#61;0.0&#10;IDD3N&#61;0.038&#10;IDD3N2&#61;0.0&#10;IDD3P0&#61;0.0&#10;IDD3P02&#61;0.0&#10;IDD3P1&#61;0.038&#10;IDD3P12&#61;0.0&#10;IDD4R&#61;0.157&#10;IDD4R2&#61;0.0&#10;IDD4W&#61;0.125&#10;IDD4W2&#61;0.0&#10;IDD5&#61;0.235&#10;IDD52&#61;0.0&#10;IDD6&#61;0.02&#10;IDD62&#61;0.0&#10;VDD&#61;1.5&#10;VDD2&#61;0.0&#10;activation_limit&#61;4&#10;addr_mapping&#61;RoRaBaCoCh&#10;bank_groups_per_rank&#61;0&#10;banks_per_rank&#61;8&#10;burst_length&#61;8&#10;channels&#61;1&#10;clk_domain&#61;system.clk_domain&#10;coherence_granularity&#61;64&#10;conf_table_reported&#61;true&#10;cpu_type&#61;TimingSimpleCPU&#10;default_p_state&#61;UNDEFINED&#10;device_bus_width&#61;8&#10;device_rowbuffer_size&#61;1024&#10;device_size&#61;536870912&#10;devices_per_rank&#61;8&#10;dll&#61;true&#10;eventq_index&#61;0&#10;in_addr_map&#61;true&#10;kvm_map&#61;true&#10;max_accesses_per_row&#61;16&#10;mem_sched_policy&#61;frfcfs&#10;min_writes_per_switch&#61;16&#10;null&#61;false&#10;p_state_clk_gate_bins&#61;20&#10;p_state_clk_gate_max&#61;1000000000000&#10;p_state_clk_gate_min&#61;1000&#10;page_policy&#61;open_adaptive&#10;power_model&#61;&#10;qos_masters&#61; &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#10;qos_policy&#61;Null&#10;qos_priorities&#61;1&#10;qos_priority_escalation&#61;false&#10;qos_q_policy&#61;fifo&#10;qos_syncro_scheduler&#61;false&#10;qos_turnaround_policy&#61;Null&#10;range&#61;0:536870911:6:19:0:0&#10;ranks_per_channel&#61;1&#10;read_buffer_size&#61;32&#10;static_backend_latency&#61;10000&#10;static_frontend_latency&#61;10000&#10;tBURST&#61;5000&#10;tCCD_L&#61;0&#10;tCCD_L_WR&#61;0&#10;tCK&#61;1250&#10;tCL&#61;13750&#10;tCS&#61;2500&#10;tRAS&#61;35000&#10;tRCD&#61;13750&#10;tREFI&#61;7800000&#10;tRFC&#61;260000&#10;tRP&#61;13750&#10;tRRD&#61;6000&#10;tRRD_L&#61;0&#10;tRTP&#61;7500&#10;tRTW&#61;2500&#10;tWR&#61;15000&#10;tWTR&#61;7500&#10;tXAW&#61;30000&#10;tXP&#61;6000&#10;tXPDLL&#61;0&#10;tXS&#61;270000&#10;tXSDLL&#61;0&#10;write_buffer_size&#61;64&#10;write_high_thresh_perc&#61;85&#10;write_low_thresh_perc&#61;50">
 <path fill="#5e5958" stroke="#000000" d="M36,-420C36,-420 149,-420 149,-420 155,-420 161,-426 161,-432 161,-432 161,-500 161,-500 161,-506 155,-512 149,-512 149,-512 36,-512 36,-512 30,-512 24,-506 24,-500 24,-500 24,-432 24,-432 24,-426 30,-420 36,-420"/>
 <text text-anchor="middle" x="92.5" y="-496.8" font-family="Arial" font-size="14.00" fill="#000000">mem_ctrls </text>
 <text text-anchor="middle" x="92.5" y="-481.8" font-family="Arial" font-size="14.00" fill="#000000">: DDR3_1600_8x8</text>
@@ -171,7 +171,7 @@
 <text text-anchor="middle" x="126" y="-443.3" font-family="Arial" font-size="14.00" fill="#000000">port</text>
 </g>
 <!-- system_membus_master&#45;&gt;system_mem_ctrls_port -->
-<g id="edge5" class="edge"><title>system_membus_master&#45;&gt;system_mem_ctrls_port</title>
+<g id="edge3" class="edge"><title>system_membus_master&#45;&gt;system_mem_ctrls_port</title>
 <path fill="none" stroke="black" d="M679.792,-638.161C571.16,-638.464 204.669,-637.012 165,-604 127.371,-572.685 122.994,-511.073 123.97,-475.364"/>
 <polygon fill="black" stroke="black" points="127.475,-475.319 124.414,-465.176 120.482,-475.014 127.475,-475.319"/>
 </g>
@@ -181,7 +181,7 @@
 <text text-anchor="middle" x="689" y="-443.3" font-family="Arial" font-size="14.00" fill="#000000">int_slave</text>
 </g>
 <!-- system_membus_master&#45;&gt;system_cpu_interrupts_int_slave -->
-<g id="edge3" class="edge"><title>system_membus_master&#45;&gt;system_cpu_interrupts_int_slave</title>
+<g id="edge5" class="edge"><title>system_membus_master&#45;&gt;system_cpu_interrupts_int_slave</title>
 <path fill="none" stroke="black" d="M708.099,-620.804C704.437,-587.668 696.377,-514.746 691.989,-475.046"/>
 <polygon fill="black" stroke="black" points="695.459,-474.576 690.881,-465.021 688.501,-475.345 695.459,-474.576"/>
 </g>
@@ -191,7 +191,7 @@
 <text text-anchor="middle" x="608" y="-443.3" font-family="Arial" font-size="14.00" fill="#000000">pio</text>
 </g>
 <!-- system_membus_master&#45;&gt;system_cpu_interrupts_pio -->
-<g id="edge2" class="edge"><title>system_membus_master&#45;&gt;system_cpu_interrupts_pio</title>
+<g id="edge4" class="edge"><title>system_membus_master&#45;&gt;system_cpu_interrupts_pio</title>
 <path fill="none" stroke="black" d="M679.933,-628.929C667.095,-623.611 653.02,-615.6 644,-604 614.747,-566.382 608.53,-509.183 607.614,-475.502"/>
 <polygon fill="black" stroke="black" points="611.113,-475.4 607.48,-465.447 604.114,-475.493 611.113,-475.4"/>
 </g>
@@ -201,7 +201,7 @@
 <text text-anchor="middle" x="1082" y="-443.3" font-family="Arial" font-size="14.00" fill="#000000">mem_port</text>
 </g>
 <!-- system_membus_master&#45;&gt;system_pim_kernerls_mem_port -->
-<g id="edge4" class="edge"><title>system_membus_master&#45;&gt;system_pim_kernerls_mem_port</title>
+<g id="edge2" class="edge"><title>system_membus_master&#45;&gt;system_pim_kernerls_mem_port</title>
 <path fill="none" stroke="black" d="M731.161,-620.839C736.664,-617.262 742.799,-613.981 749,-612 776.956,-603.071 988.653,-620.384 1013,-604 1056.49,-574.732 1072.83,-511.346 1078.77,-475.023"/>
 <polygon fill="black" stroke="black" points="1082.23,-475.522 1080.24,-465.116 1075.31,-474.493 1082.23,-475.522"/>
 </g>
