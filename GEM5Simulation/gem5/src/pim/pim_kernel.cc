@@ -21,6 +21,8 @@ status(Idle),
 parms(p),
 tickEvent([this]{ tick(); }, "PIMKernel tick",
           false, Event::Default_Pri),
+computeEvent([this]{ trycompute(); }, "PIMKernel compute",
+          false, Event::Default_Pri),
 finishEvent([this]{ finish(); }, "PIMKernel finish data process",
           false, Event::Default_Pri),
 _id(p->id),
@@ -38,6 +40,52 @@ addrRanges(p->addr_ranges.begin(), p->addr_ranges.end())
 	DPRINTF(PIM, "Kernel: %d [0x%lx - 0x%lx]\n",_id,addrRanges.begin()->start(),addrRanges.end()->end());
 }
 
+void
+PIMKernel::trycompute(){
+
+    dataType res = doCompute();
+    int toProc=locateLatest();
+    DPRINTF(PIM, "Start processing data write of Reg[%d]\n",toProc);
+    Request::Flags flags = 0;
+    RequestPtr req = make_shared<Request>(regs[toProc].first, 8, flags, 0 );
+    
+    PacketPtr pkt = new Packet(req, MemCmd::PIMWrite );
+    uint8_t* empty=new uint8_t[8];
+
+    memcpy(empty,&res,sizeof(dataType));
+    
+    pkt->dataDynamic(empty);
+    
+    Packet::PIMSenderState* senderState=new Packet::PIMSenderState(_id,toProc);
+    pkt->pushSenderState(senderState);
+    
+    DPRINTF(PIM, "Try to send write req [0x%llx]-[%d]\n",regs[toProc].first,toProc);
+    
+    if(port.sendTimingReq(pkt)){
+        
+        status=WaitingResp;
+        
+        DPRINTF(PIM, "Writen to the memory [0x%llx]-[%d] [%d]\n",regs[toProc].first,toProc,status);
+        
+        regs[toProc].second=dataWaitingResp;
+        req=nullptr;
+        write_packets++;
+        
+    }else{
+        DPRINTF(PIM, "Failed sending write to the memory [%d]\n",toProc);
+        retry_pkt=pkt;
+        status = SendRetry;
+        write_retry++;
+	
+        if(!computeEvent.scheduled()){
+
+		schedule(computeEvent,clockEdge((Cycles)1));	
+		
+	}
+    }
+
+
+}
 
 BaseMasterPort &
 PIMKernel::getMasterPort(const std::string &if_name, PortID idx) 
@@ -347,40 +395,12 @@ PIMKernel::tick()
 					
 	    }
 	    if(toProc>=_input&&toProc<_input+_output&&inputReady()){
-			
-		DPRINTF(PIM, "Start processing data write of Reg[%d]\n",toProc);
-		Request::Flags flags = 0;
-                RequestPtr req = make_shared<Request>(regs[toProc].first, 8, flags, 0 ); 
-						
-                PacketPtr pkt = new Packet(req, MemCmd::PIMWrite );
-		uint8_t* empty=new uint8_t[8];
-		dataType res = doCompute();
-		memcpy(empty,&res,sizeof(dataType));
-                
-                pkt->dataDynamic(empty);
-                				
-		Packet::PIMSenderState* senderState=new Packet::PIMSenderState(_id,toProc);
-		pkt->pushSenderState(senderState);
-						
-		DPRINTF(PIM, "Try to send write req [0x%llx]-[%d]\n",regs[toProc].first,toProc);
-						
-		if(port.sendTimingReq(pkt)){
-								
-		    status=WaitingResp;
-								
-		    DPRINTF(PIM, "Writen to the memory [0x%llx]-[%d] [%d]\n",regs[toProc].first,toProc,status);
-						
-		    regs[toProc].second=dataWaitingResp;
-		    req=nullptr;
-		    write_packets++;
-		    break;
-		}else{
-		    DPRINTF(PIM, "Failed sending write to the memory [%d]\n",toProc);
-		    retry_pkt=pkt;
-		    status = SendRetry;
-		    write_retry++;
-		    break;
+		if(!computeEvent.scheduled()){
+
+			schedule(computeEvent,clockEdge((Cycles)_latency));	
+		
 		}
+		
 	    }else{
 		if(inputReady()&&outputReady()){
 		    status=Finish;

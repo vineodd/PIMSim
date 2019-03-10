@@ -150,8 +150,9 @@ protected:
 protected:
 
     EventFunctionWrapper tickEvent;
-
+    EventFunctionWrapper computeEvent;
     EventFunctionWrapper finishEvent;
+
     
 public:
 
@@ -166,7 +167,7 @@ public:
     int _output;
 
     Addr pim_addr_base;
-
+     
     Tick tickid;
 
 
@@ -199,7 +200,7 @@ public:
     virtual bool outputReady();
     virtual void tick();
     virtual void finish();
-
+    virtual void trycompute();
     const AddrRangeList addrRanges;
 
     virtual bool start(PacketPtr pkt);
