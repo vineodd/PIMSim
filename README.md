@@ -7,11 +7,12 @@ Add support to GEM5 full-sytem simulation.
 + Detailed User Instruction to help you custmize your own PIM system.
       
 # Author
-      Xu Sheng, Yinhe Han ([HomePage](http://www.carch.ac.cn/~yinhes/)) , Xuehai Qian(University of Southern California)
+
+Xu Sheng, Yinhe Han ([HomePage](http://www.carch.ac.cn/~yinhes/)) , Xuehai Qian(University of Southern California)
       
-      This program is currently maintaind by Xingqi Zou (zouxingqi@gmail.com) and Liang Yan (yanliang405@gmail.com) .
+This program is currently maintaind by Xingqi Zou (<zouxingqi@gmail.com>) and Liang Yan (<yanliang405@gmail.com>) .
       
-      Control Computing Laboratory, State Key Laboratory of Computer Architecture, ICT, CAS.
+Control Computing Laboratory, State Key Laboratory of Computer Architecture, ICT, CAS.
       
       
 # Some recent PIM papers:
