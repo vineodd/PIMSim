@@ -8,7 +8,7 @@ Add support to GEM5 full-sytem simulation.
       
 # Author
 
-Xu Sheng, Yinhe Han ([HomePage](http://www.carch.ac.cn/~yinhes/)) , Xuehai Qian(University of Southern California)
+Sheng Xu, Xiaoming Chen, Yinhe Han ([HomePage](http://www.carch.ac.cn/~yinhes/)) , Xuehai Qian(University of Southern California)
       
 This program is currently maintaind by Xingqi Zou (<zouxingqi@gmail.com>) and Liang Yan (<yanliang405@gmail.com>) .
       
